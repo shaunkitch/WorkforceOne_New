@@ -1,4 +1,4 @@
-#!binbash
+#!/bin/bash
 
 # WorkforceOne Development Environment Setup Script
 # This script sets up the complete development environment for the WorkforceOne platform
@@ -6,47 +6,47 @@
 set -e  # Exit on error
 
 # Colors for output
-RED='033[0;31m'
-GREEN='033[0;32m'
-YELLOW='033[1;33m'
-NC='033[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
 # Function to print colored output
 print_status() {
-    echo -e ${GREEN}[✓]${NC} $1
+    echo -e "${GREEN}[✓]${NC} $1"
 }
 
 print_error() {
-    echo -e ${RED}[✗]${NC} $1
+    echo -e "${RED}[✗]${NC} $1"
 }
 
 print_warning() {
-    echo -e ${YELLOW}[!]${NC} $1
+    echo -e "${YELLOW}[!]${NC} $1"
 }
 
 # Check if Node.js is installed
 check_node() {
-    if command -v node & devnull; then
-        print_status Node.js is installed $(node --version)
+    if command -v node &> /dev/null; then
+        print_status "Node.js is installed: $(node --version)"
     else
-        print_error Node.js is not installed. Please install Node.js v18+ first.
+        print_error "Node.js is not installed. Please install Node.js v18+ first."
         exit 1
     fi
 }
 
 # Check if npm is installed
 check_npm() {
-    if command -v npm & devnull; then
-        print_status npm is installed $(npm --version)
+    if command -v npm &> /dev/null; then
+        print_status "npm is installed: $(npm --version)"
     else
-        print_error npm is not installed.
+        print_error "npm is not installed."
         exit 1
     fi
 }
 
 # Create project structure
 create_project_structure() {
-    print_status Creating WorkforceOne project structure...
+    print_status "Creating WorkforceOne project structure..."
     
     # Create main project directory
     mkdir -p workforceone
@@ -55,12 +55,12 @@ create_project_structure() {
     # Create subdirectories
     mkdir -p {frontend,backend,database,scripts,docs}
     
-    print_status Project structure created
+    print_status "Project structure created"
 }
 
 # Initialize frontend (Next.js with TypeScript)
 setup_frontend() {
-    print_status Setting up frontend with Next.js and TypeScript...
+    print_status "Setting up frontend with Next.js and TypeScript..."
     
     cd frontend
     
@@ -68,19 +68,19 @@ setup_frontend() {
     npx create-next-app@latest . --typescript --tailwind --app --no-git --eslint
     
     # Install additional dependencies
-    npm install @supabasesupabase-js @supabaseauth-helpers-nextjs @supabaseauth-ui-react @supabaseauth-ui-shared
-    npm install @tanstackreact-query axios date-fns
-    npm install react-hook-form zod @hookformresolvers
+    npm install @supabase/supabase-js @supabase/auth-helpers-nextjs @supabase/auth-ui-react @supabase/auth-ui-shared
+    npm install @tanstack/react-query axios date-fns
+    npm install react-hook-form zod @hookform/resolvers
     npm install lucide-react recharts
-    npm install --save-dev @typesnode
+    npm install --save-dev @types/node
     
-    print_status Frontend setup complete
+    print_status "Frontend setup complete"
     cd ..
 }
 
 # Initialize backend (Node.js with Express)
 setup_backend() {
-    print_status Setting up backend API server...
+    print_status "Setting up backend API server..."
     
     cd backend
     
@@ -89,33 +89,33 @@ setup_backend() {
     
     # Install dependencies
     npm install express cors dotenv helmet morgan compression
-    npm install @supabasesupabase-js jsonwebtoken bcryptjs
+    npm install @supabase/supabase-js jsonwebtoken bcryptjs
     npm install express-rate-limit express-validator
-    npm install --save-dev typescript @typesnode @typesexpress @typescors
-    npm install --save-dev nodemon ts-node @typesjsonwebtoken @typesbcryptjs
-    npm install --save-dev @typesmorgan @typescompression
+    npm install --save-dev typescript @types/node @types/express @types/cors
+    npm install --save-dev nodemon ts-node @types/jsonwebtoken @types/bcryptjs
+    npm install --save-dev @types/morgan @types/compression
     
     # Create TypeScript config
     npx tsc --init
     
-    print_status Backend setup complete
+    print_status "Backend setup complete"
     cd ..
 }
 
 # Create environment files
 create_env_files() {
-    print_status Creating environment configuration files...
+    print_status "Creating environment configuration files..."
     
     # Frontend .env.local
-    cat  frontend.env.local  'EOF'
+    cat > frontend/.env.local << 'EOF'
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=httpsqmpnekttrtlvffdxdgxv.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://qmpnekttrtlvffdxdgxv.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcG5la3R0cnRsdmZmZHhkZ3h2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MTk4MjcsImV4cCI6MjA2NzA5NTgyN30.YEZPbPvhSVGRzbQVeYhX0hpWVAgtt9GoyJQzKiFFmfU
 
 # Application Settings
 NEXT_PUBLIC_APP_NAME=WorkforceOne
-NEXT_PUBLIC_APP_URL=httplocalhost3000
-NEXT_PUBLIC_API_URL=httplocalhost5000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:5000
 
 # Feature Flags
 NEXT_PUBLIC_ENABLE_ANALYTICS=false
@@ -123,9 +123,9 @@ NEXT_PUBLIC_ENABLE_REAL_TIME=true
 EOF
     
     # Backend .env
-    cat  backend.env  'EOF'
+    cat > backend/.env << 'EOF'
 # Supabase Configuration
-SUPABASE_URL=httpsqmpnekttrtlvffdxdgxv.supabase.co
+SUPABASE_URL=https://qmpnekttrtlvffdxdgxv.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcG5la3R0cnRsdmZmZHhkZ3h2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MTk4MjcsImV4cCI6MjA2NzA5NTgyN30.YEZPbPvhSVGRzbQVeYhX0hpWVAgtt9GoyJQzKiFFmfU
 SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcG5la3R0cnRsdmZmZHhkZ3h2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTUxOTgyNywiZXhwIjoyMDY3MDk1ODI3fQ.x-rVZUco-Vtd7S8xZxEyJ2cwyoVtLLeA3vdlA4uNv3c
 
@@ -138,7 +138,7 @@ JWT_SECRET=your-jwt-secret-here-change-in-production
 JWT_EXPIRES_IN=7d
 
 # CORS Configuration
-CORS_ORIGIN=httplocalhost3000
+CORS_ORIGIN=http://localhost:3000
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
@@ -146,30 +146,30 @@ RATE_LIMIT_MAX_REQUESTS=100
 EOF
     
     # Root .env for database scripts
-    cat  .env  'EOF'
+    cat > .env << 'EOF'
 # Supabase Database Configuration
-DATABASE_URL=postgresqlpostgres[YOUR-PASSWORD]@db.qmpnekttrtlvffdxdgxv.supabase.co5432postgres
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.qmpnekttrtlvffdxdgxv.supabase.co:5432/postgres
 SUPABASE_PROJECT_ID=qmpnekttrtlvffdxdgxv
 SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcG5la3R0cnRsdmZmZHhkZ3h2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTUxOTgyNywiZXhwIjoyMDY3MDk1ODI3fQ.x-rVZUco-Vtd7S8xZxEyJ2cwyoVtLLeA3vdlA4uNv3c
 EOF
     
-    print_status Environment files created
-    print_warning Remember to update the DATABASE_URL with your actual database password
+    print_status "Environment files created"
+    print_warning "Remember to update the DATABASE_URL with your actual database password"
 }
 
 # Create initial database migration files
 create_database_schemas() {
-    print_status Creating database migration files...
+    print_status "Creating database migration files..."
     
-    mkdir -p databasemigrations
+    mkdir -p database/migrations
     
     # Create initial schema file
-    cat  databasemigrations001_initial_schema.sql  'EOF'
+    cat > database/migrations/001_initial_schema.sql << 'EOF'
 -- WorkforceOne Database Schema
 -- Initial migration for remote workforce management system
 
 -- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS uuid-ossp;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Organizations table
 CREATE TABLE IF NOT EXISTS organizations (
@@ -357,25 +357,25 @@ CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON leave_requests
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EOF
     
-    print_status Database migration files created
+    print_status "Database migration files created"
 }
 
 # Create README file
 create_readme() {
-    print_status Creating README documentation...
+    print_status "Creating README documentation..."
     
-    cat  README.md  'EOF'
+    cat > README.md << 'EOF'
 # WorkforceOne - Remote Workforce Management System
 
 ## Overview
 WorkforceOne is a comprehensive remote workforce management platform built with modern technologies to help organizations manage their distributed teams effectively.
 
 ## Tech Stack
-- Frontend Next.js 14 (App Router), TypeScript, Tailwind CSS
-- Backend Node.js, Express, TypeScript
-- Database Supabase (PostgreSQL)
-- Authentication Supabase Auth
-- Real-time Supabase Realtime
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Backend**: Node.js, Express, TypeScript
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Real-time**: Supabase Realtime
 
 ## Features
 - Employee Management
@@ -395,14 +395,14 @@ WorkforceOne is a comprehensive remote workforce management platform built with 
 - Supabase account
 
 ### Installation
-1. Run the setup script
+1. Run the setup script:
    ```bash
-   .setup.sh
+   ./setup.sh
    ```
 
 2. Update the database password in `.env` file
 
-3. Start the development servers
+3. Start the development servers:
    ```bash
    # Frontend
    cd frontend
@@ -414,17 +414,17 @@ WorkforceOne is a comprehensive remote workforce management platform built with 
    ```
 
 ### Default Ports
-- Frontend httplocalhost3000
-- Backend API httplocalhost5000
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000
 
 ## Project Structure
 ```
-workforceone
-├── frontend          # Next.js frontend application
-├── backend           # Express.js API server
-├── database          # Database migrations and scripts
-├── scripts           # Utility scripts
-├── docs             # Documentation
+workforceone/
+├── frontend/          # Next.js frontend application
+├── backend/           # Express.js API server
+├── database/          # Database migrations and scripts
+├── scripts/           # Utility scripts
+├── docs/             # Documentation
 └── README.md
 ```
 
@@ -440,47 +440,47 @@ See `.env.example` files in each directory for required environment variables.
 Proprietary - WorkforceOne © 2025
 EOF
     
-    print_status README created
+    print_status "README created"
 }
 
 # Create package.json scripts
 create_package_scripts() {
-    print_status Creating root package.json with scripts...
+    print_status "Creating root package.json with scripts..."
     
-    cat  package.json  'EOF'
+    cat > package.json << 'EOF'
 {
-  name workforceone,
-  version 1.0.0,
-  description Remote Workforce Management System,
-  private true,
-  scripts {
-    dev concurrently npm run devfrontend npm run devbackend,
-    devfrontend cd frontend && npm run dev,
-    devbackend cd backend && npm run dev,
-    build npm run buildfrontend && npm run buildbackend,
-    buildfrontend cd frontend && npm run build,
-    buildbackend cd backend && npm run build,
-    installall npm install && cd frontend && npm install && cd ..backend && npm install,
-    dbmigrate node scriptsmigrate.js,
-    dbseed node scriptsseed.js
+  "name": "workforceone",
+  "version": "1.0.0",
+  "description": "Remote Workforce Management System",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js"
   },
-  devDependencies {
-    concurrently ^8.2.2
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }
 EOF
     
     npm install
     
-    print_status Package scripts created
+    print_status "Package scripts created"
 }
 
 # Main setup function
 main() {
-    echo =========================================
-    echo WorkforceOne Development Environment Setup
-    echo =========================================
-    echo 
+    echo "========================================="
+    echo "WorkforceOne Development Environment Setup"
+    echo "========================================="
+    echo ""
     
     # Check prerequisites
     check_node
@@ -499,22 +499,22 @@ main() {
     create_readme
     create_package_scripts
     
-    echo 
-    echo =========================================
-    print_status Setup Complete!
-    echo =========================================
-    echo 
-    echo Next steps
-    echo 1. Update the DATABASE_URL in .env with your Supabase database password
-    echo 2. Run database migrations in Supabase dashboard
-    echo 3. Start development servers
-    echo    cd workforceone
-    echo    npm run dev
-    echo 
-    echo Frontend httplocalhost3000
-    echo Backend  httplocalhost5000
-    echo 
-    print_warning Don't forget to configure RLS policies in Supabase!
+    echo ""
+    echo "========================================="
+    print_status "Setup Complete!"
+    echo "========================================="
+    echo ""
+    echo "Next steps:"
+    echo "1. Update the DATABASE_URL in .env with your Supabase database password"
+    echo "2. Run database migrations in Supabase dashboard"
+    echo "3. Start development servers:"
+    echo "   cd workforceone"
+    echo "   npm run dev"
+    echo ""
+    echo "Frontend: http://localhost:3000"
+    echo "Backend:  http://localhost:5000"
+    echo ""
+    print_warning "Don't forget to configure RLS policies in Supabase!"
 }
 
 # Run main function
