@@ -103,6 +103,9 @@ export default function SettingsPage() {
   const supabase = createClient()
 
   const [organization, setOrganization] = useState<any | null>(null)
+  const [organizationSettings, setOrganizationSettings] = useState<any | null>(null)
+  const [regionalPresets, setRegionalPresets] = useState<any[]>([])
+  const [savingSettings, setSavingSettings] = useState(false)
 
   useEffect(() => {
     fetchProfile()
@@ -122,6 +125,7 @@ export default function SettingsPage() {
 
       if (!profile?.organization_id) return
 
+      // Fetch organization data
       const { data, error } = await supabase
         .from('organizations')
         .select('*')
@@ -130,6 +134,23 @@ export default function SettingsPage() {
 
       if (error) throw error
       setOrganization(data)
+
+      // Fetch organization settings
+      const { data: settings } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .single()
+
+      setOrganizationSettings(settings)
+
+      // Fetch regional presets
+      const { data: presets } = await supabase
+        .from('regional_presets')
+        .select('*')
+        .order('country_name')
+
+      setRegionalPresets(presets || [])
     } catch (error) {
       console.error('Error fetching organization:', error)
     }
@@ -160,6 +181,46 @@ export default function SettingsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const updateOrganizationSettings = async (updates: any) => {
+    if (!organizationSettings || !organization) return
+
+    setSavingSettings(true)
+    try {
+      const { error } = await supabase
+        .from('organization_settings')
+        .update(updates)
+        .eq('organization_id', organization.id)
+
+      if (error) throw error
+
+      setOrganizationSettings((prev: any) => ({ ...prev, ...updates }))
+      
+      const successMsg = document.createElement('div')
+      successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50'
+      successMsg.textContent = 'Settings saved successfully!'
+      document.body.appendChild(successMsg)
+      setTimeout(() => document.body.removeChild(successMsg), 3000)
+    } catch (error) {
+      console.error('Error updating organization settings:', error)
+      alert('Failed to save settings. Please try again.')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const applyRegionalPreset = async (preset: any) => {
+    const updates = {
+      region: preset.region,
+      currency_code: preset.currency_code,
+      currency_symbol: preset.currency_symbol,
+      date_format: preset.date_format,
+      time_format: preset.time_format,
+      timezone: preset.timezone,
+      language: preset.language
+    }
+    await updateOrganizationSettings(updates)
   }
 
   const fetchProfile = async () => {
@@ -385,6 +446,8 @@ export default function SettingsPage() {
   ]
 
   if (profile?.role === 'admin') {
+    tabs.push({ id: 'regional', label: 'Regional Settings', icon: Globe })
+    tabs.push({ id: 'accounting', label: 'Accounting', icon: Users })
     tabs.push({ id: 'branding', label: 'Branding', icon: Camera })
     tabs.push({ id: 'features', label: 'Features', icon: Building })
   }
@@ -1035,6 +1098,24 @@ export default function SettingsPage() {
             <BrandingManagement 
               organization={organization} 
               saving={saving} 
+            />
+          )}
+
+          {activeTab === 'regional' && organizationSettings && (
+            <RegionalSettings 
+              settings={organizationSettings}
+              presets={regionalPresets}
+              onUpdate={updateOrganizationSettings}
+              onApplyPreset={applyRegionalPreset}
+              saving={savingSettings}
+            />
+          )}
+
+          {activeTab === 'accounting' && organizationSettings && (
+            <AccountingSettings 
+              settings={organizationSettings}
+              onUpdate={updateOrganizationSettings}
+              saving={savingSettings}
             />
           )}
 
