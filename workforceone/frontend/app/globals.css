@@ -1,26 +1,316 @@
+/* ===================================
+// app/globals.css - Modern Design System (Tailwind v4)
+// =================================== */
 @import "tailwindcss";
 
+/* CSS Variables for Design System */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 255 255 255;
+  --foreground: 15 23 42;
+  --card: 255 255 255;
+  --card-foreground: 15 23 42;
+  --popover: 255 255 255;
+  --popover-foreground: 15 23 42;
+  --primary: 59 130 246;
+  --primary-foreground: 248 250 252;
+  --secondary: 241 245 249;
+  --secondary-foreground: 15 23 42;
+  --muted: 248 250 252;
+  --muted-foreground: 100 116 139;
+  --accent: 241 245 249;
+  --accent-foreground: 15 23 42;
+  --destructive: 239 68 68;
+  --destructive-foreground: 248 250 252;
+  --border: 226 232 240;
+  --input: 226 232 240;
+  --ring: 59 130 246;
+  --success: 34 197 94;
+  --warning: 245 158 11;
+  --error: 239 68 68;
+  --radius: 12px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  --background: 2 8 23;
+  --foreground: 248 250 252;
+  --card: 2 8 23;
+  --card-foreground: 248 250 252;
+  --popover: 2 8 23;
+  --popover-foreground: 248 250 252;
+  --primary: 59 130 246;
+  --primary-foreground: 2 8 23;
+  --secondary: 30 41 59;
+  --secondary-foreground: 248 250 252;
+  --muted: 30 41 59;
+  --muted-foreground: 148 163 184;
+  --accent: 30 41 59;
+  --accent-foreground: 248 250 252;
+  --destructive: 220 38 38;
+  --destructive-foreground: 248 250 252;
+  --border: 30 41 59;
+  --input: 30 41 59;
+  --ring: 59 130 246;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Base styles */
+* {
+  border-color: rgb(var(--border));
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Modern scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--muted-foreground), 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--muted-foreground), 0.5);
+}
+
+/* Custom utility classes */
+.text-foreground {
+  color: rgb(var(--foreground));
+}
+
+.text-muted-foreground {
+  color: rgb(var(--muted-foreground));
+}
+
+.bg-background {
+  background-color: rgb(var(--background));
+}
+
+.bg-card {
+  background-color: rgb(var(--card));
+}
+
+.text-card-foreground {
+  color: rgb(var(--card-foreground));
+}
+
+.bg-primary {
+  background-color: rgb(var(--primary));
+}
+
+.text-primary-foreground {
+  color: rgb(var(--primary-foreground));
+}
+
+.bg-secondary {
+  background-color: rgb(var(--secondary));
+}
+
+.text-secondary-foreground {
+  color: rgb(var(--secondary-foreground));
+}
+
+.bg-muted {
+  background-color: rgb(var(--muted));
+}
+
+.bg-accent {
+  background-color: rgb(var(--accent));
+}
+
+.text-accent-foreground {
+  color: rgb(var(--accent-foreground));
+}
+
+.bg-destructive {
+  background-color: rgb(var(--destructive));
+}
+
+.text-destructive-foreground {
+  color: rgb(var(--destructive-foreground));
+}
+
+.border-border {
+  border-color: rgb(var(--border));
+}
+
+.border-input {
+  border-color: rgb(var(--input));
+}
+
+.text-primary {
+  color: rgb(var(--primary));
+}
+
+.text-success-600 {
+  color: rgb(34 197 94);
+}
+
+.text-warning-600 {
+  color: rgb(217 119 6);
+}
+
+.text-error-600 {
+  color: rgb(220 38 38);
+}
+
+.text-green-600 {
+  color: rgb(34 197 94);
+}
+
+.text-blue-600 {
+  color: rgb(37 99 235);
+}
+
+.text-yellow-600 {
+  color: rgb(217 119 6);
+}
+
+.text-red-600 {
+  color: rgb(220 38 38);
+}
+
+.text-purple-600 {
+  color: rgb(147 51 234);
+}
+
+.text-orange-600 {
+  color: rgb(234 88 12);
+}
+
+.bg-blue-100 {
+  background-color: rgb(219 234 254);
+}
+
+.bg-green-100 {
+  background-color: rgb(220 252 231);
+}
+
+.bg-yellow-100 {
+  background-color: rgb(254 249 195);
+}
+
+.bg-red-100 {
+  background-color: rgb(254 226 226);
+}
+
+.bg-purple-100 {
+  background-color: rgb(243 232 255);
+}
+
+.bg-orange-100 {
+  background-color: rgb(255 237 213);
+}
+
+.bg-success-500 {
+  background-color: rgb(34 197 94);
+}
+
+.bg-warning-500 {
+  background-color: rgb(245 158 11);
+}
+
+/* Focus styles */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--background)), 0 0 0 4px rgba(var(--primary), 0.5);
+}
+
+/* Glass morphism utility */
+.glass {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Modern gradient text */
+.gradient-text {
+  background: linear-gradient(to right, rgb(var(--primary)), rgb(168 85 247), rgb(236 72 153));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Modern button base styles */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.btn-base:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.btn-base:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--background)), 0 0 0 4px rgba(var(--primary), 0.5);
+}
+
+/* Card hover effects */
+.card-hover:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  transform: translateY(-4px);
+}
+
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+/* Shadow utilities */
+.shadow-soft {
+  box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+}
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Text selection */
+::selection {
+  background-color: rgba(var(--primary), 0.2);
 }

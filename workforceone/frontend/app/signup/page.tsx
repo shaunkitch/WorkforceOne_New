@@ -3,15 +3,28 @@
 // ===================================
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Mail, Lock, User, Building } from 'lucide-react'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
+import { Loader2, Mail, Lock, User, Building, Users, Plus } from 'lucide-react'
+
+interface Organization {
+  id: string
+  name: string
+  slug: string
+}
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -19,11 +32,62 @@ export default function SignupPage() {
     password: '',
     fullName: '',
     organizationName: '',
+    phone: '',
+    department: ''
   })
+  const [signupMode, setSignupMode] = useState<'join' | 'create'>('join')
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingOrgs, setLoadingOrgs] = useState(true)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Load organizations
+    fetchOrganizations()
+    
+    // Check for URL parameters (for invitation links)
+    const orgParam = searchParams.get('org')
+    const emailParam = searchParams.get('email')
+    const nameParam = searchParams.get('name')
+    
+    if (orgParam) {
+      setSelectedOrgId(orgParam)
+      setSignupMode('join')
+    }
+    
+    if (emailParam) {
+      setFormData(prev => ({ ...prev, email: emailParam }))
+    }
+    
+    if (nameParam) {
+      setFormData(prev => ({ ...prev, fullName: decodeURIComponent(nameParam) }))
+    }
+  }, [searchParams])
+
+  const fetchOrganizations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name, slug')
+        .order('name')
+
+      if (error) throw error
+      setOrganizations(data || [])
+      
+      // If only one organization exists, auto-select it
+      if (data && data.length === 1) {
+        setSelectedOrgId(data[0].id)
+      }
+    } catch (error) {
+      console.error('Error fetching organizations:', error)
+    } finally {
+      setLoadingOrgs(false)
+    }
+  }
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,6 +95,15 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
+      // Validation
+      if (signupMode === 'join' && !selectedOrgId) {
+        throw new Error('Please select an organization to join.')
+      }
+      
+      if (signupMode === 'create' && !formData.organizationName) {
+        throw new Error('Please enter an organization name.')
+      }
+
       // Sign up the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -38,34 +111,68 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: formData.fullName,
+            phone: formData.phone,
+            department: formData.department,
           },
         },
       })
 
       if (authError) throw authError
 
-      // Create organization
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: formData.organizationName,
-          slug: formData.organizationName.toLowerCase().replace(/\s+/g, '-'),
-        })
-        .select()
-        .single()
+      let organizationId = selectedOrgId
 
-      if (orgError) throw orgError
+      // Create organization if in create mode
+      if (signupMode === 'create') {
+        // Check if organization name already exists
+        const { data: existingOrg } = await supabase
+          .from('organizations')
+          .select('id')
+          .eq('name', formData.organizationName)
+          .maybeSingle()
+
+        if (existingOrg) {
+          throw new Error('An organization with this name already exists. Please choose a different name or join the existing organization.')
+        }
+
+        const { data: org, error: orgError } = await supabase
+          .from('organizations')
+          .insert({
+            name: formData.organizationName,
+            slug: formData.organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+            settings: {},
+            feature_flags: {
+              dashboard: true,
+              time_tracking: true,
+              attendance: true,
+              maps: true,
+              teams: true,
+              projects: true,
+              tasks: true,
+              forms: true,
+              leave: true,
+              outlets: true,
+              settings: true
+            }
+          })
+          .select()
+          .single()
+
+        if (orgError) throw orgError
+        organizationId = org.id
+      }
 
       // Create user profile
-      if (authData.user) {
+      if (authData.user && organizationId) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
             id: authData.user.id,
             email: formData.email,
             full_name: formData.fullName,
-            organization_id: org.id,
-            role: 'admin', // First user is admin
+            phone: formData.phone || null,
+            organization_id: organizationId,
+            role: signupMode === 'create' ? 'admin' : 'member', // Creator is admin, joiners are members
+            is_active: true
           })
 
         if (profileError) throw profileError
@@ -74,7 +181,15 @@ export default function SignupPage() {
       router.push('/dashboard')
       router.refresh()
     } catch (error: any) {
-      setError(error.message)
+      // Handle rate limiting specifically
+      if (error.message?.includes('Too Many Requests') || error.message?.includes('429')) {
+        setError('Too many signup attempts. Please wait a few minutes and try again.')
+      } else if (error.message?.includes('already registered')) {
+        setError('An account with this email already exists. Please try logging in instead.')
+      } else {
+        setError(error.message || 'An error occurred during signup')
+      }
+      console.error('Signup error:', error)
     } finally {
       setLoading(false)
     }
@@ -86,8 +201,32 @@ export default function SignupPage() {
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900">WorkforceOne</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Create your account
+            {signupMode === 'join' ? 'Join an organization' : 'Create your organization'}
           </p>
+        </div>
+
+        {/* Signup Mode Toggle */}
+        <div className="flex rounded-lg bg-gray-100 p-1">
+          <Button
+            type="button"
+            variant={signupMode === 'join' ? 'default' : 'ghost'}
+            size="sm"
+            className="flex-1"
+            onClick={() => setSignupMode('join')}
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Join Organization
+          </Button>
+          <Button
+            type="button"
+            variant={signupMode === 'create' ? 'default' : 'ghost'}
+            size="sm"
+            className="flex-1"
+            onClick={() => setSignupMode('create')}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Organization
+          </Button>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSignup}>
@@ -111,22 +250,6 @@ export default function SignupPage() {
                   placeholder="John Doe"
                 />
                 <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="organizationName">Organization Name</Label>
-              <div className="mt-1 relative">
-                <Input
-                  id="organizationName"
-                  type="text"
-                  value={formData.organizationName}
-                  onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-                  required
-                  className="pl-10"
-                  placeholder="Acme Corp"
-                />
-                <Building className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               </div>
             </div>
 
@@ -162,15 +285,97 @@ export default function SignupPage() {
                 <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               </div>
             </div>
+
+            <div>
+              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <div className="mt-1">
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+            </div>
+
+            {/* Organization Selection/Creation */}
+            {signupMode === 'join' ? (
+              <div>
+                <Label htmlFor="organization">Select Organization</Label>
+                <div className="mt-1">
+                  {loadingOrgs ? (
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="ml-2 text-sm text-gray-500">Loading organizations...</span>
+                    </div>
+                  ) : organizations.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500 mb-2">No organizations available</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSignupMode('create')}
+                      >
+                        Create First Organization
+                      </Button>
+                    </div>
+                  ) : (
+                    <Select value={selectedOrgId} onValueChange={setSelectedOrgId} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose an organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="organizationName">Organization Name</Label>
+                <div className="mt-1 relative">
+                  <Input
+                    id="organizationName"
+                    type="text"
+                    value={formData.organizationName}
+                    onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
+                    required
+                    className="pl-10"
+                    placeholder="Acme Corp"
+                  />
+                  <Building className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="department">Department (Optional)</Label>
+              <div className="mt-1">
+                <Input
+                  id="department"
+                  type="text"
+                  value={formData.department}
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  placeholder="Engineering, Sales, Marketing..."
+                />
+              </div>
+            </div>
           </div>
 
           <Button
             type="submit"
             className="w-full"
-            disabled={loading}
+            disabled={loading || (signupMode === 'join' && loadingOrgs)}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Account
+            {signupMode === 'join' ? 'Join Organization' : 'Create Organization'}
           </Button>
 
           <div className="text-center text-sm">

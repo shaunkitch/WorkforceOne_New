@@ -37,7 +37,13 @@ export default function LoginPage() {
       router.push('/dashboard')
       router.refresh()
     } catch (error: any) {
-      setError(error.message)
+      // Handle rate limiting specifically
+      if (error.message?.includes('Too Many Requests') || error.message?.includes('429')) {
+        setError('Too many login attempts. Please wait a few minutes and try again.')
+      } else {
+        setError(error.message || 'An error occurred during login')
+      }
+      console.error('Login error:', error)
     } finally {
       setLoading(false)
     }

@@ -1,47 +1,176 @@
-
 // ===================================
-// app/dashboard/layout.tsx
+// app/dashboard/layout.tsx - Modern Dashboard Layout
 // ===================================
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useFeatureFlags } from '@/components/feature-flags-provider'
+import { Dialog, Transition, Menu as HeadlessMenu } from '@headlessui/react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
-  Home,
-  Clock,
-  Calendar,
-  Users,
-  Briefcase,
-  CheckSquare,
-  FileText,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  ChevronDown,
+  Home, Clock, Calendar, Users, Briefcase, CheckSquare,
+  FileText, Settings, LogOut, Menu, X, ChevronDown,
+  ClipboardList, MapPin, Building, Bell, Search,
+  User
 } from 'lucide-react'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Time Tracking', href: '/dashboard/time', icon: Clock },
-  { name: 'Attendance', href: '/dashboard/attendance', icon: Calendar },
-  { name: 'Teams', href: '/dashboard/teams', icon: Users },
-  { name: 'Projects', href: '/dashboard/projects', icon: Briefcase },
-  { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare },
-  { name: 'Leave Requests', href: '/dashboard/leave', icon: FileText },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+// Navigation arrays with modern icons and descriptions
+const allNavigation = [
+  { 
+    name: 'Dashboard', 
+    href: '/dashboard', 
+    icon: Home, 
+    feature: 'dashboard',
+    description: 'Overview and quick stats'
+  },
+  { 
+    name: 'Time Tracking', 
+    href: '/dashboard/time', 
+    icon: Clock, 
+    feature: 'time_tracking',
+    description: 'Track work hours and productivity'
+  },
+  { 
+    name: 'Attendance', 
+    href: '/dashboard/attendance', 
+    icon: Calendar, 
+    feature: 'attendance',
+    description: 'Check-in and attendance records'
+  },
+  { 
+    name: 'Team Map', 
+    href: '/dashboard/maps', 
+    icon: MapPin, 
+    feature: 'maps',
+    description: 'Real-time team locations'
+  },
+  { 
+    name: 'Outlets', 
+    href: '/dashboard/outlets', 
+    icon: Building, 
+    feature: 'outlets',
+    description: 'Manage office locations'
+  },
+  { 
+    name: 'Teams', 
+    href: '/dashboard/teams', 
+    icon: Users, 
+    feature: 'teams',
+    description: 'Team management and structure'
+  },
+  { 
+    name: 'Projects', 
+    href: '/dashboard/projects', 
+    icon: Briefcase, 
+    feature: 'projects',
+    description: 'Project tracking and management'
+  },
+  { 
+    name: 'Tasks', 
+    href: '/dashboard/tasks', 
+    icon: CheckSquare, 
+    feature: 'tasks',
+    description: 'Task assignments and progress'
+  },
+  { 
+    name: 'Forms', 
+    href: '/dashboard/forms', 
+    icon: ClipboardList, 
+    feature: 'forms',
+    description: 'Dynamic form builder and responses'
+  },
+  { 
+    name: 'Leave Requests', 
+    href: '/dashboard/leave', 
+    icon: FileText, 
+    feature: 'leave',
+    description: 'Time off requests and approvals'
+  },
 ]
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
+
+// Modern Sidebar Navigation Component
+function SidebarNav({ navigation, pathname, mobile = false }: { 
+  navigation: typeof allNavigation, 
+  pathname: string,
+  mobile?: boolean 
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const pathname = usePathname()
+  return (
+    <nav className="space-y-1 px-3">
+      {navigation.map((item) => {
+        const isActive = pathname === item.href
+        return (
+          <Link
+            key={item.name}
+            href={item.href}
+            className={`
+              group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200
+              ${isActive 
+                ? 'bg-blue-600 text-white shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
+              }
+              ${mobile ? 'text-base py-3' : ''}
+            `}
+          >
+            <item.icon 
+              className={`
+                flex-shrink-0 h-5 w-5 mr-3 transition-colors
+                ${isActive ? 'text-white' : 'text-gray-600 group-hover:text-gray-900'}
+                ${mobile ? 'h-6 w-6' : ''}
+              `} 
+            />
+            <div className="flex-1 min-w-0">
+              <div className="font-medium">{item.name}</div>
+              {!mobile && (
+                <div className={`text-xs mt-0.5 truncate ${
+                  isActive 
+                    ? 'text-blue-100' 
+                    : 'text-gray-600 group-hover:text-gray-700'
+                }`}>
+                  {item.description}
+                </div>
+              )}
+            </div>
+            {isActive && (
+              <div className="w-2 h-2 bg-white rounded-full ml-2" />
+            )}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
+// Logo Brand Component
+function LogoBrand({ organization, className = "" }: { organization: any, className?: string }) {
+  return (
+    <Link href="/dashboard" className={`flex items-center group ${className}`}>
+      {organization?.logo_url ? (
+        <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden bg-white border border-gray-200 hover:shadow-lg transition-all">
+          <img 
+            src={organization.logo_url} 
+            alt="Company Logo" 
+            className="h-full w-full object-contain"
+          />
+        </div>
+      ) : (
+        <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center hover:shadow-lg transition-all">
+          <Users className="h-5 w-5 text-white" />
+        </div>
+      )}
+      <span className="ml-3 text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+        {organization?.name || 'WorkforceOne'}
+      </span>
+    </Link>
+  )
+}
+
+// User Profile Component
+function UserProfile({ profile }: { profile: any }) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -51,124 +180,245 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between h-16 px-4 border-b">
-          <h1 className="text-xl font-bold text-gray-900">WorkforceOne</h1>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden"
-          >
-            <X className="h-6 w-6 text-gray-500" />
-          </button>
-        </div>
-
-        <nav className="mt-5 px-2">
-          <div className="space-y-1">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon
-                    className={`mr-3 h-5 w-5 ${
-                      isActive ? 'text-blue-600' : 'text-gray-400'
-                    }`}
-                  />
-                  {item.name}
-                </Link>
-              )
-            })}
+    <HeadlessMenu as="div" className="relative">
+      <HeadlessMenu.Button className="flex items-center w-full px-3 py-2 text-sm text-left rounded-xl hover:bg-gray-100/50 transition-colors group">
+        <div className="flex items-center w-full">
+          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <User className="h-4 w-4 text-blue-600" />
           </div>
-        </nav>
+          <div className="ml-3 flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {profile?.full_name || 'User'}
+            </p>
+            <p className="text-xs text-gray-600 truncate">
+              {profile?.role || 'Member'}
+            </p>
+          </div>
+          <ChevronDown className="h-4 w-4 text-gray-600 group-hover:text-gray-900" />
+        </div>
+      </HeadlessMenu.Button>
+
+      <Transition
+        as={Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <HeadlessMenu.Items className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-lg py-2 z-10">
+          <HeadlessMenu.Item>
+            {({ active }) => (
+              <Link
+                href="/dashboard/settings"
+                className={`
+                  flex items-center px-3 py-2 text-sm transition-colors
+                  ${active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'}
+                `}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Link>
+            )}
+          </HeadlessMenu.Item>
+          <HeadlessMenu.Item>
+            {({ active }) => (
+              <button
+                onClick={handleSignOut}
+                className={`
+                  flex items-center w-full px-3 py-2 text-sm transition-colors
+                  ${active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'}
+                `}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign out
+              </button>
+            )}
+          </HeadlessMenu.Item>
+        </HeadlessMenu.Items>
+      </Transition>
+    </HeadlessMenu>
+  )
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [organization, setOrganization] = useState<any>(null)
+  const pathname = usePathname()
+  const featureFlags = useFeatureFlags()
+  const supabase = createClient()
+
+  // Filter navigation based on feature flags (wait for loading to complete)
+  const enabledNavigation = featureFlags?.isLoading ? 
+    [] : // Show empty navigation while loading
+    allNavigation.filter(item => featureFlags.featureFlags[item.feature] !== false)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          
+          setUserProfile(profile)
+
+          // Fetch organization data for logo
+          if (profile?.organization_id) {
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('*')
+              .eq('id', profile.organization_id)
+              .single()
+            
+            setOrganization(orgData)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error)
+      } finally {
+        // Loading complete
+      }
+    }
+
+    fetchProfile()
+  }, [supabase])
+
+  return (
+    <div className="flex h-full bg-background">
+      {/* Mobile sidebar */}
+      <Transition.Root show={sidebarOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
+          <Transition.Child
+            as={Fragment}
+            enter="transition-opacity ease-linear duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="transition-opacity ease-linear duration-300"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 flex">
+            <Transition.Child
+              as={Fragment}
+              enter="transition ease-in-out duration-300 transform"
+              enterFrom="-translate-x-full"
+              enterTo="translate-x-0"
+              leave="transition ease-in-out duration-300 transform"
+              leaveFrom="translate-x-0"
+              leaveTo="-translate-x-full"
+            >
+              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-gray-200 px-6 pb-4">
+                  <div className="flex h-16 shrink-0 items-center justify-between">
+                    <LogoBrand organization={organization} />
+                    <button
+                      type="button"
+                      className="-m-2.5 p-2.5 text-gray-600 hover:text-gray-900"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                  <nav className="flex flex-1 flex-col">
+                    <SidebarNav navigation={enabledNavigation} pathname={pathname} mobile />
+                    <div className="mt-auto pt-6 border-t border-border">
+                      {userProfile && <UserProfile profile={userProfile} />}
+                    </div>
+                  </nav>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </Dialog>
+      </Transition.Root>
+
+      {/* Static sidebar for desktop */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white/95 backdrop-blur-sm border-r border-gray-200 px-6 pb-4">
+          <div className="flex h-16 shrink-0 items-center">
+            <LogoBrand organization={organization} />
+          </div>
+          <nav className="flex flex-1 flex-col gap-y-7">
+            <SidebarNav navigation={enabledNavigation} pathname={pathname} />
+            <div className="mt-auto space-y-4">
+              <div className="border-t border-border pt-4">
+                {userProfile && <UserProfile profile={userProfile} />}
+              </div>
+            </div>
+          </nav>
+        </div>
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64 flex flex-col flex-1">
+      <div className="lg:pl-72 flex flex-1 flex-col">
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-16 bg-white shadow">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
           <button
             type="button"
-            className="px-4 text-gray-500 focus:outline-none lg:hidden"
+            className="-m-2.5 p-2.5 text-gray-600 lg:hidden hover:text-gray-900"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-6 w-6" />
           </button>
 
-          <div className="flex flex-1 items-center justify-between px-4">
-            <div className="flex-1" />
+          {/* Separator */}
+          <div className="h-6 w-px bg-gray-300 lg:hidden" />
 
-            {/* User menu */}
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <div className="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center text-white">
-                  U
-                </div>
-                <ChevronDown className="ml-2 h-4 w-4 text-gray-500" />
-              </button>
-
-              {userMenuOpen && (
-                <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
-                  <div className="py-1">
-                    <Link
-                      href="/dashboard/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Your Profile
-                    </Link>
-                    <Link
-                      href="/dashboard/settings"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Settings
-                    </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <LogOut className="inline-block h-4 w-4 mr-2" />
-                      Sign out
-                    </button>
+          <div className="flex flex-1 items-center justify-between">
+            {/* Search */}
+            <div className="flex flex-1 justify-center lg:justify-start">
+              <div className="w-full max-w-lg">
+                <label htmlFor="search" className="sr-only">Search</label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <Search className="h-5 w-5 text-gray-500" />
                   </div>
+                  <input
+                    id="search"
+                    name="search"
+                    className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm placeholder:text-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="Search..."
+                    type="search"
+                  />
                 </div>
-              )}
+              </div>
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-x-4 lg:gap-x-6">
+              <Button variant="ghost" size="sm" className="relative">
+                <Bell className="h-5 w-5" />
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                  3
+                </Badge>
+              </Button>
+              
+              <Button variant="ghost" size="sm" asChild className="lg:hidden">
+                <Link href="/dashboard/settings">
+                  <Settings className="h-5 w-5" />
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Page content */}
-        <main className="flex-1">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              {children}
-            </div>
+        <main className="flex-1 overflow-y-auto">
+          <div className="px-4 py-8 sm:px-6 lg:px-8">
+            {children}
           </div>
         </main>
       </div>
+
     </div>
   )
 }
