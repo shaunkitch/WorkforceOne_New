@@ -229,13 +229,22 @@ export default function AutomationPage() {
           </p>
         </div>
         {canManageWorkflows() && (
-          <Button 
-            onClick={() => setShowCreateModal(true)}
-            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Workflow
-          </Button>
+          <div className="flex space-x-3">
+            <Button 
+              onClick={() => window.location.href = '/dashboard/automation/triggers'}
+              variant="outline"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Triggers
+            </Button>
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Workflow
+            </Button>
+          </div>
         )}
       </div>
 

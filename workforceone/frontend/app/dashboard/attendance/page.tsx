@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { workflowTriggerEngine } from '@/lib/workflow-triggers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -258,6 +259,40 @@ export default function AttendancePage() {
           .insert(attendanceData)
 
         if (error) throw error
+      }
+
+      // Trigger workflow events based on check-in status
+      if (profile?.organization_id) {
+        try {
+          // Trigger check-in event
+          await workflowTriggerEngine.triggerAttendanceEvent(
+            profile.organization_id,
+            user.user.id,
+            'check_in',
+            {
+              status: status,
+              timestamp: now.toISOString(),
+              location: locationData
+            }
+          )
+
+          // If late, trigger late check-in event
+          if (status === 'late') {
+            await workflowTriggerEngine.triggerAttendanceEvent(
+              profile.organization_id,
+              user.user.id,
+              'late',
+              {
+                check_in_time: now.toISOString(),
+                late_by_minutes: (checkInHour - 9) * 60 + now.getMinutes(),
+                location: locationData
+              }
+            )
+          }
+        } catch (triggerError) {
+          console.warn('Failed to trigger workflow events:', triggerError)
+          // Don't throw error - attendance should still work even if triggers fail
+        }
       }
 
       setIsCheckedIn(true)

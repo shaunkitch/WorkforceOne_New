@@ -1494,7 +1494,7 @@ function RegionalSettings({ settings, presets, onUpdate, onApplyPreset, saving }
               Select your country to automatically configure regional settings:
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {presets.slice(0, 6).map((preset) => (
+              {presets.filter(p => ['US', 'GB', 'ZA', 'NL', 'AU', 'CA'].includes(p.country_code)).map((preset) => (
                 <Button
                   key={preset.id}
                   variant="outline"
