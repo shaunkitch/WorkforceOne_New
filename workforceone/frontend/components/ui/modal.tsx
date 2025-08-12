@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
             className
           )}
         >
-          <div className="bg-.white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium leading-6 text-gray-900">
                 {title}

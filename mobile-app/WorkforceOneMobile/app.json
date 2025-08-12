@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "WorkforceOne Mobile",
-    "slug": "workforceone-mobile",
+    "slug": "workforceone-nt4ygzvok9o8koo87qspm",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,10 +9,21 @@
     "newArchEnabled": true,
     "description": "Complete workforce management solution for attendance tracking, time management, task coordination, and team collaboration. Features real-time notifications, location-based check-ins, and comprehensive reporting for modern businesses.",
     "privacy": "public",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "githubUrl": "https://github.com/shaunkitch/workforceone",
     "category": "BUSINESS",
-    "keywords": ["workforce", "attendance", "time tracking", "business", "productivity", "management", "hr"],
+    "keywords": [
+      "workforce",
+      "attendance",
+      "time tracking",
+      "business",
+      "productivity",
+      "management",
+      "hr"
+    ],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -42,14 +53,18 @@
       "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION", 
+        "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "RECORD_AUDIO",
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "WAKE_LOCK",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.workforceone.mobile"
@@ -75,8 +90,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "ab2c3d4e-5f6g-7h8i-9j0k-1l2m3n4o5p6q"
+        "projectId": "e450cb6a-8add-4ce0-b2a4-f513cce316ee"
       }
-    }
+    },
+    "owner": "shaunkitch"
   }
 }
