@@ -101,6 +101,47 @@ const allNavigation = [
   },
 ]
 
+// Advanced features navigation
+const advancedNavigation = [
+  {
+    name: 'Automation',
+    href: '/dashboard/automation',
+    icon: ({ className }: { className?: string }) => (
+      <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2L2 7v10c0 5.55 3.84 10 9 10s9-4.45 9-10V7l-10-5z"/>
+        <path d="M8 11h8l-4 4-4-4z"/>
+      </svg>
+    ),
+    feature: 'automation',
+    requiresRole: ['admin', 'manager'],
+    description: 'Workflow automation and triggers'
+  },
+  {
+    name: 'Analytics',
+    href: '/dashboard/analytics',
+    icon: ({ className }: { className?: string }) => (
+      <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+        <path d="M3 3v18h18v-2H5V3H3zm16 5h-2v8h2v-8zm-4-3h-2v11h2V5zm-4 6h-2v5h2v-5z"/>
+      </svg>
+    ),
+    feature: 'analytics',
+    requiresRole: ['admin', 'manager'],
+    description: 'Advanced reporting and insights'
+  },
+  {
+    name: 'Payroll Export',
+    href: '/dashboard/payroll',
+    icon: ({ className }: { className?: string }) => (
+      <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+      </svg>
+    ),
+    feature: 'payroll',
+    requiresRole: ['admin'],
+    description: 'Payroll generation and export'
+  },
+]
+
 
 // Modern Sidebar Navigation Component
 function SidebarNav({ navigation, pathname, mobile = false }: { 
@@ -275,6 +316,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return hasFeature
     })
 
+  // Filter advanced navigation
+  const enabledAdvancedNavigation = featureFlags?.isLoading ? 
+    [] : 
+    advancedNavigation.filter(item => {
+      // Check role requirement for advanced features
+      if (item.requiresRole && userProfile) {
+        return item.requiresRole.includes(userProfile.role)
+      }
+      return false
+    })
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -350,6 +402,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   <nav className="flex flex-1 flex-col">
                     <SidebarNav navigation={enabledNavigation} pathname={pathname} mobile />
+                    {enabledAdvancedNavigation.length > 0 && (
+                      <div className="mt-6 space-y-1">
+                        <div className="px-3 py-2">
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Advanced Features
+                          </h3>
+                        </div>
+                        <SidebarNav navigation={enabledAdvancedNavigation} pathname={pathname} mobile />
+                      </div>
+                    )}
                     <div className="mt-auto pt-6 border-t border-border">
                       {userProfile && <UserProfile profile={userProfile} />}
                     </div>
@@ -369,6 +431,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <nav className="flex flex-1 flex-col gap-y-7">
             <SidebarNav navigation={enabledNavigation} pathname={pathname} />
+            {enabledAdvancedNavigation.length > 0 && (
+              <div className="space-y-1">
+                <div className="px-3 py-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Advanced Features
+                  </h3>
+                </div>
+                <SidebarNav navigation={enabledAdvancedNavigation} pathname={pathname} />
+              </div>
+            )}
             <div className="mt-auto space-y-4">
               <div className="border-t border-border pt-4">
                 {userProfile && <UserProfile profile={userProfile} />}
