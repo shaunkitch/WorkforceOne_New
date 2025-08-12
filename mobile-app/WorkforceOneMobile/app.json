@@ -1,29 +1,82 @@
 {
   "expo": {
-    "name": "WorkforceOneMobile",
-    "slug": "WorkforceOneMobile",
+    "name": "WorkforceOne Mobile",
+    "slug": "workforceone-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "description": "Complete workforce management solution for attendance tracking, time management, task coordination, and team collaboration. Features real-time notifications, location-based check-ins, and comprehensive reporting for modern businesses.",
+    "privacy": "public",
+    "platforms": ["ios", "android"],
+    "githubUrl": "https://github.com/shaunkitch/workforceone",
+    "category": "BUSINESS",
+    "keywords": ["workforce", "attendance", "time tracking", "business", "productivity", "management", "hr"],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#3b82f6"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.workforceone.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses location to track attendance check-ins and verify work locations.",
+        "NSCameraUsageDescription": "This app uses the camera to capture profile photos and attach images to reports.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for voice notes and team communication features."
+      }
     },
     "android": {
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#3b82f6"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.workforceone.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION", 
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "edgeToEdgeEnabled": true,
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.workforceone.mobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "This app uses location to track attendance check-ins and verify work locations."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "This app uses the camera to capture profile photos and attach images to reports."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "workforceone-mobile-2024"
+      }
     }
   }
 }

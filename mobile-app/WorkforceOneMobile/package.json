@@ -6,7 +6,14 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "eject": "expo eject",
+    "build": "eas build",
+    "build:android": "eas build --platform android",
+    "build:ios": "eas build --platform ios",
+    "submit": "eas submit",
+    "submit:android": "eas submit --platform android",
+    "submit:ios": "eas submit --platform ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -18,7 +25,9 @@
     "@react-navigation/stack": "^7.4.7",
     "@supabase/supabase-js": "^2.54.0",
     "expo": "~53.0.20",
+    "expo-camera": "^16.0.11",
     "expo-device": "^7.1.4",
+    "expo-location": "^18.0.2",
     "expo-notifications": "^0.31.4",
     "expo-secure-store": "^14.2.3",
     "expo-status-bar": "~2.2.3",
