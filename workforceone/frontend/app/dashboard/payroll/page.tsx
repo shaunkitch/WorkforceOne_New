@@ -67,6 +67,7 @@ export default function PayrollPage() {
     pay_frequency: 'bi-weekly',
     export_format: 'csv'
   })
+  const [organizationSettings, setOrganizationSettings] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
@@ -113,6 +114,25 @@ export default function PayrollPage() {
         .single()
 
       if (!profile?.organization_id) return
+
+      // Fetch organization settings for regional and accounting configuration
+      const { data: orgSettings } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .single()
+
+      if (orgSettings) {
+        setOrganizationSettings(orgSettings)
+        // Update payroll settings with organization settings
+        setSettings(prev => ({
+          ...prev,
+          overtime_threshold: orgSettings.overtime_threshold || 40,
+          overtime_multiplier: orgSettings.overtime_multiplier || 1.5,
+          default_hourly_rate: orgSettings.member_hourly_rate || 15.00,
+          pay_frequency: orgSettings.payroll_frequency || 'bi-weekly'
+        }))
+      }
 
       // Generate sample payroll periods for now
       const samplePeriods: PayrollPeriod[] = [
@@ -199,6 +219,14 @@ export default function PayrollPage() {
       const employeeHours = new Map()
 
       employees.forEach(employee => {
+        // Get role-based hourly rate from organization settings
+        let hourlyRate = organizationSettings?.member_hourly_rate || settings.default_hourly_rate
+        if (employee.role === 'manager') {
+          hourlyRate = organizationSettings?.manager_hourly_rate || hourlyRate * 1.67
+        } else if (employee.role === 'admin') {
+          hourlyRate = organizationSettings?.admin_hourly_rate || hourlyRate * 2.33
+        }
+
         employeeHours.set(employee.id, {
           employee_id: employee.id,
           employee_name: employee.full_name,
@@ -206,7 +234,7 @@ export default function PayrollPage() {
           regular_hours: 0,
           overtime_hours: 0,
           total_hours: 0,
-          hourly_rate: settings.default_hourly_rate,
+          hourly_rate: hourlyRate,
           attendance_records: 0,
           late_checkins: 0
         })
@@ -258,20 +286,25 @@ export default function PayrollPage() {
         })
       }
 
-      // Calculate pay
+      // Calculate pay using organization settings
       const payrollData: PayrollData[] = Array.from(employeeHours.values()).map(emp => {
         const regular_pay = emp.regular_hours * emp.hourly_rate
-        const overtime_pay = emp.overtime_hours * emp.hourly_rate * settings.overtime_multiplier
+        const overtime_pay = emp.overtime_hours * emp.hourly_rate * (organizationSettings?.overtime_multiplier || settings.overtime_multiplier)
         const total_pay = regular_pay + overtime_pay
-        const deductions = total_pay * 0.2 // Mock 20% deductions
-        const net_pay = total_pay - deductions
+        
+        // Calculate deductions using organization settings
+        const taxDeduction = total_pay * (organizationSettings?.tax_rate || 0.20)
+        const benefitsDeduction = total_pay * (organizationSettings?.benefits_rate || 0.05)
+        const otherDeduction = total_pay * (organizationSettings?.other_deductions_rate || 0.00)
+        const totalDeductions = taxDeduction + benefitsDeduction + otherDeduction
+        const net_pay = total_pay - totalDeductions
 
         return {
           ...emp,
           regular_pay: Math.round(regular_pay * 100) / 100,
           overtime_pay: Math.round(overtime_pay * 100) / 100,
           total_pay: Math.round(total_pay * 100) / 100,
-          deductions: Math.round(deductions * 100) / 100,
+          deductions: Math.round(totalDeductions * 100) / 100,
           net_pay: Math.round(net_pay * 100) / 100,
           regular_hours: Math.round(emp.regular_hours * 100) / 100,
           overtime_hours: Math.round(emp.overtime_hours * 100) / 100,
@@ -347,6 +380,10 @@ export default function PayrollPage() {
 
   const canAccessPayroll = () => {
     return userProfile?.role === 'admin'
+  }
+
+  const getCurrencySymbol = () => {
+    return organizationSettings?.currency_symbol || '$'
   }
 
   const getStatusColor = (status: string) => {
@@ -531,7 +568,7 @@ export default function PayrollPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                ${Math.round(currentPeriodData.reduce((sum, emp) => sum + emp.total_pay, 0)).toLocaleString()}
+                {getCurrencySymbol()}{Math.round(currentPeriodData.reduce((sum, emp) => sum + emp.total_pay, 0)).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -545,7 +582,7 @@ export default function PayrollPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                ${Math.round(currentPeriodData.reduce((sum, emp) => sum + emp.net_pay, 0)).toLocaleString()}
+                {getCurrencySymbol()}{Math.round(currentPeriodData.reduce((sum, emp) => sum + emp.net_pay, 0)).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -585,9 +622,9 @@ export default function PayrollPage() {
                       <td className="p-3 text-right">{employee.regular_hours}</td>
                       <td className="p-3 text-right">{employee.overtime_hours}</td>
                       <td className="p-3 text-right font-medium">{employee.total_hours}</td>
-                      <td className="p-3 text-right">${employee.hourly_rate}</td>
-                      <td className="p-3 text-right font-medium">${employee.total_pay}</td>
-                      <td className="p-3 text-right font-bold text-green-600">${employee.net_pay}</td>
+                      <td className="p-3 text-right">{getCurrencySymbol()}{employee.hourly_rate}</td>
+                      <td className="p-3 text-right font-medium">{getCurrencySymbol()}{employee.total_pay}</td>
+                      <td className="p-3 text-right font-bold text-green-600">{getCurrencySymbol()}{employee.net_pay}</td>
                       <td className="p-3 text-center">
                         {employee.late_checkins > 0 ? (
                           <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
@@ -630,7 +667,7 @@ export default function PayrollPage() {
                       {new Date(period.start_date).toLocaleDateString()} - {new Date(period.end_date).toLocaleDateString()}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {period.total_employees} employees • {period.total_hours} hours • ${period.total_amount.toLocaleString()}
+                      {period.total_employees} employees • {period.total_hours} hours • {getCurrencySymbol()}{period.total_amount.toLocaleString()}
                     </div>
                   </div>
                 </div>

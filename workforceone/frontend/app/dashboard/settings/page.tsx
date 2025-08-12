@@ -1448,6 +1448,478 @@ function BrandingManagement({ organization, saving }: BrandingManagementProps) {
   )
 }
 
+interface RegionalSettingsProps {
+  settings: any
+  presets: any[]
+  onUpdate: (updates: any) => void
+  onApplyPreset: (preset: any) => void
+  saving: boolean
+}
+
+function RegionalSettings({ settings, presets, onUpdate, onApplyPreset, saving }: RegionalSettingsProps) {
+  const [localSettings, setLocalSettings] = useState(settings)
+
+  useEffect(() => {
+    setLocalSettings(settings)
+  }, [settings])
+
+  const handleFieldChange = (field: string, value: any) => {
+    setLocalSettings((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const saveChanges = () => {
+    onUpdate(localSettings)
+  }
+
+  const hasChanges = JSON.stringify(localSettings) !== JSON.stringify(settings)
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Globe className="h-5 w-5 mr-2" />
+            Regional Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-gray-600">
+            Configure regional settings including currency, date format, and timezone for your organization.
+          </p>
+
+          {/* Quick Regional Presets */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Quick Setup</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Select your country to automatically configure regional settings:
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {presets.slice(0, 6).map((preset) => (
+                <Button
+                  key={preset.id}
+                  variant="outline"
+                  onClick={() => onApplyPreset(preset)}
+                  disabled={saving}
+                  className="justify-start text-left"
+                >
+                  <div>
+                    <div className="font-medium">{preset.country_name}</div>
+                    <div className="text-xs text-gray-500">{preset.currency_symbol} {preset.currency_code}</div>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Manual Configuration */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Manual Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="currency_code">Currency Code</Label>
+                <Select
+                  value={localSettings?.currency_code || 'USD'}
+                  onValueChange={(value) => handleFieldChange('currency_code', value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD - US Dollar</SelectItem>
+                    <SelectItem value="EUR">EUR - Euro</SelectItem>
+                    <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                    <SelectItem value="ZAR">ZAR - South African Rand</SelectItem>
+                    <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                    <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                    <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                    <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                    <SelectItem value="BRL">BRL - Brazilian Real</SelectItem>
+                    <SelectItem value="MXN">MXN - Mexican Peso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="currency_symbol">Currency Symbol</Label>
+                <Input
+                  id="currency_symbol"
+                  value={localSettings?.currency_symbol || '$'}
+                  onChange={(e) => handleFieldChange('currency_symbol', e.target.value)}
+                  placeholder="$"
+                  className="mt-2"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="date_format">Date Format</Label>
+                <Select
+                  value={localSettings?.date_format || 'MM/dd/yyyy'}
+                  onValueChange={(value) => handleFieldChange('date_format', value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MM/dd/yyyy">MM/dd/yyyy (US)</SelectItem>
+                    <SelectItem value="dd/MM/yyyy">dd/MM/yyyy (UK/AU)</SelectItem>
+                    <SelectItem value="yyyy/MM/dd">yyyy/MM/dd (ZA)</SelectItem>
+                    <SelectItem value="dd.MM.yyyy">dd.MM.yyyy (DE)</SelectItem>
+                    <SelectItem value="yyyy-MM-dd">yyyy-MM-dd (ISO)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="time_format">Time Format</Label>
+                <Select
+                  value={localSettings?.time_format || '12h'}
+                  onValueChange={(value) => handleFieldChange('time_format', value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="12h">12-hour (1:30 PM)</SelectItem>
+                    <SelectItem value="24h">24-hour (13:30)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="timezone">Timezone</Label>
+                <Select
+                  value={localSettings?.timezone || 'America/New_York'}
+                  onValueChange={(value) => handleFieldChange('timezone', value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="America/New_York">Eastern Time (UTC-5)</SelectItem>
+                    <SelectItem value="America/Chicago">Central Time (UTC-6)</SelectItem>
+                    <SelectItem value="America/Denver">Mountain Time (UTC-7)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific Time (UTC-8)</SelectItem>
+                    <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
+                    <SelectItem value="Europe/Paris">Paris (UTC+1)</SelectItem>
+                    <SelectItem value="Europe/Berlin">Berlin (UTC+1)</SelectItem>
+                    <SelectItem value="Africa/Johannesburg">Johannesburg (UTC+2)</SelectItem>
+                    <SelectItem value="Asia/Tokyo">Tokyo (UTC+9)</SelectItem>
+                    <SelectItem value="Australia/Sydney">Sydney (UTC+10)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="language">Language</Label>
+                <Select
+                  value={localSettings?.language || 'en'}
+                  onValueChange={(value) => handleFieldChange('language', value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Spanish</SelectItem>
+                    <SelectItem value="fr">French</SelectItem>
+                    <SelectItem value="de">German</SelectItem>
+                    <SelectItem value="pt">Portuguese</SelectItem>
+                    <SelectItem value="ja">Japanese</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {hasChanges && (
+              <div className="flex justify-end mt-6">
+                <Button onClick={saveChanges} disabled={saving}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Preview */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-medium mb-4">Preview</h3>
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div><strong>Currency:</strong> {localSettings?.currency_symbol}{localSettings?.currency_code === 'JPY' ? '1,000' : '1,234.56'}</div>
+              <div><strong>Date:</strong> {new Date().toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: localSettings?.date_format?.includes('MM/dd') ? '2-digit' : 'numeric',
+                day: '2-digit'
+              })}</div>
+              <div><strong>Time:</strong> {new Date().toLocaleTimeString('en-US', { 
+                hour12: localSettings?.time_format === '12h',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</div>
+              <div><strong>Timezone:</strong> {localSettings?.timezone}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+interface AccountingSettingsProps {
+  settings: any
+  onUpdate: (updates: any) => void
+  saving: boolean
+}
+
+function AccountingSettings({ settings, onUpdate, saving }: AccountingSettingsProps) {
+  const [localSettings, setLocalSettings] = useState(settings)
+
+  useEffect(() => {
+    setLocalSettings(settings)
+  }, [settings])
+
+  const handleFieldChange = (field: string, value: any) => {
+    setLocalSettings((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const saveChanges = () => {
+    onUpdate(localSettings)
+  }
+
+  const hasChanges = JSON.stringify(localSettings) !== JSON.stringify(settings)
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="h-5 w-5 mr-2" />
+            Accounting Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-gray-600">
+            Configure payroll rates, overtime settings, and deductions for your organization.
+          </p>
+
+          {/* Hourly Rates by Role */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Hourly Rates by Role</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <Label htmlFor="member_rate">Member Hourly Rate</Label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    {settings?.currency_symbol || '$'}
+                  </span>
+                  <Input
+                    id="member_rate"
+                    type="number"
+                    step="0.01"
+                    value={localSettings?.member_hourly_rate || 15.00}
+                    onChange={(e) => handleFieldChange('member_hourly_rate', parseFloat(e.target.value))}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="manager_rate">Manager Hourly Rate</Label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    {settings?.currency_symbol || '$'}
+                  </span>
+                  <Input
+                    id="manager_rate"
+                    type="number"
+                    step="0.01"
+                    value={localSettings?.manager_hourly_rate || 25.00}
+                    onChange={(e) => handleFieldChange('manager_hourly_rate', parseFloat(e.target.value))}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="admin_rate">Admin Hourly Rate</Label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    {settings?.currency_symbol || '$'}
+                  </span>
+                  <Input
+                    id="admin_rate"
+                    type="number"
+                    step="0.01"
+                    value={localSettings?.admin_hourly_rate || 35.00}
+                    onChange={(e) => handleFieldChange('admin_hourly_rate', parseFloat(e.target.value))}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Overtime Settings */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Overtime Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="overtime_threshold">Weekly Overtime Threshold (hours)</Label>
+                <Input
+                  id="overtime_threshold"
+                  type="number"
+                  value={localSettings?.overtime_threshold || 40}
+                  onChange={(e) => handleFieldChange('overtime_threshold', parseInt(e.target.value))}
+                  className="mt-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Hours worked beyond this will be considered overtime
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="overtime_multiplier">Overtime Multiplier</Label>
+                <Input
+                  id="overtime_multiplier"
+                  type="number"
+                  step="0.1"
+                  value={localSettings?.overtime_multiplier || 1.5}
+                  onChange={(e) => handleFieldChange('overtime_multiplier', parseFloat(e.target.value))}
+                  className="mt-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Overtime pay = regular rate × this multiplier
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Deduction Settings */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Deduction Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <Label htmlFor="tax_rate">Tax Rate (%)</Label>
+                <Input
+                  id="tax_rate"
+                  type="number"
+                  step="0.01"
+                  value={(localSettings?.tax_rate || 0.20) * 100}
+                  onChange={(e) => handleFieldChange('tax_rate', parseFloat(e.target.value) / 100)}
+                  className="mt-2"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="benefits_rate">Benefits Rate (%)</Label>
+                <Input
+                  id="benefits_rate"
+                  type="number"
+                  step="0.01"
+                  value={(localSettings?.benefits_rate || 0.05) * 100}
+                  onChange={(e) => handleFieldChange('benefits_rate', parseFloat(e.target.value) / 100)}
+                  className="mt-2"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="other_deductions">Other Deductions (%)</Label>
+                <Input
+                  id="other_deductions"
+                  type="number"
+                  step="0.01"
+                  value={(localSettings?.other_deductions_rate || 0.00) * 100}
+                  onChange={(e) => handleFieldChange('other_deductions_rate', parseFloat(e.target.value) / 100)}
+                  className="mt-2"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Payroll Settings */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Payroll Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="payroll_frequency">Payroll Frequency</Label>
+                <Select
+                  value={localSettings?.payroll_frequency || 'bi-weekly'}
+                  onValueChange={(value) => handleFieldChange('payroll_frequency', value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="pay_period_start">Pay Period Start Day</Label>
+                <Select
+                  value={localSettings?.pay_period_start_day?.toString() || '1'}
+                  onValueChange={(value) => handleFieldChange('pay_period_start_day', parseInt(value))}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Monday</SelectItem>
+                    <SelectItem value="2">Tuesday</SelectItem>
+                    <SelectItem value="3">Wednesday</SelectItem>
+                    <SelectItem value="4">Thursday</SelectItem>
+                    <SelectItem value="5">Friday</SelectItem>
+                    <SelectItem value="6">Saturday</SelectItem>
+                    <SelectItem value="0">Sunday</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Payroll Preview */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-medium mb-4">Payroll Calculation Preview</h3>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div className="font-medium">Member (40 hrs)</div>
+                  <div>Regular: {settings?.currency_symbol}{(localSettings?.member_hourly_rate * 40 || 600).toFixed(2)}</div>
+                  <div>Overtime (8 hrs): {settings?.currency_symbol}{(localSettings?.member_hourly_rate * 8 * (localSettings?.overtime_multiplier || 1.5) || 180).toFixed(2)}</div>
+                  <div className="font-medium">Gross: {settings?.currency_symbol}{((localSettings?.member_hourly_rate * 40) + (localSettings?.member_hourly_rate * 8 * (localSettings?.overtime_multiplier || 1.5)) || 780).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="font-medium">Manager (40 hrs)</div>
+                  <div>Regular: {settings?.currency_symbol}{(localSettings?.manager_hourly_rate * 40 || 1000).toFixed(2)}</div>
+                  <div>Overtime (8 hrs): {settings?.currency_symbol}{(localSettings?.manager_hourly_rate * 8 * (localSettings?.overtime_multiplier || 1.5) || 300).toFixed(2)}</div>
+                  <div className="font-medium">Gross: {settings?.currency_symbol}{((localSettings?.manager_hourly_rate * 40) + (localSettings?.manager_hourly_rate * 8 * (localSettings?.overtime_multiplier || 1.5)) || 1300).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="font-medium">Admin (40 hrs)</div>
+                  <div>Regular: {settings?.currency_symbol}{(localSettings?.admin_hourly_rate * 40 || 1400).toFixed(2)}</div>
+                  <div>Overtime (8 hrs): {settings?.currency_symbol}{(localSettings?.admin_hourly_rate * 8 * (localSettings?.overtime_multiplier || 1.5) || 420).toFixed(2)}</div>
+                  <div className="font-medium">Gross: {settings?.currency_symbol}{((localSettings?.admin_hourly_rate * 40) + (localSettings?.admin_hourly_rate * 8 * (localSettings?.overtime_multiplier || 1.5)) || 1820).toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {hasChanges && (
+            <div className="flex justify-end">
+              <Button onClick={saveChanges} disabled={saving}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManagementProps) {
   const [featureFlags, setFeatureFlags] = useState(organization.feature_flags || {})
   const [activeTab, setActiveTab] = useState<'organization' | 'users'>('organization')
