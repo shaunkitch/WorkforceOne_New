@@ -3,7 +3,7 @@
 // ===================================
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -26,7 +26,7 @@ interface Organization {
   slug: string
 }
 
-export default function SignupPage() {
+function SignupForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -387,5 +387,13 @@ export default function SignupPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <SignupForm />
+    </Suspense>
   )
 }

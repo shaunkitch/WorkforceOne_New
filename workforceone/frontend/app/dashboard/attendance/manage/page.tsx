@@ -186,7 +186,7 @@ export default function AttendanceManagePage() {
         `)
         .eq('organization_id', currentUser.profile.organization_id)
         .eq('date', selectedDate)
-        .order('check_in_time', { ascending: true, nullsLast: true })
+        .order('check_in_time', { ascending: true, nullsFirst: false })
 
       if (attendanceError) throw attendanceError
 
@@ -282,9 +282,28 @@ export default function AttendanceManagePage() {
 
   const sendNotification = async (employeeIds: string[], message: string) => {
     try {
-      // Here you would implement your notification system
-      // For now, we'll just show an alert
-      alert(`Notification sent to ${employeeIds.length} employee(s): "${message}"`)
+      if (!currentUser?.profile?.organization_id) {
+        throw new Error('Organization not found')
+      }
+
+      // Send notification to each selected employee
+      const notifications = employeeIds.map(employeeId => ({
+        organization_id: currentUser.profile.organization_id,
+        recipient_id: employeeId,
+        sender_id: currentUser.id,
+        title: 'Attendance Reminder',
+        message: message,
+        type: 'attendance',
+        priority: 'normal'
+      }))
+
+      const { error } = await supabase
+        .from('notifications')
+        .insert(notifications)
+
+      if (error) throw error
+
+      alert(`Notification sent successfully to ${employeeIds.length} employee(s)!`)
       setShowNotificationModal(false)
       setNotificationMessage('')
       setSelectedEmployees([])
@@ -298,6 +317,15 @@ export default function AttendanceManagePage() {
     const notCheckedInEmployees = employees
       .filter(emp => emp.status === 'not_checked_in' || emp.status === 'absent')
       .map(emp => emp.id)
+    
+    console.log('Employees:', employees)
+    console.log('Not checked in employees:', notCheckedInEmployees)
+    console.log('Stats:', stats)
+    
+    if (notCheckedInEmployees.length === 0) {
+      alert('All employees have already checked in!')
+      return
+    }
     
     setSelectedEmployees(notCheckedInEmployees)
     setNotificationMessage('Please remember to check in for today. Your attendance is important!')
@@ -385,10 +413,10 @@ export default function AttendanceManagePage() {
             <Button 
               onClick={sendCheckInReminder}
               className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-lg"
-              disabled={stats.notCheckedIn === 0}
+              disabled={loading || stats.totalEmployees === 0}
             >
               <Bell className="h-4 w-4 mr-2" />
-              Send Check-in Reminder ({stats.notCheckedIn})
+              Send Check-in Reminder ({stats.notCheckedIn + stats.absent})
             </Button>
             <Button 
               onClick={fetchAttendanceData}
@@ -542,7 +570,7 @@ export default function AttendanceManagePage() {
         <CardHeader>
           <CardTitle className="text-xl font-bold text-gray-800 flex items-center">
             <Users className="h-6 w-6 mr-2 text-blue-600" />
-            Employee Attendance ({filteredEmployees.length})
+            Employee Attendance ({filteredEmployees?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>

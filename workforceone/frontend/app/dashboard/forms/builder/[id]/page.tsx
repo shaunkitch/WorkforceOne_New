@@ -582,6 +582,7 @@ export default function FormBuilderPage() {
               <Save className="h-4 w-4 mr-2" />
               {saving ? 'Saving...' : 'Save'}
             </Button>
+          </div>
         </div>
       </div>
 
@@ -691,6 +692,7 @@ export default function FormBuilderPage() {
             </CardContent>
           </Card>
         )}
+      </div>
       </div>
     </div>
   )

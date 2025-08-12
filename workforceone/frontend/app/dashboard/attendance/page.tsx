@@ -388,7 +388,7 @@ export default function AttendancePage() {
                 {formatLiveHours(liveHours)}
               </div>
               <div className="text-sm text-blue-600">
-                Since {todayRecord ? formatTime(todayRecord.check_in_time) : 'check-in'} • Updates live
+                Since {todayRecord ? formatTime(todayRecord.check_in_time || null) : 'check-in'} • Updates live
               </div>
             </div>
           </CardContent>
@@ -421,8 +421,8 @@ export default function AttendancePage() {
               </div>
               {todayRecord && (
                 <div className="space-y-1 text-sm text-gray-600">
-                  <p>Check-in: {formatTime(todayRecord.check_in_time)}</p>
-                  <p>Check-out: {formatTime(todayRecord.check_out_time)}</p>
+                  <p>Check-in: {formatTime(todayRecord.check_in_time || null)}</p>
+                  <p>Check-out: {formatTime(todayRecord.check_out_time || null)}</p>
                   {isCheckedIn ? (
                     <div className="space-y-1">
                       <p className="text-blue-600 font-medium">
@@ -432,8 +432,8 @@ export default function AttendancePage() {
                     </div>
                   ) : (
                     <>
-                      <p>Total Hours: {formatHours(todayRecord.work_hours)}</p>
-                      <p>Overtime: {formatHours(todayRecord.overtime_hours)}</p>
+                      <p>Total Hours: {formatHours(todayRecord.work_hours || null)}</p>
+                      <p>Overtime: {formatHours(todayRecord.overtime_hours || null)}</p>
                     </>
                   )}
                 </div>
@@ -604,7 +604,7 @@ export default function AttendancePage() {
                   </div>
                   <div className="text-right">
                     <div className="font-medium">
-                      {formatHours(record.work_hours)}
+                      {formatHours(record.work_hours || null)}
                     </div>
                     <div className="text-sm text-gray-500">
                       {record.work_hours ? `${((record.work_hours / 8) * 100).toFixed(0)}%` : '0%'}

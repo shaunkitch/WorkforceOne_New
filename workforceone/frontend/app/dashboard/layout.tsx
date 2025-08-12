@@ -15,8 +15,9 @@ import {
   Home, Clock, Calendar, Users, Briefcase, CheckSquare,
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
-  User
+  User, UserCheck
 } from 'lucide-react'
+import NotificationSystem from '@/components/notifications/NotificationSystem'
 
 // Navigation arrays with modern icons and descriptions
 const allNavigation = [
@@ -40,6 +41,14 @@ const allNavigation = [
     icon: Calendar, 
     feature: 'attendance',
     description: 'Check-in and attendance records'
+  },
+  { 
+    name: 'Attendance Management', 
+    href: '/dashboard/attendance/manage', 
+    icon: UserCheck, 
+    feature: 'attendance',
+    requiresRole: ['admin', 'manager'],
+    description: 'Monitor team attendance and send reminders'
   },
   { 
     name: 'Team Map', 
@@ -250,10 +259,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const featureFlags = useFeatureFlags()
   const supabase = createClient()
 
-  // Filter navigation based on feature flags (wait for loading to complete)
+  // Filter navigation based on feature flags and user role (wait for loading to complete)
   const enabledNavigation = featureFlags?.isLoading ? 
     [] : // Show empty navigation while loading
-    allNavigation.filter(item => featureFlags.featureFlags[item.feature] !== false)
+    allNavigation.filter(item => {
+      // Check feature flag
+      const hasFeature = featureFlags.featureFlags[item.feature] !== false
+      
+      // Check role requirement if specified
+      if (item.requiresRole && userProfile) {
+        const hasRole = item.requiresRole.includes(userProfile.role)
+        return hasFeature && hasRole
+      }
+      
+      return hasFeature
+    })
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -395,12 +415,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Right side */}
             <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                  3
-                </Badge>
-              </Button>
+              <NotificationSystem />
               
               <Button variant="ghost" size="sm" asChild className="lg:hidden">
                 <Link href="/dashboard/settings">
