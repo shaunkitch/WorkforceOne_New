@@ -38,7 +38,10 @@ import {
   Pause,
   Timer,
   BarChart3,
-  Target
+  Target,
+  MapPin,
+  Users,
+  UserCheck
 } from 'lucide-react'
 import { format, parseISO, differenceInDays, isAfter, isBefore, isToday } from 'date-fns'
 
@@ -51,6 +54,7 @@ interface Task {
   assignee_id?: string
   reporter_id: string
   project_id?: string
+  outlet_id?: string
   due_date?: string
   estimated_hours?: number
   actual_hours?: number
@@ -68,12 +72,12 @@ interface Task {
   project?: {
     name: string
   }
+  outlet?: {
+    name: string
+    address?: string
+  }
   comments?: TaskComment[]
   attachments?: TaskAttachment[]
-  _count?: {
-    comments: number
-    attachments: number
-  }
 }
 
 interface TaskComment {
@@ -127,6 +131,10 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [outlets, setOutlets] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+  const [assignmentType, setAssignmentType] = useState<'user' | 'team'>('user')
   
   // Form state
   const [taskForm, setTaskForm] = useState({
@@ -134,7 +142,9 @@ export default function TasksPage() {
     description: '',
     priority: 'medium' as Task['priority'],
     assignee_id: '',
+    team_id: '',
     project_id: '',
+    outlet_id: '',
     due_date: '',
     estimated_hours: ''
   })
@@ -147,6 +157,9 @@ export default function TasksPage() {
     fetchCurrentUser()
     fetchUserProfile()
     fetchTasks()
+    fetchOutlets()
+    fetchUsers()
+    fetchTeams()
   }, [statusFilter, priorityFilter, assigneeFilter, searchTerm])
 
   const fetchUserProfile = async () => {
@@ -194,30 +207,90 @@ export default function TasksPage() {
     }
   }
 
+  const fetchOutlets = async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: outlets } = await supabase
+        .from('outlets')
+        .select('id, name, address')
+        .eq('organization_id', profile.organization_id)
+        .order('name')
+
+      setOutlets(outlets || [])
+    } catch (error) {
+      console.error('Error fetching outlets:', error)
+    }
+  }
+
+  const fetchUsers = async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: users } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .eq('organization_id', profile.organization_id)
+        .order('full_name')
+
+      setUsers(users || [])
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    }
+  }
+
+  const fetchTeams = async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: teams } = await supabase
+        .from('teams')
+        .select('id, name, description')
+        .eq('organization_id', profile.organization_id)
+        .order('name')
+
+      setTeams(teams || [])
+    } catch (error) {
+      console.error('Error fetching teams:', error)
+    }
+  }
+
   const fetchTasks = async () => {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
 
+      // First try to fetch tasks without joins to check if table exists
       let query = supabase
         .from('tasks')
-        .select(`
-          *,
-          assignee:profiles!tasks_assignee_id_fkey (
-            full_name,
-            email,
-            avatar_url
-          ),
-          reporter:profiles!tasks_reporter_id_fkey (
-            full_name,
-            email
-          ),
-          project:projects (
-            name
-          ),
-          _count:task_comments(count),
-          _count:task_attachments(count)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
 
       if (statusFilter !== 'all') {
@@ -244,7 +317,17 @@ export default function TasksPage() {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching tasks:', error)
+        // If tasks table doesn't exist, just set empty array
+        if (error.code === 'PGRST204' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+          console.log('Tasks table does not exist yet. Please run database migrations.')
+          setTasks([])
+          setLoading(false)
+          return
+        }
+        throw error
+      }
       setTasks(data || [])
       
       // Auto-select first task if none selected
@@ -283,38 +366,52 @@ export default function TasksPage() {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
 
+      // Handle assignment based on type
+      const assigneeId = assignmentType === 'user' 
+        ? (taskForm.assignee_id || null)
+        : null // For team assignments, we'll handle separately
+
       const { data, error } = await supabase
         .from('tasks')
         .insert({
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
-          assignee_id: taskForm.assignee_id || null,
+          assignee_id: assigneeId,
           reporter_id: user.user.id,
           project_id: taskForm.project_id || null,
+          outlet_id: taskForm.outlet_id || null,
           due_date: taskForm.due_date || null,
           estimated_hours: taskForm.estimated_hours ? parseFloat(taskForm.estimated_hours) : null,
           status: 'todo',
           actual_hours: 0
         })
-        .select(`
-          *,
-          assignee:profiles!tasks_assignee_id_fkey (
-            full_name,
-            email,
-            avatar_url
-          ),
-          reporter:profiles!tasks_reporter_id_fkey (
-            full_name,
-            email
-          ),
-          project:projects (
-            name
-          )
-        `)
+        .select('*')
         .single()
 
       if (error) throw error
+
+      // If assigning to team, create task assignments for all team members
+      if (assignmentType === 'team' && taskForm.team_id) {
+        const { data: teamMembers } = await supabase
+          .from('team_members')
+          .select('user_id')
+          .eq('team_id', taskForm.team_id)
+
+        if (teamMembers && teamMembers.length > 0) {
+          // Create task assignments for each team member
+          const taskAssignments = teamMembers.map(member => ({
+            task_id: data.id,
+            user_id: member.user_id,
+            assigned_at: new Date().toISOString(),
+            assigned_by: user.user.id
+          }))
+
+          await supabase
+            .from('task_assignments')
+            .insert(taskAssignments)
+        }
+      }
 
       setTasks(prev => [data, ...prev])
       setTaskForm({
@@ -322,7 +419,9 @@ export default function TasksPage() {
         description: '',
         priority: 'medium',
         assignee_id: '',
+        team_id: '',
         project_id: '',
+        outlet_id: '',
         due_date: '',
         estimated_hours: ''
       })
@@ -408,11 +507,7 @@ export default function TasksPage() {
       // Update selected task comments
       setSelectedTask(prev => ({
         ...prev!,
-        comments: [...(prev!.comments || []), data],
-        _count: {
-          ...prev!._count,
-          comments: (prev!._count?.comments || 0) + 1
-        }
+        comments: [...(prev!.comments || []), data]
       }))
 
       setNewComment('')
@@ -693,29 +788,21 @@ export default function TasksPage() {
                             </div>
                           </div>
                           <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>{task.assignee?.full_name || 'Unassigned'}</span>
+                            <div className="flex items-center space-x-2">
+                              <span>{task.assignee?.full_name || 'Unassigned'}</span>
+                              {task.outlet && (
+                                <span className="flex items-center text-blue-600">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  {task.outlet.name}
+                                </span>
+                              )}
+                            </div>
                             {task.due_date && (
                               <span className={getDaysUntilDue(task.due_date)?.color}>
                                 {getDaysUntilDue(task.due_date)?.text}
                               </span>
                             )}
                           </div>
-                          {(task._count?.comments || task._count?.attachments) && (
-                            <div className="flex items-center space-x-4 text-xs text-gray-500">
-                              {task._count.comments > 0 && (
-                                <span className="flex items-center">
-                                  <MessageSquare className="h-3 w-3 mr-1" />
-                                  {task._count.comments}
-                                </span>
-                              )}
-                              {task._count.attachments > 0 && (
-                                <span className="flex items-center">
-                                  <Paperclip className="h-3 w-3 mr-1" />
-                                  {task._count.attachments}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </button>
                     ))}
@@ -753,6 +840,12 @@ export default function TasksPage() {
                             <span className="flex items-center">
                               <Target className="h-4 w-4 mr-1" />
                               {selectedTask.project.name}
+                            </span>
+                          )}
+                          {selectedTask.outlet && (
+                            <span className="flex items-center">
+                              <MapPin className="h-4 w-4 mr-1" />
+                              {selectedTask.outlet.name}
                             </span>
                           )}
                           {selectedTask.due_date && (
@@ -823,7 +916,7 @@ export default function TasksPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <MessageSquare className="h-5 w-5 mr-2" />
-                      Comments ({selectedTask._count?.comments || 0})
+                      Comments
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1003,6 +1096,115 @@ export default function TasksPage() {
                   />
                 </div>
               </div>
+
+              {/* Outlet Selection */}
+              <div>
+                <Label htmlFor="outlet">
+                  <MapPin className="h-4 w-4 inline mr-2" />
+                  Outlet (Optional)
+                </Label>
+                <Select
+                  value={taskForm.outlet_id}
+                  onValueChange={(value) => setTaskForm(prev => ({ ...prev, outlet_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select outlet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No outlet</SelectItem>
+                    {outlets.map(outlet => (
+                      <SelectItem key={outlet.id} value={outlet.id}>
+                        {outlet.name} {outlet.address && `- ${outlet.address}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Assignment Type Selection */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <Label className="text-base font-semibold flex items-center">
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Assignment
+                </Label>
+                <div className="flex space-x-4 mt-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="assignmentType"
+                      value="user"
+                      checked={assignmentType === 'user'}
+                      onChange={(e) => setAssignmentType(e.target.value as 'user' | 'team')}
+                      className="rounded"
+                    />
+                    <span className="flex items-center">
+                      <User className="h-4 w-4 mr-1" />
+                      Assign to User
+                    </span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="assignmentType"
+                      value="team"
+                      checked={assignmentType === 'team'}
+                      onChange={(e) => setAssignmentType(e.target.value as 'user' | 'team')}
+                      className="rounded"
+                    />
+                    <span className="flex items-center">
+                      <Users className="h-4 w-4 mr-1" />
+                      Assign to Team
+                    </span>
+                  </label>
+                </div>
+
+                {/* User Assignment */}
+                {assignmentType === 'user' && (
+                  <div className="mt-3">
+                    <Label htmlFor="assignee">Select User</Label>
+                    <Select
+                      value={taskForm.assignee_id}
+                      onValueChange={(value) => setTaskForm(prev => ({ ...prev, assignee_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Unassigned</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.full_name} - {user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Team Assignment */}
+                {assignmentType === 'team' && (
+                  <div className="mt-3">
+                    <Label htmlFor="team">Select Team</Label>
+                    <Select
+                      value={taskForm.team_id}
+                      onValueChange={(value) => setTaskForm(prev => ({ ...prev, team_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select team" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No team</SelectItem>
+                        {teams.map(team => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name} {team.description && `- ${team.description}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <Label htmlFor="dueDate">Due Date</Label>
                 <Input

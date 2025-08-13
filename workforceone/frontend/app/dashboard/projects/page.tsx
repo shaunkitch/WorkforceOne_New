@@ -101,6 +101,7 @@ export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
+  const [organizationSettings, setOrganizationSettings] = useState<any>(null)
   
   // Form state
   const [projectForm, setProjectForm] = useState({
@@ -117,8 +118,36 @@ export default function ProjectsPage() {
   const supabase = createClient()
 
   useEffect(() => {
+    fetchOrganizationSettings()
     fetchProjects()
   }, [statusFilter, priorityFilter, searchTerm])
+
+  const fetchOrganizationSettings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.organization_id) {
+        const { data: orgSettings } = await supabase
+          .from('organization_settings')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .single()
+
+        if (orgSettings) {
+          setOrganizationSettings(orgSettings)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching organization settings:', error)
+    }
+  }
 
   useEffect(() => {
     calculateStats()
@@ -388,6 +417,11 @@ export default function ProjectsPage() {
     return Math.min((spent / total) * 100, 100)
   }
 
+  const formatCurrency = (amount: number) => {
+    const currencySymbol = organizationSettings?.currency_symbol || '$'
+    return `${currencySymbol}${amount.toLocaleString()}`
+  }
+
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter
@@ -441,14 +475,14 @@ export default function ProjectsPage() {
         <Card>
           <CardContent className="p-4 text-center">
             <DollarSign className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">${projectStats.totalBudget.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(projectStats.totalBudget)}</div>
             <div className="text-sm text-gray-600">Budget</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <BarChart3 className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold">${projectStats.spentBudget.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(projectStats.spentBudget)}</div>
             <div className="text-sm text-gray-600">Spent</div>
           </CardContent>
         </Card>
@@ -644,11 +678,11 @@ export default function ProjectsPage() {
                       <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                         <div>
                           <div className="text-sm text-gray-600">Total Budget</div>
-                          <div className="text-lg font-medium">${selectedProject.budget.toLocaleString()}</div>
+                          <div className="text-lg font-medium">{formatCurrency(selectedProject.budget)}</div>
                         </div>
                         <div>
                           <div className="text-sm text-gray-600">Spent</div>
-                          <div className="text-lg font-medium">${(selectedProject.spent_budget || 0).toLocaleString()}</div>
+                          <div className="text-lg font-medium">{formatCurrency(selectedProject.spent_budget || 0)}</div>
                         </div>
                         <div className="col-span-2">
                           <div className="flex items-center justify-between mb-2">

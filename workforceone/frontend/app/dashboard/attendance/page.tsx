@@ -27,7 +27,9 @@ import {
   Coffee,
   Timer,
   TrendingUp,
-  Users
+  Users,
+  Settings,
+  Save
 } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, isToday, parseISO } from 'date-fns'
 
@@ -70,12 +72,16 @@ export default function AttendancePage() {
   const [breakStartTime, setBreakStartTime] = useState<Date | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [notes, setNotes] = useState('')
+  const [activeTab, setActiveTab] = useState<'attendance' | 'settings'>('attendance')
+  const [organizationSettings, setOrganizationSettings] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
   const [filterWeek, setFilterWeek] = useState('current')
   const [liveHours, setLiveHours] = useState(0)
   
   const supabase = createClient()
 
   useEffect(() => {
+    fetchUserProfile()
     fetchAttendanceData()
     
     // Update current time every second for live tracking
@@ -94,6 +100,36 @@ export default function AttendancePage() {
     
     return () => clearInterval(timer)
   }, [filterWeek, isCheckedIn, todayRecord])
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      setUserProfile(profile)
+
+      if (profile?.organization_id) {
+        // Fetch organization settings
+        const { data: orgSettings } = await supabase
+          .from('organization_settings')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .single()
+
+        if (orgSettings) {
+          setOrganizationSettings(orgSettings)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
+    }
+  }
 
   const fetchAttendanceData = async () => {
     try {
@@ -416,29 +452,94 @@ export default function AttendancePage() {
     return `${h}h ${m}m ${s}s`
   }
 
+  const saveAttendanceSettings = async (settings: any) => {
+    try {
+      if (!userProfile?.organization_id) {
+        alert('Unable to save settings: No organization found')
+        return
+      }
+
+      const { error } = await supabase
+        .from('organization_settings')
+        .update({
+          ...settings,
+          updated_at: new Date().toISOString()
+        })
+        .eq('organization_id', userProfile.organization_id)
+
+      if (error) throw error
+
+      // Update local state
+      setOrganizationSettings(prev => ({ ...prev, ...settings }))
+      alert('Attendance settings saved successfully!')
+    } catch (error) {
+      console.error('Error saving attendance settings:', error)
+      alert('Error saving settings. Please try again.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-gray-600">Track your daily attendance and working hours.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
+          <p className="text-gray-600">Track attendance and configure work hours settings.</p>
         </div>
-        <div className="flex items-center space-x-4">
-          <Select value={filterWeek} onValueChange={setFilterWeek}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current">This Week</SelectItem>
-              <SelectItem value="last">Last Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {activeTab === 'attendance' && (
+          <div className="flex items-center space-x-4">
+            <Select value={filterWeek} onValueChange={setFilterWeek}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">This Week</SelectItem>
+                <SelectItem value="last">Last Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      {/* Live Hours Counter - Show when checked in */}
-      {isCheckedIn && (
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('attendance')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'attendance'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Clock className="h-4 w-4" />
+              <span>Attendance</span>
+            </div>
+          </button>
+          {userProfile?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'settings'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </div>
+            </button>
+          )}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'attendance' && (
+        <>
+          {/* Live Hours Counter - Show when checked in */}
+          {isCheckedIn && (
         <Card className="bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
           <CardContent className="p-6">
             <div className="text-center">
@@ -678,6 +779,232 @@ export default function AttendancePage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="h-5 w-5" />
+                <span>Attendance Settings</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {organizationSettings ? (
+                <AttendanceSettingsForm
+                  settings={organizationSettings}
+                  onSave={saveAttendanceSettings}
+                />
+              ) : (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-gray-600 mt-2">Loading settings...</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
+  )
+}
+
+// Settings Form Component
+function AttendanceSettingsForm({ settings, onSave }: { settings: any; onSave: (settings: any) => void }) {
+  const [formData, setFormData] = useState({
+    work_start_time: settings?.work_start_time || '09:00',
+    work_end_time: settings?.work_end_time || '17:00',
+    manager_work_start_time: settings?.manager_work_start_time || '08:30',
+    manager_work_end_time: settings?.manager_work_end_time || '17:30',
+    break_duration_minutes: settings?.break_duration_minutes || 60,
+    allow_adhoc_times: settings?.allow_adhoc_times || false,
+    require_approval_for_adhoc: settings?.require_approval_for_adhoc || true,
+    late_threshold_minutes: settings?.late_threshold_minutes || 15,
+    early_leave_threshold_minutes: settings?.early_leave_threshold_minutes || 30,
+    auto_checkout_enabled: settings?.auto_checkout_enabled || false,
+    auto_checkout_time: settings?.auto_checkout_time || '18:00'
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Member Work Hours */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Users className="h-5 w-5 mr-2" />
+          Member Work Hours
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="work_start_time">Start Time</Label>
+            <Input
+              id="work_start_time"
+              type="time"
+              value={formData.work_start_time}
+              onChange={(e) => setFormData(prev => ({ ...prev, work_start_time: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="work_end_time">End Time</Label>
+            <Input
+              id="work_end_time"
+              type="time"
+              value={formData.work_end_time}
+              onChange={(e) => setFormData(prev => ({ ...prev, work_end_time: e.target.value }))}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Manager Work Hours */}
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Timer className="h-5 w-5 mr-2" />
+          Manager Work Hours
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="manager_work_start_time">Start Time</Label>
+            <Input
+              id="manager_work_start_time"
+              type="time"
+              value={formData.manager_work_start_time}
+              onChange={(e) => setFormData(prev => ({ ...prev, manager_work_start_time: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="manager_work_end_time">End Time</Label>
+            <Input
+              id="manager_work_end_time"
+              type="time"
+              value={formData.manager_work_end_time}
+              onChange={(e) => setFormData(prev => ({ ...prev, manager_work_end_time: e.target.value }))}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Break and Timing Settings */}
+      <div className="bg-green-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Coffee className="h-5 w-5 mr-2" />
+          Break & Timing Settings
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="break_duration_minutes">Break Duration (minutes)</Label>
+            <Input
+              id="break_duration_minutes"
+              type="number"
+              min="0"
+              max="120"
+              value={formData.break_duration_minutes}
+              onChange={(e) => setFormData(prev => ({ ...prev, break_duration_minutes: parseInt(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="late_threshold_minutes">Late Threshold (minutes)</Label>
+            <Input
+              id="late_threshold_minutes"
+              type="number"
+              min="0"
+              max="60"
+              value={formData.late_threshold_minutes}
+              onChange={(e) => setFormData(prev => ({ ...prev, late_threshold_minutes: parseInt(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="early_leave_threshold_minutes">Early Leave Threshold (minutes)</Label>
+            <Input
+              id="early_leave_threshold_minutes"
+              type="number"
+              min="0"
+              max="120"
+              value={formData.early_leave_threshold_minutes}
+              onChange={(e) => setFormData(prev => ({ ...prev, early_leave_threshold_minutes: parseInt(e.target.value) }))}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Adhoc Time Settings */}
+      <div className="bg-orange-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <AlertCircle className="h-5 w-5 mr-2" />
+          Adhoc Time Options
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <input
+              id="allow_adhoc_times"
+              type="checkbox"
+              checked={formData.allow_adhoc_times}
+              onChange={(e) => setFormData(prev => ({ ...prev, allow_adhoc_times: e.target.checked }))}
+              className="rounded"
+            />
+            <Label htmlFor="allow_adhoc_times">Allow employees to set custom work hours</Label>
+          </div>
+          {formData.allow_adhoc_times && (
+            <div className="flex items-center space-x-2 ml-6">
+              <input
+                id="require_approval_for_adhoc"
+                type="checkbox"
+                checked={formData.require_approval_for_adhoc}
+                onChange={(e) => setFormData(prev => ({ ...prev, require_approval_for_adhoc: e.target.checked }))}
+                className="rounded"
+              />
+              <Label htmlFor="require_approval_for_adhoc">Require manager approval for adhoc hours</Label>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Auto Checkout Settings */}
+      <div className="bg-purple-50 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Timer className="h-5 w-5 mr-2" />
+          Auto Checkout
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <input
+              id="auto_checkout_enabled"
+              type="checkbox"
+              checked={formData.auto_checkout_enabled}
+              onChange={(e) => setFormData(prev => ({ ...prev, auto_checkout_enabled: e.target.checked }))}
+              className="rounded"
+            />
+            <Label htmlFor="auto_checkout_enabled">Enable automatic checkout</Label>
+          </div>
+          {formData.auto_checkout_enabled && (
+            <div className="ml-6">
+              <Label htmlFor="auto_checkout_time">Auto Checkout Time</Label>
+              <Input
+                id="auto_checkout_time"
+                type="time"
+                value={formData.auto_checkout_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, auto_checkout_time: e.target.value }))}
+                className="w-32"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <Button type="submit" className="flex items-center space-x-2">
+          <Save className="h-4 w-4" />
+          <span>Save Settings</span>
+        </Button>
+      </div>
+    </form>
   )
 }

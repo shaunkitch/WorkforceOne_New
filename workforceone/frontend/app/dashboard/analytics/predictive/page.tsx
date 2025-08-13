@@ -55,6 +55,7 @@ export default function PredictiveAnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedView, setSelectedView] = useState<'overview' | 'attendance' | 'productivity' | 'forms'>('overview')
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [organizationSettings, setOrganizationSettings] = useState<any>(null)
 
   const supabase = createClient()
 
@@ -95,6 +96,17 @@ export default function PredictiveAnalyticsPage() {
 
       if (!profile?.organization_id) return
 
+      // Fetch organization settings for regional configuration
+      const { data: orgSettings } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .single()
+
+      if (orgSettings) {
+        setOrganizationSettings(orgSettings)
+      }
+
       const insights = await predictiveAnalytics.generateInsights(profile.organization_id)
       setInsights(insights)
     } catch (error) {
@@ -126,6 +138,11 @@ export default function PredictiveAnalyticsPage() {
       case 'down': return <TrendingDown className="h-4 w-4 text-red-600" />
       default: return <Activity className="h-4 w-4 text-gray-600" />
     }
+  }
+
+  const formatCurrency = (amount: number) => {
+    const currencySymbol = organizationSettings?.currency_symbol || '$'
+    return `${currencySymbol}${Math.abs(amount).toLocaleString()}`
   }
 
   if (loading) {
@@ -398,7 +415,7 @@ export default function PredictiveAnalyticsPage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center p-3 bg-red-50 rounded">
                     <p className="text-xs text-red-600">Financial Impact</p>
-                    <p className="text-lg font-bold text-red-900">${Math.abs(prediction.impact.financial).toLocaleString()}</p>
+                    <p className="text-lg font-bold text-red-900">{formatCurrency(prediction.impact.financial)}</p>
                   </div>
                   <div className="text-center p-3 bg-orange-50 rounded">
                     <p className="text-xs text-orange-600">Productivity Impact</p>

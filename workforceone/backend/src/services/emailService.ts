@@ -491,15 +491,51 @@ This email was sent by WorkforceOne on behalf of ${data.organizationName}.
     }
   }
 
-  async testConnectionForOrganization(organizationId: string): Promise<boolean> {
+  async testConnectionForOrganization(organizationId: string): Promise<{ success: boolean; error?: string; details?: any }> {
     try {
+      console.log('🔍 Testing email connection for organization:', organizationId)
+      
+      const integration = await this.getOrganizationEmailIntegration(organizationId)
+      if (!integration) {
+        console.log('⚠️ No email integration found, using default transporter')
+        const transporter = this.createDefaultTransporter()
+        await transporter.verify()
+        console.log('✅ Default email service connection verified')
+        return { success: true }
+      }
+      
+      console.log('📧 Email integration found:', {
+        provider: integration.provider,
+        host: integration.smtp_host,
+        port: integration.smtp_port,
+        secure: integration.smtp_secure,
+        user: integration.smtp_user
+      })
+      
       const transporter = await this.createTransporterForOrganization(organizationId)
+      
+      console.log('🔧 Testing transporter connection...')
       await transporter.verify()
-      console.log('Email service connection verified for organization:', organizationId)
-      return true
+      console.log('✅ Email service connection verified for organization:', organizationId)
+      return { success: true }
     } catch (error) {
-      console.error('Email service connection failed for organization:', organizationId, error)
-      return false
+      console.error('❌ Email service connection failed for organization:', organizationId)
+      console.error('Error details:', error)
+      
+      let errorMessage = 'Unknown error'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage,
+        details: {
+          code: (error as any)?.code,
+          responseCode: (error as any)?.responseCode,
+          response: (error as any)?.response
+        }
+      }
     }
   }
 
