@@ -197,25 +197,63 @@ export default function PayrollPage() {
 
       if (!profile?.organization_id) return
 
-      // Fetch employees
-      const { data: employees } = await supabase
+      // Fetch employees (temporarily removing is_active filter to debug)
+      const { data: employees, error: employeesError } = await supabase
         .from('profiles')
         .select('*')
         .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
+
+      console.log('Employees query:', {
+        organizationId: profile.organization_id,
+        employeesCount: employees?.length || 0,
+        employeesError,
+        employees: employees?.map(emp => ({ 
+          id: emp.id, 
+          name: emp.full_name, 
+          email: emp.email,
+          role: emp.role,
+          is_active: emp.is_active
+        }))
+      })
 
       if (!employees) return
 
-      // Fetch attendance data for the period
-      const { data: attendanceData } = await supabase
+      // Fetch attendance data for work hours (this is where actual hours worked are tracked)
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('*')
+        .select(`
+          *,
+          user:profiles!attendance_user_id_fkey (
+            id,
+            full_name,
+            email,
+            role
+          )
+        `)
         .eq('organization_id', profile.organization_id)
-        .gte('created_at', `${dateRange.start}T00:00:00.000Z`)
-        .lte('created_at', `${dateRange.end}T23:59:59.999Z`)
-        .order('created_at')
+        .gte('date', dateRange.start)
+        .lte('date', dateRange.end)
+        .in('user_id', employees.map(emp => emp.id))
+        .order('date')
 
-      // Process attendance data to calculate hours worked
+      console.log('Attendance data query:', {
+        dateRange,
+        employeeIds: employees.map(emp => emp.id),
+        employeeNames: employees.map(emp => ({ id: emp.id, name: emp.full_name })),
+        attendanceCount: attendanceData?.length || 0,
+        attendanceError,
+        sampleAttendance: attendanceData?.[0],
+        allAttendance: attendanceData?.map(entry => ({
+          user_id: entry.user_id,
+          work_hours: entry.work_hours,
+          overtime_hours: entry.overtime_hours,
+          date: entry.date,
+          status: entry.status,
+          user_name: entry.user?.full_name
+        }))
+      })
+
+      // Initialize employee hours map
       const employeeHours = new Map()
 
       employees.forEach(employee => {
@@ -240,51 +278,60 @@ export default function PayrollPage() {
         })
       })
 
-      // Calculate hours from attendance data
-      if (attendanceData) {
-        const dailyHours = new Map() // employeeId-date -> { checkIn, checkOut, hours }
-        
+      // Calculate hours from attendance data (this is where actual work hours are tracked)
+      if (attendanceData && attendanceData.length > 0) {
         attendanceData.forEach(record => {
-          const employeeId = record.employee_id
-          const date = record.created_at.split('T')[0]
-          const key = `${employeeId}-${date}`
+          if (!record.user_id) return
           
-          if (!dailyHours.has(key)) {
-            dailyHours.set(key, { checkIn: null, checkOut: null, hours: 0 })
-          }
+          const empData = employeeHours.get(record.user_id)
+          if (!empData) return
+
+          console.log(`Processing attendance for ${empData.employee_name} on ${record.date}:`, {
+            work_hours: record.work_hours,
+            overtime_hours: record.overtime_hours,
+            status: record.status
+          })
+
+          // Add work hours (already calculated in attendance table)
+          const workHours = parseFloat(record.work_hours) || 0
+          const overtimeHours = parseFloat(record.overtime_hours) || 0
           
-          const dayData = dailyHours.get(key)
-          if (record.type === 'check_in') {
-            dayData.checkIn = new Date(record.created_at)
-            // Check if late (after 9 AM)
-            const hour = dayData.checkIn.getHours()
-            if (hour >= 9) {
-              const empData = employeeHours.get(employeeId)
-              if (empData) empData.late_checkins++
+          empData.total_hours += workHours
+          empData.attendance_records++
+          
+          // Use the overtime hours from the attendance table if available
+          if (overtimeHours > 0) {
+            empData.overtime_hours += overtimeHours
+            empData.regular_hours += workHours - overtimeHours
+          } else {
+            // Apply standard overtime rules if not pre-calculated
+            if (workHours > 8) {
+              empData.overtime_hours += workHours - 8
+              empData.regular_hours += 8
+            } else {
+              empData.regular_hours += workHours
             }
-          } else if (record.type === 'check_out') {
-            dayData.checkOut = new Date(record.created_at)
           }
-          
-          // Calculate hours if both check-in and check-out exist
-          if (dayData.checkIn && dayData.checkOut && dayData.checkOut > dayData.checkIn) {
-            dayData.hours = (dayData.checkOut.getTime() - dayData.checkIn.getTime()) / (1000 * 60 * 60)
+
+          // Check for late check-ins
+          if (record.check_in_time) {
+            const checkInTime = new Date(record.check_in_time)
+            const hour = checkInTime.getHours()
+            const minute = checkInTime.getMinutes()
             
-            const empData = employeeHours.get(employeeId)
-            if (empData) {
-              empData.attendance_records++
-              empData.total_hours += dayData.hours
-              
-              if (dayData.hours > 8) {
-                empData.overtime_hours += dayData.hours - 8
-                empData.regular_hours += 8
-              } else {
-                empData.regular_hours += dayData.hours
-              }
+            if (hour > 9 || (hour === 9 && minute > 0)) {
+              empData.late_checkins++
             }
           }
         })
       }
+
+      // Add debug logging for final employee hours data
+      console.log('Final employee hours data:', {
+        totalEmployees: employeeHours.size,
+        employeesWithHours: Array.from(employeeHours.values()).filter(emp => emp.total_hours > 0).length,
+        sampleEmployeeData: Array.from(employeeHours.values())[0]
+      })
 
       // Calculate pay using organization settings
       const payrollData: PayrollData[] = Array.from(employeeHours.values()).map(emp => {
@@ -312,6 +359,7 @@ export default function PayrollPage() {
         }
       })
 
+      // Show all employees in payroll data, including those with 0 hours
       setCurrentPeriodData(payrollData)
 
     } catch (error) {

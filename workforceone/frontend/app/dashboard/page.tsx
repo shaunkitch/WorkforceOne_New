@@ -30,6 +30,7 @@ interface DashboardStats {
   activeProjects: number
   completedTasks: number
   pendingForms: number
+  projectsDueThisWeek: number
   todayAttendance: {
     present: number
     absent: number
@@ -43,6 +44,7 @@ interface RecentActivity {
   user: string
   action: string
   time: string
+  timestamp: string
 }
 
 export default function DashboardPage() {
@@ -56,6 +58,123 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData()
   }, [])
+
+  const fetchRecentActivity = async (organizationId: string) => {
+    try {
+      const activities: RecentActivity[] = []
+
+      // Get recent attendance records (last 24 hours)
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select(`
+          id,
+          status,
+          check_in_time,
+          check_out_time,
+          date,
+          user:profiles!attendance_user_id_fkey (
+            full_name
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .gte('created_at', yesterday.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      attendanceData?.forEach(record => {
+        if (record.user?.full_name) {
+          const action = record.status === 'present' && record.check_out_time 
+            ? 'checked out' 
+            : 'checked in'
+          const timestamp = record.check_in_time || record.date
+          const time = format(new Date(timestamp), 'h:mm a')
+          
+          activities.push({
+            id: `attendance_${record.id}`,
+            type: 'attendance',
+            user: record.user.full_name,
+            action,
+            time,
+            timestamp
+          })
+        }
+      })
+
+      // Get recent completed tasks (last 7 days)
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      const { data: taskData } = await supabase
+        .from('tasks')
+        .select(`
+          id,
+          title,
+          updated_at,
+          assignee:profiles!tasks_assignee_id_fkey (
+            full_name
+          )
+        `)
+        .eq('status', 'completed')
+        .gte('updated_at', weekAgo.toISOString())
+        .order('updated_at', { ascending: false })
+        .limit(5)
+
+      taskData?.forEach(task => {
+        if (task.assignee?.full_name) {
+          activities.push({
+            id: `task_${task.id}`,
+            type: 'task',
+            user: task.assignee.full_name,
+            action: `completed "${task.title}"`,
+            time: format(new Date(task.updated_at), 'h:mm a'),
+            timestamp: task.updated_at
+          })
+        }
+      })
+
+      // Get recent form submissions (last 7 days)
+      const { data: formData } = await supabase
+        .from('form_responses')
+        .select(`
+          id,
+          created_at,
+          form:forms!form_responses_form_id_fkey (
+            title
+          ),
+          user:profiles!form_responses_user_id_fkey (
+            full_name
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .gte('created_at', weekAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      formData?.forEach(response => {
+        if (response.user?.full_name && response.form?.title) {
+          activities.push({
+            id: `form_${response.id}`,
+            type: 'form',
+            user: response.user.full_name,
+            action: `submitted ${response.form.title}`,
+            time: format(new Date(response.created_at), 'h:mm a'),
+            timestamp: response.created_at
+          })
+        }
+      })
+
+      // Sort all activities by most recent first and limit to 8
+      const sortedActivities = activities
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 8)
+
+      setRecentActivity(sortedActivities)
+    } catch (error) {
+      console.error('Error fetching recent activity:', error)
+      setRecentActivity([])
+    }
+  }
 
   const fetchDashboardData = async () => {
     try {
@@ -104,21 +223,40 @@ export default function DashboardPage() {
         .eq('organization_id', profile.organization_id)
         .eq('status', 'pending')
 
+      // Get active projects
+      const { count: activeProjects } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'active')
+
+      // Get completed tasks
+      const { count: completedTasks } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed')
+
+      // Get projects due this week
+      const oneWeekFromNow = new Date()
+      oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7)
+      const { count: projectsDueThisWeek } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', profile.organization_id)
+        .in('status', ['active', 'planning'])
+        .lte('end_date', oneWeekFromNow.toISOString().split('T')[0])
+
       setStats({
         totalEmployees: totalEmployees || 0,
-        activeProjects: 5, // Mock data
-        completedTasks: 23, // Mock data
+        activeProjects: activeProjects || 0,
+        completedTasks: completedTasks || 0,
         pendingForms: pendingForms || 0,
+        projectsDueThisWeek: projectsDueThisWeek || 0,
         todayAttendance: attendanceStats
       })
 
-      // Mock recent activity
-      setRecentActivity([
-        { id: '1', type: 'attendance', user: 'John Doe', action: 'checked in', time: '9:15 AM' },
-        { id: '2', type: 'form', user: 'Sarah Smith', action: 'submitted Safety Form', time: '8:45 AM' },
-        { id: '3', type: 'task', user: 'Mike Wilson', action: 'completed Project Review', time: '8:30 AM' },
-        { id: '4', type: 'attendance', user: 'Emma Brown', action: 'checked out', time: 'Yesterday' },
-      ])
+      // Get real recent activity
+      await fetchRecentActivity(profile.organization_id)
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -188,9 +326,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-              <span className="text-green-600">+12%</span>
-              <span className="text-muted-foreground ml-1">from last month</span>
+              <span className="text-muted-foreground">Active team members</span>
             </div>
           </CardContent>
         </Card>
@@ -226,7 +362,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-purple-600">3 due this week</span>
+              <span className="text-purple-600">{stats?.projectsDueThisWeek || 0} due this week</span>
             </div>
           </CardContent>
         </Card>
@@ -267,18 +403,25 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                    {getActivityIcon(activity.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">
-                        {activity.user} {activity.action}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                {recentActivity.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Activity className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No recent activity</p>
                   </div>
-                ))}
+                ) : (
+                  recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                      {getActivityIcon(activity.type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">
+                          {activity.user} {activity.action}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -333,7 +476,9 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Projects Due</span>
-                <Badge variant="destructive">3</Badge>
+                <Badge variant={stats?.projectsDueThisWeek ? "destructive" : "secondary"}>
+                  {stats?.projectsDueThisWeek || 0}
+                </Badge>
               </div>
             </CardContent>
           </Card>

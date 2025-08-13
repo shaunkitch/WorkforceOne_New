@@ -1,0 +1,4 @@
+name,address,province,phone,email,manager_name,manager_phone,manager_email,latitude,longitude
+Main Store,"123 Main Street, City Center",New York,(555) 123-4567,main@company.com,John Smith,(555) 123-4568,john.smith@company.com,40.7128,-74.0060
+Branch Office,"456 Oak Avenue, Business District",California,(555) 987-6543,branch@company.com,Jane Doe,(555) 987-6544,jane.doe@company.com,34.0522,-118.2437
+Warehouse,"789 Industrial Blvd, Warehouse Zone",Texas,(555) 555-0123,warehouse@company.com,Mike Johnson,(555) 555-0124,mike.johnson@company.com,29.7604,-95.3698

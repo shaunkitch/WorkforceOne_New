@@ -48,6 +48,7 @@ interface Project {
   end_date?: string
   budget?: number
   spent_budget?: number
+  hourly_rate?: number
   progress: number
   team_id?: string
   project_manager_id?: string
@@ -135,6 +136,7 @@ export default function ProjectsPage() {
     start_date: '',
     end_date: '',
     budget: '',
+    hourly_rate: '',
     team_id: ''
   })
   
@@ -215,7 +217,7 @@ export default function ProjectsPage() {
       // Fetch time data for each project
       const projectsWithTimeData = await Promise.all(
         (data || []).map(async (project) => {
-          const timeData = await fetchProjectTimeData(project.id)
+          const timeData = await fetchProjectTimeData(project.id, project.hourly_rate)
           const remaining_budget = (project.budget || 0) - (project.spent_budget || 0) - timeData.total_time_cost
           return {
             ...project,
@@ -258,36 +260,57 @@ export default function ProjectsPage() {
     setProjectStats(stats)
   }
 
-  const calculateProjectTimeCost = (timeEntries: TimeEntry[], defaultHourlyRate: number = 50): number => {
+  const calculateProjectTimeCost = (timeEntries: TimeEntry[], projectHourlyRate?: number, defaultHourlyRate: number = 50): number => {
     return timeEntries.reduce((total, entry) => {
       if (!entry.is_billable) return total
-      const hourlyRate = entry.user?.hourly_rate || defaultHourlyRate
+      // Priority: project hourly rate > user hourly rate > default hourly rate
+      const hourlyRate = projectHourlyRate || entry.user?.hourly_rate || defaultHourlyRate
       const hours = entry.duration / 60 // duration is in minutes
       return total + (hours * hourlyRate)
     }, 0)
   }
 
-  const fetchProjectTimeData = async (projectId: string): Promise<{ total_time_minutes: number, total_time_cost: number, time_entries: TimeEntry[] }> => {
+  const fetchProjectTimeData = async (projectId: string, projectHourlyRate?: number): Promise<{ total_time_minutes: number, total_time_cost: number, time_entries: TimeEntry[] }> => {
     try {
+      // First check what time entries exist for this project without status filtering
+      const { data: allEntries } = await supabase
+        .from('time_entries')
+        .select('status, duration, project_id')
+        .eq('project_id', projectId)
+
+      console.log(`Time entries for project ${projectId}:`, {
+        total: allEntries?.length || 0,
+        statuses: [...new Set(allEntries?.map(e => e.status) || [])],
+        entries: allEntries?.map(e => ({ status: e.status, duration: e.duration }))
+      })
+
       const { data, error } = await supabase
         .from('time_entries')
         .select(`
           id,
           duration,
           is_billable,
+          status,
           user:profiles!time_entries_user_id_fkey (
             hourly_rate,
             full_name
           )
         `)
         .eq('project_id', projectId)
-        .eq('status', 'completed')
+        .in('status', ['completed', 'stopped', 'running']) // Expanded status filter
 
       if (error) throw error
 
       const timeEntries = data || []
       const totalTimeMinutes = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
-      const totalTimeCost = calculateProjectTimeCost(timeEntries)
+      const totalTimeCost = calculateProjectTimeCost(timeEntries, projectHourlyRate)
+
+      console.log(`Processed time data for project ${projectId}:`, {
+        timeEntriesCount: timeEntries.length,
+        totalTimeMinutes,
+        totalTimeCost,
+        sampleEntry: timeEntries[0]
+      })
 
       return {
         total_time_minutes: totalTimeMinutes,
@@ -345,6 +368,7 @@ export default function ProjectsPage() {
           start_date: projectForm.start_date,
           end_date: projectForm.end_date || null,
           budget: projectForm.budget ? parseFloat(projectForm.budget) : null,
+          hourly_rate: projectForm.hourly_rate ? parseFloat(projectForm.hourly_rate) : null,
           project_manager_id: user.user.id,
           team_id: projectForm.team_id || null,
           organization_id: organizationId,
@@ -374,6 +398,7 @@ export default function ProjectsPage() {
         start_date: '',
         end_date: '',
         budget: '',
+        hourly_rate: '',
         team_id: ''
       })
       setShowCreateProject(false)
@@ -394,6 +419,7 @@ export default function ProjectsPage() {
       start_date: project.start_date,
       end_date: project.end_date || '',
       budget: project.budget?.toString() || '',
+      hourly_rate: project.hourly_rate?.toString() || '',
       team_id: project.team_id || ''
     })
     setShowEditProject(true)
@@ -413,6 +439,7 @@ export default function ProjectsPage() {
           start_date: projectForm.start_date,
           end_date: projectForm.end_date || null,
           budget: projectForm.budget ? parseFloat(projectForm.budget) : null,
+          hourly_rate: projectForm.hourly_rate ? parseFloat(projectForm.hourly_rate) : null,
           team_id: projectForm.team_id || null,
         })
         .eq('id', editingProject.id)
@@ -451,6 +478,7 @@ export default function ProjectsPage() {
         start_date: '',
         end_date: '',
         budget: '',
+        hourly_rate: '',
         team_id: ''
       })
       setShowEditProject(false)
@@ -932,7 +960,7 @@ export default function ProjectsPage() {
                         <Clock className="h-5 w-5 mr-2 text-blue-600" />
                         Time Tracking Summary
                       </h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
                           <div className="text-sm text-gray-600">Total Time Logged</div>
                           <div className="text-lg font-medium text-blue-600">
@@ -945,8 +973,14 @@ export default function ProjectsPage() {
                             {formatCurrency(selectedProject.total_time_cost || 0)}
                           </div>
                         </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Project Hourly Rate</div>
+                          <div className="text-lg font-medium text-purple-600">
+                            {selectedProject.hourly_rate ? formatCurrency(selectedProject.hourly_rate) + '/hr' : 'User default rates'}
+                          </div>
+                        </div>
                         {selectedProject.time_entries && selectedProject.time_entries.length > 0 && (
-                          <div className="col-span-2">
+                          <div className="col-span-3">
                             <div className="text-sm text-gray-600 mb-2">Recent Contributors</div>
                             <div className="flex flex-wrap gap-2">
                               {[...new Set(selectedProject.time_entries.map(entry => entry.user?.full_name).filter(Boolean))].slice(0, 5).map(name => (
@@ -1052,6 +1086,20 @@ export default function ProjectsPage() {
                     onChange={(e) => setProjectForm(prev => ({ ...prev, budget: e.target.value }))}
                     placeholder="0"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="hourly_rate">Hourly Rate (Optional)</Label>
+                  <Input
+                    id="hourly_rate"
+                    type="number"
+                    step="0.01"
+                    value={projectForm.hourly_rate}
+                    onChange={(e) => setProjectForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
+                    placeholder="50.00"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Override default user rates for time tracking on this project
+                  </p>
                 </div>
               </div>
               <div>
@@ -1163,6 +1211,23 @@ export default function ProjectsPage() {
                     placeholder="0"
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editHourlyRate">Hourly Rate (Optional)</Label>
+                  <Input
+                    id="editHourlyRate"
+                    type="number"
+                    step="0.01"
+                    value={projectForm.hourly_rate}
+                    onChange={(e) => setProjectForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
+                    placeholder="50.00"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Override default user rates for time tracking
+                  </p>
+                </div>
+                <div></div>
               </div>
               <div>
                 <Label htmlFor="editDescription">Description</Label>

@@ -205,22 +205,27 @@ export default function TimeTrackingPage() {
       }
 
       const now = new Date()
+      const timeEntryData = {
+        user_id: user.user.id,
+        organization_id: organizationId,
+        start_time: now.toISOString(),
+        description: description,
+        project_id: selectedProject || null,
+        is_billable: isBillable,
+        status: 'active'
+      }
+
+      console.log('Creating time entry:', timeEntryData)
+
       const { data, error } = await supabase
         .from('time_entries')
-        .insert({
-          user_id: user.user.id,
-          organization_id: organizationId,
-          start_time: now.toISOString(),
-          description: description,
-          project_id: selectedProject || null,
-          is_billable: isBillable,
-          status: 'active'
-        })
+        .insert(timeEntryData)
         .select()
         .single()
 
       if (error) throw error
 
+      console.log('Time entry created:', data)
       setActiveEntryId(data.id)
       setStartTime(now)
       setIsRunning(true)
@@ -263,16 +268,24 @@ export default function TimeTrackingPage() {
       const now = new Date()
       const duration = Math.floor((now.getTime() - (startTime?.getTime() || 0)) / 1000 / 60)
 
-      const { error } = await supabase
+      const updateData = {
+        end_time: now.toISOString(),
+        duration: duration,
+        status: 'completed'
+      }
+
+      console.log('Updating time entry to completed:', { activeEntryId, updateData })
+
+      const { data, error } = await supabase
         .from('time_entries')
-        .update({
-          end_time: now.toISOString(),
-          duration: duration,
-          status: 'completed'
-        })
+        .update(updateData)
         .eq('id', activeEntryId)
+        .select()
+        .single()
 
       if (error) throw error
+
+      console.log('Time entry completed:', data)
 
       setIsRunning(false)
       setActiveEntryId(null)
@@ -322,21 +335,29 @@ export default function TimeTrackingPage() {
       const end = new Date(manualEndTime)
       const duration = Math.floor((end.getTime() - start.getTime()) / 1000 / 60)
 
-      const { error } = await supabase
+      const manualEntryData = {
+        user_id: user.user.id,
+        organization_id: organizationId,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        duration: duration,
+        description: manualDescription,
+        project_id: manualProject || null,
+        is_billable: false,
+        status: 'completed'
+      }
+
+      console.log('Creating manual time entry:', manualEntryData)
+
+      const { data, error } = await supabase
         .from('time_entries')
-        .insert({
-          user_id: user.user.id,
-          organization_id: organizationId,
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-          duration: duration,
-          description: manualDescription,
-          project_id: manualProject || null,
-          is_billable: false,
-          status: 'completed'
-        })
+        .insert(manualEntryData)
+        .select()
+        .single()
 
       if (error) throw error
+
+      console.log('Manual time entry created:', data)
 
       // Reset form
       setManualStartTime('')

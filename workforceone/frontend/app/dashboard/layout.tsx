@@ -15,7 +15,7 @@ import {
   Home, Clock, Calendar, Users, Briefcase, CheckSquare,
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
-  User, UserCheck, Zap
+  User, UserCheck, Zap, Route
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
 
@@ -56,6 +56,13 @@ const allNavigation = [
     icon: MapPin, 
     feature: 'maps',
     description: 'Real-time team locations'
+  },
+  { 
+    name: 'Routes', 
+    href: '/dashboard/routes', 
+    icon: Route, 
+    feature: 'routes',
+    description: 'Route optimization and planning'
   },
   { 
     name: 'Outlets', 

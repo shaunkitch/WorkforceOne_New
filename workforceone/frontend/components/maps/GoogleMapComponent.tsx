@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import simpleGoogleMapsService from '@/lib/google-maps-simple'
+import { OptimizedRoute } from '@/lib/routeOptimization'
 
 interface MapMarker {
   id: string
@@ -23,6 +24,8 @@ interface GoogleMapComponentProps {
   style?: React.CSSProperties
   onMapLoad?: (map: google.maps.Map) => void
   onMarkerClick?: (marker: MapMarker) => void
+  optimizedRoute?: OptimizedRoute
+  showRoutePolyline?: boolean
 }
 
 export default function GoogleMapComponent({
@@ -32,12 +35,16 @@ export default function GoogleMapComponent({
   className = '',
   style = { width: '100%', height: '400px' },
   onMapLoad,
-  onMarkerClick
+  onMarkerClick,
+  optimizedRoute,
+  showRoutePolyline = false
 }: GoogleMapComponentProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null)
+  const polylineRef = useRef<google.maps.Polyline | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,28 +52,34 @@ export default function GoogleMapComponent({
   useEffect(() => {
     return () => {
       if (mapInstanceRef.current) {
-        // The Google Maps library can sometimes throw errors during cleanup
-        // depending on its internal state. We can wrap this in a try/catch.
         try {
-          // Clear all event listeners on the map
           google.maps.event.clearInstanceListeners(mapInstanceRef.current)
         } catch (e) {
           console.error('Error clearing map instance listeners:', e)
         }
         mapInstanceRef.current = null
       }
+      
+      // Clean up directions renderer
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null)
+        directionsRendererRef.current = null
+      }
+      
+      // Clean up polyline
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null)
+        polylineRef.current = null
+      }
     }
   }, [])
 
   const initializeMap = useCallback(async (mapContainer: HTMLDivElement) => {
-    console.log('Initializing Google Map component...')
     try {
       setIsLoading(true)
       setError(null)
       
       await simpleGoogleMapsService.loadGoogleMaps()
-      console.log('Google Maps API loaded, creating map...')
-
       const map = await simpleGoogleMapsService.createMap(mapContainer, {
         center,
         zoom,
@@ -80,15 +93,11 @@ export default function GoogleMapComponent({
       })
 
       mapInstanceRef.current = map
-      console.log('Map created successfully')
-
       const infoWindow = await simpleGoogleMapsService.createInfoWindow()
       infoWindowRef.current = infoWindow
-      console.log('Info window created')
 
       onMapLoad?.(map)
       setIsLoading(false)
-      console.log('Map initialization complete')
     } catch (err) {
       console.error('Failed to initialize Google Maps:', err)
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
@@ -160,6 +169,152 @@ export default function GoogleMapComponent({
     }
   }, [markers, onMarkerClick])
 
+  // Function to display route polyline on map
+  const displayRoute = useCallback(async () => {
+    if (!mapInstanceRef.current || !optimizedRoute || !showRoutePolyline) {
+      console.log('Route display conditions not met:', {
+        mapReady: !!mapInstanceRef.current,
+        optimizedRoute: !!optimizedRoute,
+        showRoutePolyline
+      })
+      return
+    }
+
+    console.log('=== ROUTE VISUALIZATION DEBUG ===')
+    console.log('Displaying route on map:', optimizedRoute)
+    console.log('Route stops:', optimizedRoute.stops)
+    console.log('Number of stops:', optimizedRoute.stops.length)
+    console.log('Google Maps available:', typeof google !== 'undefined')
+    console.log('Maps API key:', process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing')
+
+    // If we have less than 2 stops, just center on the stops
+    if (optimizedRoute.stops.length < 2) {
+      console.log('Not enough stops for route display')
+      return
+    }
+
+    try {
+      // Clear existing route display
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null)
+        directionsRendererRef.current = null
+      }
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null)
+        polylineRef.current = null
+      }
+
+      // Create directions service if not exists
+      const directionsService = new google.maps.DirectionsService()
+      
+      // Prepare waypoints (exclude first and last stops)
+      const waypoints: google.maps.DirectionsWaypoint[] = []
+      for (let i = 1; i < optimizedRoute.stops.length - 1; i++) {
+        waypoints.push({
+          location: new google.maps.LatLng(
+            optimizedRoute.stops[i].latitude,
+            optimizedRoute.stops[i].longitude
+          ),
+          stopover: true
+        })
+      }
+
+      const origin = optimizedRoute.stops[0]
+      const destination = optimizedRoute.stops[optimizedRoute.stops.length - 1]
+
+      // Get directions from Google Maps
+      console.log('Making directions request:', {
+        origin: `${origin.latitude}, ${origin.longitude}`,
+        destination: `${destination.latitude}, ${destination.longitude}`,
+        waypointsCount: waypoints.length
+      })
+      
+      const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
+        directionsService.route({
+          origin: new google.maps.LatLng(origin.latitude, origin.longitude),
+          destination: new google.maps.LatLng(destination.latitude, destination.longitude),
+          waypoints: waypoints,
+          optimizeWaypoints: false, // Don't re-optimize, use our order
+          travelMode: google.maps.TravelMode.DRIVING,
+          unitSystem: google.maps.UnitSystem.METRIC
+        }, (result, status) => {
+          console.log('Directions API response:', status, result)
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            resolve(result)
+          } else {
+            console.error('Directions API error:', status)
+            reject(new Error(`Directions request failed: ${status}`))
+          }
+        })
+      })
+
+      // Create and configure directions renderer
+      const directionsRenderer = new google.maps.DirectionsRenderer({
+        suppressMarkers: true, // We'll show our own markers
+        polylineOptions: {
+          strokeColor: '#2563eb', // Blue color
+          strokeWeight: 4,
+          strokeOpacity: 0.8,
+          icons: [{
+            icon: {
+              path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+              scale: 3,
+              fillColor: '#2563eb',
+              fillOpacity: 0.8,
+              strokeColor: '#ffffff',
+              strokeWeight: 1
+            },
+            offset: '50px',
+            repeat: '200px'
+          }]
+        }
+      })
+
+      directionsRenderer.setDirections(result)
+      directionsRenderer.setMap(mapInstanceRef.current)
+      directionsRendererRef.current = directionsRenderer
+
+      // Fit map to show entire route
+      const bounds = new google.maps.LatLngBounds()
+      optimizedRoute.stops.forEach(stop => {
+        bounds.extend(new google.maps.LatLng(stop.latitude, stop.longitude))
+      })
+      mapInstanceRef.current.fitBounds(bounds)
+
+      console.log('Route displayed successfully')
+    } catch (err) {
+      console.error('Failed to display route using Directions API:', err)
+      console.log('Attempting fallback simple polyline...')
+      
+      // Fallback: Create simple polyline connecting stops
+      try {
+        const path = optimizedRoute.stops.map(stop => 
+          new google.maps.LatLng(stop.latitude, stop.longitude)
+        )
+        
+        const polyline = new google.maps.Polyline({
+          path: path,
+          geodesic: true,
+          strokeColor: '#2563eb',
+          strokeOpacity: 0.8,
+          strokeWeight: 4,
+        })
+        
+        polyline.setMap(mapInstanceRef.current)
+        polylineRef.current = polyline
+        
+        // Fit map to show all points
+        const bounds = new google.maps.LatLngBounds()
+        path.forEach(point => bounds.extend(point))
+        mapInstanceRef.current.fitBounds(bounds)
+        
+        console.log('Fallback polyline displayed successfully')
+      } catch (fallbackErr) {
+        console.error('Failed to display fallback polyline:', fallbackErr)
+      }
+    }
+  }, [optimizedRoute, showRoutePolyline])
+
   // Update markers, center, and zoom
   useEffect(() => {
     if (mapInstanceRef.current) {
@@ -168,6 +323,23 @@ export default function GoogleMapComponent({
       mapInstanceRef.current.setZoom(zoom)
     }
   }, [markers, center, zoom, updateMarkers])
+
+  // Update route display when route changes
+  useEffect(() => {
+    if (mapInstanceRef.current && showRoutePolyline) {
+      displayRoute()
+    } else {
+      // Clear route display when not showing
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null)
+        directionsRendererRef.current = null
+      }
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null)
+        polylineRef.current = null
+      }
+    }
+  }, [optimizedRoute, showRoutePolyline, displayRoute])
 
   return (
     <div className={`relative rounded-lg border ${className}`} style={style}>

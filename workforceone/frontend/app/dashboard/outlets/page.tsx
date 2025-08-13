@@ -7,13 +7,20 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { PlusCircle, MapPin, Users, User, Edit, Trash2, Settings, Loader2 } from 'lucide-react'
+import { PlusCircle, MapPin, Users, User, Edit, Trash2, Settings, Loader2, Upload, Download } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 
 interface Outlet {
   id: string
   name: string
+  outlet_code: string | null
   address: string | null
+  province: string | null
+  phone: string | null
+  email: string | null
+  manager_name: string | null
+  manager_phone: string | null
+  manager_email: string | null
   latitude: number | null
   longitude: number | null
   organization_id: string
@@ -45,6 +52,7 @@ export default function OutletsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [selectedOutlet, setSelectedOutlet] = useState<Outlet | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -219,10 +227,20 @@ export default function OutletsPage() {
           </p>
         </div>
         {canManageOutlets() && (
-          <Button onClick={handleCreateOutlet} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Create Outlet
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Button 
+              onClick={() => setShowImportModal(true)} 
+              variant="outline"
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            <Button onClick={handleCreateOutlet} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Create Outlet
+            </Button>
+          </div>
         )}
       </div>
 
@@ -232,9 +250,16 @@ export default function OutletsPage() {
           <Card key={outlet.id} className="group hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <MapPin className="h-5 w-5 text-blue-600" />
-                  <span className="text-lg font-semibold">{outlet.name}</span>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-5 w-5 text-blue-600" />
+                    <span className="text-lg font-semibold">{outlet.name}</span>
+                  </div>
+                  {outlet.outlet_code && (
+                    <div className="text-sm text-gray-500 font-mono">
+                      {outlet.outlet_code}
+                    </div>
+                  )}
                 </div>
                 {canManageOutlets() && (
                   <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -263,15 +288,38 @@ export default function OutletsPage() {
 
             <CardContent>
               <div className="space-y-3">
-                {outlet.address && (
-                  <p className="text-sm text-gray-600 flex items-start space-x-2">
-                    <MapPin className="h-4 w-4 mt-0.5 text-gray-400" />
-                    <span>{outlet.address}</span>
-                  </p>
-                )}
+                <div className="space-y-2">
+                  {outlet.address && (
+                    <p className="text-sm text-gray-600 flex items-start space-x-2">
+                      <MapPin className="h-4 w-4 mt-0.5 text-gray-400" />
+                      <span>
+                        {outlet.address}
+                        {outlet.province && <>, {outlet.province}</>}
+                      </span>
+                    </p>
+                  )}
+                  
+                  {outlet.phone && (
+                    <p className="text-sm text-gray-600">
+                      📞 {outlet.phone}
+                    </p>
+                  )}
+                  
+                  {outlet.email && (
+                    <p className="text-sm text-gray-600">
+                      ✉️ {outlet.email}
+                    </p>
+                  )}
+                  
+                  {outlet.manager_name && (
+                    <p className="text-sm text-gray-600">
+                      👤 Manager: {outlet.manager_name}
+                    </p>
+                  )}
+                </div>
                 
                 {(outlet.latitude && outlet.longitude) && (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 border-t pt-2">
                     Coordinates: {outlet.latitude}, {outlet.longitude}
                   </p>
                 )}
@@ -354,6 +402,15 @@ export default function OutletsPage() {
           outlet={selectedOutlet}
         />
       )}
+
+      {/* Import CSV Modal */}
+      {showImportModal && (
+        <ImportCSVModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={fetchOutlets}
+        />
+      )}
     </div>
   )
 }
@@ -371,6 +428,12 @@ function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFo
   const [formData, setFormData] = useState({
     name: outlet?.name || '',
     address: outlet?.address || '',
+    province: outlet?.province || '',
+    phone: outlet?.phone || '',
+    email: outlet?.email || '',
+    manager_name: outlet?.manager_name || '',
+    manager_phone: outlet?.manager_phone || '',
+    manager_email: outlet?.manager_email || '',
     latitude: outlet?.latitude?.toString() || '',
     longitude: outlet?.longitude?.toString() || ''
   })
@@ -396,6 +459,12 @@ function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFo
       const outletData = {
         name: formData.name.trim(),
         address: formData.address.trim() || null,
+        province: formData.province.trim() || null,
+        phone: formData.phone.trim() || null,
+        email: formData.email.trim() || null,
+        manager_name: formData.manager_name.trim() || null,
+        manager_phone: formData.manager_phone.trim() || null,
+        manager_email: formData.manager_email.trim() || null,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         organization_id: profile.organization_id
@@ -431,7 +500,7 @@ function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-90vh overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-90vh overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
@@ -468,6 +537,80 @@ function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFo
                 rows={2}
                 className="mt-1"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="province">Province/State</Label>
+              <Input
+                id="province"
+                value={formData.province}
+                onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                placeholder="Enter province or state"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="Outlet phone number"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Outlet email address"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Manager Information</h3>
+              
+              <div>
+                <Label htmlFor="manager_name">Manager Name</Label>
+                <Input
+                  id="manager_name"
+                  value={formData.manager_name}
+                  onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}
+                  placeholder="Manager full name"
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label htmlFor="manager_phone">Manager Phone</Label>
+                  <Input
+                    id="manager_phone"
+                    value={formData.manager_phone}
+                    onChange={(e) => setFormData({ ...formData, manager_phone: e.target.value })}
+                    placeholder="Manager phone number"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="manager_email">Manager Email</Label>
+                  <Input
+                    id="manager_email"
+                    type="email"
+                    value={formData.manager_email}
+                    onChange={(e) => setFormData({ ...formData, manager_email: e.target.value })}
+                    placeholder="Manager email address"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -800,6 +943,366 @@ function AssignmentModal({ isOpen, onClose, onSuccess, outlet }: AssignmentModal
               )}
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Import CSV Modal Component
+interface ImportCSVModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+interface CSVOutletData {
+  name: string
+  address?: string
+  province?: string
+  phone?: string
+  email?: string
+  manager_name?: string
+  manager_phone?: string
+  manager_email?: string
+  latitude?: number
+  longitude?: number
+}
+
+function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
+  const [file, setFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [previewData, setPreviewData] = useState<CSVOutletData[]>([])
+  const [showPreview, setShowPreview] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+  const supabase = createClient()
+
+  const downloadTemplate = () => {
+    const link = document.createElement('a')
+    link.href = '/templates/outlets_template.csv'
+    link.download = 'outlets_template.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const parseCSV = (text: string): CSVOutletData[] => {
+    const lines = text.trim().split('\n')
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+    
+    return lines.slice(1).map(line => {
+      const values = []
+      let current = ''
+      let inQuotes = false
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        if (char === '"' && (i === 0 || line[i-1] === ',')) {
+          inQuotes = true
+        } else if (char === '"' && (i === line.length - 1 || line[i+1] === ',')) {
+          inQuotes = false
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      values.push(current.trim())
+
+      const outlet: any = {}
+      headers.forEach((header, index) => {
+        const value = values[index]?.replace(/"/g, '') || ''
+        
+        switch (header.toLowerCase()) {
+          case 'name':
+            outlet.name = value
+            break
+          case 'address':
+            outlet.address = value || null
+            break
+          case 'province':
+            outlet.province = value || null
+            break
+          case 'phone':
+            outlet.phone = value || null
+            break
+          case 'email':
+            outlet.email = value || null
+            break
+          case 'manager_name':
+            outlet.manager_name = value || null
+            break
+          case 'manager_phone':
+            outlet.manager_phone = value || null
+            break
+          case 'manager_email':
+            outlet.manager_email = value || null
+            break
+          case 'latitude':
+            outlet.latitude = value ? parseFloat(value) : null
+            break
+          case 'longitude':
+            outlet.longitude = value ? parseFloat(value) : null
+            break
+        }
+      })
+      
+      return outlet
+    })
+  }
+
+  const validateData = (data: CSVOutletData[]): string[] => {
+    const validationErrors: string[] = []
+    
+    data.forEach((outlet, index) => {
+      const row = index + 2 // +2 because index starts at 0 and we skip header
+      
+      if (!outlet.name || outlet.name.trim() === '') {
+        validationErrors.push(`Row ${row}: Name is required`)
+      }
+      
+      if (outlet.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(outlet.email)) {
+        validationErrors.push(`Row ${row}: Invalid email format`)
+      }
+      
+      if (outlet.manager_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(outlet.manager_email)) {
+        validationErrors.push(`Row ${row}: Invalid manager email format`)
+      }
+      
+      if (outlet.latitude && (isNaN(outlet.latitude) || outlet.latitude < -90 || outlet.latitude > 90)) {
+        validationErrors.push(`Row ${row}: Invalid latitude (must be between -90 and 90)`)
+      }
+      
+      if (outlet.longitude && (isNaN(outlet.longitude) || outlet.longitude < -180 || outlet.longitude > 180)) {
+        validationErrors.push(`Row ${row}: Invalid longitude (must be between -180 and 180)`)
+      }
+    })
+    
+    return validationErrors
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile && selectedFile.type === 'text/csv') {
+      setFile(selectedFile)
+      setShowPreview(false)
+      setPreviewData([])
+      setErrors([])
+    } else {
+      alert('Please select a valid CSV file')
+    }
+  }
+
+  const handlePreview = async () => {
+    if (!file) return
+    
+    setLoading(true)
+    try {
+      const text = await file.text()
+      const data = parseCSV(text)
+      const validationErrors = validateData(data)
+      
+      setPreviewData(data)
+      setErrors(validationErrors)
+      setShowPreview(true)
+    } catch (error) {
+      console.error('Error parsing CSV:', error)
+      alert('Error parsing CSV file. Please check the format.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!file || errors.length > 0) return
+    
+    setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id) throw new Error('No organization found')
+
+      const outletsToInsert = previewData.map(outlet => ({
+        ...outlet,
+        organization_id: profile.organization_id
+      }))
+
+      const { error } = await supabase
+        .from('outlets')
+        .insert(outletsToInsert)
+
+      if (error) throw error
+
+      onSuccess()
+      onClose()
+      alert(`Successfully imported ${outletsToInsert.length} outlets!`)
+    } catch (error) {
+      console.error('Error importing outlets:', error)
+      alert('Failed to import outlets. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-90vh overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Import Outlets from CSV</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {!showPreview ? (
+            <div className="space-y-6">
+              <div className="text-center border-2 border-dashed border-gray-300 rounded-lg p-8">
+                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <div className="space-y-2">
+                  <p className="text-lg font-medium text-gray-900">Upload CSV File</p>
+                  <p className="text-sm text-gray-600">
+                    Import multiple outlets at once using a CSV file
+                  </p>
+                </div>
+                
+                <div className="mt-4">
+                  <Input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="max-w-xs mx-auto"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-medium text-blue-900 mb-2">CSV Format Requirements:</h3>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• <strong>Required:</strong> name</li>
+                  <li>• <strong>Optional:</strong> address, province, phone, email</li>
+                  <li>• <strong>Optional:</strong> manager_name, manager_phone, manager_email</li>
+                  <li>• <strong>Optional:</strong> latitude, longitude</li>
+                </ul>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Button
+                  onClick={downloadTemplate}
+                  variant="outline"
+                  className="flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Template
+                </Button>
+                
+                <Button
+                  onClick={handlePreview}
+                  disabled={!file || loading}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Preview Data'
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Preview ({previewData.length} outlets)</h3>
+                <Button
+                  onClick={() => setShowPreview(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Back to Upload
+                </Button>
+              </div>
+
+              {errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-900 mb-2">Validation Errors:</h4>
+                  <ul className="text-sm text-red-800 space-y-1">
+                    {errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="text-left p-3 border-b">Name</th>
+                        <th className="text-left p-3 border-b">Address</th>
+                        <th className="text-left p-3 border-b">Province</th>
+                        <th className="text-left p-3 border-b">Phone</th>
+                        <th className="text-left p-3 border-b">Manager</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.map((outlet, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-3 font-medium">{outlet.name}</td>
+                          <td className="p-3 text-gray-600">{outlet.address || '-'}</td>
+                          <td className="p-3 text-gray-600">{outlet.province || '-'}</td>
+                          <td className="p-3 text-gray-600">{outlet.phone || '-'}</td>
+                          <td className="p-3 text-gray-600">{outlet.manager_name || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <Button
+                  onClick={onClose}
+                  variant="outline"
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleImport}
+                  disabled={loading || errors.length > 0}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    `Import ${previewData.length} Outlets`
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
