@@ -245,26 +245,57 @@ export default function LandingPage() {
               <p className="text-gray-400 mb-4 max-w-md">
                 The complete remote workforce management solution for modern distributed teams.
               </p>
+              <div className="flex space-x-4">
+                <a href="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
+                  Start Free Trial
+                </a>
+                <a href="/contact" className="text-gray-400 hover:text-white">
+                  Contact Sales
+                </a>
+              </div>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white">Features</a></li>
-                <li><a href="#" className="hover:text-white">Pricing</a></li>
-                <li><a href="#" className="hover:text-white">Security</a></li>
+                <li><a href="/features" className="hover:text-white">Features</a></li>
+                <li><a href="/pricing" className="hover:text-white">Pricing</a></li>
+                <li><a href="/security" className="hover:text-white">Security</a></li>
+                <li><a href="/integrations" className="hover:text-white">Integrations</a></li>
+                <li><a href="/mobile" className="hover:text-white">Mobile Apps</a></li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Support</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white">Help Center</a></li>
-                <li><a href="#" className="hover:text-white">Contact Us</a></li>
-                <li><a href="#" className="hover:text-white">Privacy Policy</a></li>
+                <li><a href="/help" className="hover:text-white">Help Center</a></li>
+                <li><a href="/contact" className="hover:text-white">Contact Us</a></li>
+                <li><a href="/api-docs" className="hover:text-white">API Documentation</a></li>
+                <li><a href="/status" className="hover:text-white">System Status</a></li>
+                <li><a href="/community" className="hover:text-white">Community</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-4">Company</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/about" className="hover:text-white">About Us</a></li>
+                <li><a href="/blog" className="hover:text-white">Blog</a></li>
+                <li><a href="/careers" className="hover:text-white">Careers</a></li>
+                <li><a href="/press" className="hover:text-white">Press</a></li>
+                <li><a href="/partners" className="hover:text-white">Partners</a></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 WorkforceOne. All rights reserved.</p>
+          <div className="border-t border-gray-800 mt-8 pt-8">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <div className="flex flex-wrap justify-center md:justify-start space-x-6 text-gray-400 text-sm mb-4 md:mb-0">
+                <a href="/privacy" className="hover:text-white">Privacy Policy</a>
+                <a href="/terms" className="hover:text-white">Terms of Service</a>
+                <a href="/cookies" className="hover:text-white">Cookie Policy</a>
+                <a href="/gdpr" className="hover:text-white">GDPR</a>
+                <a href="/ccpa" className="hover:text-white">CCPA</a>
+              </div>
+              <p className="text-center text-gray-400 text-sm">&copy; 2025 WorkforceOne. All rights reserved.</p>
+            </div>
           </div>
         </div>
       </footer>

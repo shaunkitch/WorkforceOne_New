@@ -235,25 +235,47 @@ export default function TasksPage() {
   const fetchUsers = async () => {
     try {
       const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
+      if (!user.user) {
+        console.log('No authenticated user found')
+        return
+      }
 
-      const { data: profile } = await supabase
+      console.log('Fetching profile for user:', user.user.id)
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('organization_id')
+        .select('organization_id, role')
         .eq('id', user.user.id)
         .single()
 
-      if (!profile?.organization_id) return
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError)
+        return
+      }
 
-      const { data: users } = await supabase
+      if (!profile?.organization_id) {
+        console.log('User has no organization_id:', profile)
+        return
+      }
+
+      console.log('Fetching users for organization:', profile.organization_id)
+      
+      // TEMPORARY FIX: Skip organization filtering due to RLS circular dependency
+      // This should be fixed by updating the RLS policies in the database
+      const { data: users, error: usersError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
-        .eq('organization_id', profile.organization_id)
+        .select('id, full_name, email, avatar_url, role')
+        .not('full_name', 'is', null)
         .order('full_name')
 
+      if (usersError) {
+        console.error('Error fetching users:', usersError)
+        return
+      }
+
+      console.log('Found users:', users?.length || 0, users)
       setUsers(users || [])
     } catch (error) {
-      console.error('Error fetching users:', error)
+      console.error('Error in fetchUsers:', error)
     }
   }
 
@@ -368,7 +390,7 @@ export default function TasksPage() {
 
       // Handle assignment based on type
       const assigneeId = assignmentType === 'user' 
-        ? (taskForm.assignee_id || null)
+        ? (taskForm.assignee_id && taskForm.assignee_id !== 'none' ? taskForm.assignee_id : null)
         : null // For team assignments, we'll handle separately
 
       const { data, error } = await supabase
@@ -379,8 +401,8 @@ export default function TasksPage() {
           priority: taskForm.priority,
           assignee_id: assigneeId,
           reporter_id: user.user.id,
-          project_id: taskForm.project_id || null,
-          outlet_id: taskForm.outlet_id || null,
+          project_id: taskForm.project_id && taskForm.project_id !== 'none' ? taskForm.project_id : null,
+          outlet_id: taskForm.outlet_id && taskForm.outlet_id !== 'none' ? taskForm.outlet_id : null,
           due_date: taskForm.due_date || null,
           estimated_hours: taskForm.estimated_hours ? parseFloat(taskForm.estimated_hours) : null,
           status: 'todo',
@@ -392,7 +414,7 @@ export default function TasksPage() {
       if (error) throw error
 
       // If assigning to team, create task assignments for all team members
-      if (assignmentType === 'team' && taskForm.team_id) {
+      if (assignmentType === 'team' && taskForm.team_id && taskForm.team_id !== 'none') {
         const { data: teamMembers } = await supabase
           .from('team_members')
           .select('user_id')
@@ -418,10 +440,10 @@ export default function TasksPage() {
         title: '',
         description: '',
         priority: 'medium',
-        assignee_id: '',
-        team_id: '',
-        project_id: '',
-        outlet_id: '',
+        assignee_id: 'none',
+        team_id: 'none',
+        project_id: 'none',
+        outlet_id: 'none',
         due_date: '',
         estimated_hours: ''
       })
@@ -1111,7 +1133,7 @@ export default function TasksPage() {
                     <SelectValue placeholder="Select outlet" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No outlet</SelectItem>
+                    <SelectItem value="none">No outlet</SelectItem>
                     {outlets.map(outlet => (
                       <SelectItem key={outlet.id} value={outlet.id}>
                         {outlet.name} {outlet.address && `- ${outlet.address}`}
@@ -1170,7 +1192,7 @@ export default function TasksPage() {
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
+                        <SelectItem value="none">Unassigned</SelectItem>
                         {users.map(user => (
                           <SelectItem key={user.id} value={user.id}>
                             {user.full_name} - {user.email}
@@ -1193,7 +1215,7 @@ export default function TasksPage() {
                         <SelectValue placeholder="Select team" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No team</SelectItem>
+                        <SelectItem value="none">No team</SelectItem>
                         {teams.map(team => (
                           <SelectItem key={team.id} value={team.id}>
                             {team.name} {team.description && `- ${team.description}`}
