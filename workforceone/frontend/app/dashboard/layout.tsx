@@ -15,7 +15,7 @@ import {
   Home, Clock, Calendar, Users, Briefcase, CheckSquare,
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
-  User, UserCheck
+  User, UserCheck, Zap
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
 
@@ -127,6 +127,14 @@ const advancedNavigation = [
     feature: 'analytics',
     requiresRole: ['admin', 'manager'],
     description: 'Advanced reporting and insights'
+  },
+  {
+    name: 'Integrations',
+    href: '/dashboard/integrations',
+    icon: Zap,
+    feature: 'integrations',
+    requiresRole: ['admin', 'manager'],
+    description: 'Slack and Teams integrations'
   },
   {
     name: 'Payroll Export',

@@ -20,7 +20,8 @@ import {
   BarChart3,
   PieChart,
   LineChart,
-  Loader2
+  Loader2,
+  Brain
 } from 'lucide-react'
 
 interface AnalyticsData {
@@ -389,6 +390,20 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button 
+            onClick={() => window.location.href = '/dashboard/analytics/predictive'}
+            className="bg-gradient-to-r from-purple-600 to-blue-600"
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            AI Insights
+          </Button>
+          <Button 
+            onClick={() => window.location.href = '/dashboard/reports/powerbi'}
+            variant="outline"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Power BI
+          </Button>
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}

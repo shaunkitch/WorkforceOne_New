@@ -323,6 +323,33 @@ export default function AttendancePage() {
 
       if (error) throw error
 
+      // Trigger check-out workflow event
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('organization_id')
+            .eq('id', user.user.id)
+            .single()
+
+          if (profile?.organization_id) {
+            await workflowTriggerEngine.triggerAttendanceEvent(
+              profile.organization_id,
+              user.user.id,
+              'check_out',
+              {
+                check_out_time: now.toISOString(),
+                total_hours: totalHours,
+                check_in_time: todayRecord.check_in_time
+              }
+            )
+          }
+        }
+      } catch (triggerError) {
+        console.warn('Failed to trigger check-out workflow events:', triggerError)
+      }
+
       setIsCheckedIn(false)
       setBreakStartTime(null)
       fetchAttendanceData()

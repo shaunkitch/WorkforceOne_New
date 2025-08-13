@@ -35,7 +35,9 @@ import {
   Calendar,
   Download,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Settings
 } from 'lucide-react'
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 
@@ -191,6 +193,13 @@ export default function ReportsPage() {
           <p className="text-gray-600">Track performance and productivity insights.</p>
         </div>
         <div className="flex items-center space-x-4">
+          <Button 
+            onClick={() => window.location.href = '/dashboard/reports/builder'}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Custom Report
+          </Button>
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="w-40">
               <SelectValue />
