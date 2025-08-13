@@ -124,6 +124,8 @@ export default function TasksPage() {
   })
   const [loading, setLoading] = useState(true)
   const [showCreateTask, setShowCreateTask] = useState(false)
+  const [showEditTask, setShowEditTask] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -513,6 +515,72 @@ export default function TasksPage() {
     } catch (error) {
       console.error('Error creating task:', error)
       alert('Failed to create task. Please try again.')
+    }
+  }
+
+  const startEditTask = (task: Task) => {
+    setEditingTask(task)
+    setTaskForm({
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority,
+      assignee_id: task.assignee_id || 'none',
+      team_id: '',
+      project_id: task.project_id || 'none',
+      outlet_id: task.outlet_id || 'none',
+      due_date: task.due_date || '',
+      estimated_hours: task.estimated_hours?.toString() || ''
+    })
+    setShowEditTask(true)
+  }
+
+  const updateTask = async () => {
+    if (!editingTask || !taskForm.title) return
+
+    try {
+      const assigneeId = taskForm.assignee_id && taskForm.assignee_id !== 'none' ? taskForm.assignee_id : null
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({
+          title: taskForm.title,
+          description: taskForm.description,
+          priority: taskForm.priority,
+          assignee_id: assigneeId,
+          project_id: taskForm.project_id && taskForm.project_id !== 'none' ? taskForm.project_id : null,
+          outlet_id: taskForm.outlet_id && taskForm.outlet_id !== 'none' ? taskForm.outlet_id : null,
+          due_date: taskForm.due_date || null,
+          estimated_hours: taskForm.estimated_hours ? parseFloat(taskForm.estimated_hours) : null,
+        })
+        .eq('id', editingTask.id)
+        .select('*')
+        .single()
+
+      if (error) throw error
+
+      const updatedTask = { ...data, assignee: taskForm.assignee_id !== 'none' ? users.find(u => u.id === taskForm.assignee_id) : null }
+
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t))
+      if (selectedTask?.id === editingTask.id) {
+        setSelectedTask(updatedTask)
+      }
+
+      setTaskForm({
+        title: '',
+        description: '',
+        priority: 'medium',
+        assignee_id: 'none',
+        team_id: 'none',
+        project_id: 'none',
+        outlet_id: 'none',
+        due_date: '',
+        estimated_hours: ''
+      })
+      setShowEditTask(false)
+      setEditingTask(null)
+    } catch (error) {
+      console.error('Error updating task:', error)
+      alert('Failed to update task. Please try again.')
     }
   }
 
@@ -941,7 +1009,11 @@ export default function TasksPage() {
                       </div>
                       <div className="flex space-x-2">
                         {canEditTasks() && (
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => startEditTask(selectedTask)}
+                          >
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
                           </Button>
@@ -1403,6 +1475,120 @@ export default function TasksPage() {
                 </Button>
                 <Button onClick={createTask}>
                   Create Task
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {showEditTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Edit Task</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="editTaskTitle">Task Title</Label>
+                <Input
+                  id="editTaskTitle"
+                  value={taskForm.title}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter task title"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editDescription">Description</Label>
+                <Textarea
+                  id="editDescription"
+                  value={taskForm.description}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter task description"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editPriority">Priority</Label>
+                  <Select
+                    value={taskForm.priority}
+                    onValueChange={(value: Task['priority']) => setTaskForm(prev => ({ ...prev, priority: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="editEstimatedHours">Estimated Hours</Label>
+                  <Input
+                    id="editEstimatedHours"
+                    type="number"
+                    value={taskForm.estimated_hours}
+                    onChange={(e) => setTaskForm(prev => ({ ...prev, estimated_hours: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="editAssignee">Assignee</Label>
+                <Select
+                  value={taskForm.assignee_id}
+                  onValueChange={(value) => setTaskForm(prev => ({ ...prev, assignee_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name} - {user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editDueDate">Due Date</Label>
+                <Input
+                  id="editDueDate"
+                  type="date"
+                  value={taskForm.due_date}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, due_date: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditTask(false)
+                    setEditingTask(null)
+                    setTaskForm({
+                      title: '',
+                      description: '',
+                      priority: 'medium',
+                      assignee_id: 'none',
+                      team_id: 'none',
+                      project_id: 'none',
+                      outlet_id: 'none',
+                      due_date: '',
+                      estimated_hours: ''
+                    })
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={updateTask}>
+                  Update Task
                 </Button>
               </div>
             </CardContent>

@@ -53,6 +53,7 @@ interface TimeEntry {
 interface Project {
   id: string
   name: string
+  status?: string
 }
 
 export default function TimeTrackingPage() {
@@ -164,8 +165,8 @@ export default function TimeTrackingPage() {
 
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name')
-        .eq('status', 'active')
+        .select('id, name, status')
+        .not('status', 'eq', 'cancelled')
 
       if (error) throw error
       setProjects(data || [])
@@ -470,6 +471,11 @@ export default function TimeTrackingPage() {
                                   }`}
                                 >
                                   {project.name}
+                                  {project.status && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      ({project.status})
+                                    </span>
+                                  )}
                                 </span>
                                 {selected ? (
                                   <span
@@ -623,6 +629,11 @@ export default function TimeTrackingPage() {
                                   }`}
                                 >
                                   {project.name}
+                                  {project.status && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      ({project.status})
+                                    </span>
+                                  )}
                                 </span>
                                 {selected ? (
                                   <span

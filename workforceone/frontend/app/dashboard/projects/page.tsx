@@ -82,11 +82,30 @@ interface ProjectStats {
   totalBudget: number
   spentBudget: number
   avgProgress: number
+  totalTimeSpent: number
+  totalTimeCost: number
+}
+
+interface TimeEntry {
+  id: string
+  duration: number
+  is_billable: boolean
+  user: {
+    hourly_rate: number | null
+    full_name: string
+  }
+}
+
+interface ProjectWithTimeData extends Project {
+  time_entries?: TimeEntry[]
+  total_time_minutes: number
+  total_time_cost: number
+  remaining_budget: number
 }
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [projects, setProjects] = useState<ProjectWithTimeData[]>([])
+  const [selectedProject, setSelectedProject] = useState<ProjectWithTimeData | null>(null)
   const [projectStats, setProjectStats] = useState<ProjectStats>({
     totalProjects: 0,
     activeProjects: 0,
@@ -94,10 +113,14 @@ export default function ProjectsPage() {
     overdueProjects: 0,
     totalBudget: 0,
     spentBudget: 0,
-    avgProgress: 0
+    avgProgress: 0,
+    totalTimeSpent: 0,
+    totalTimeCost: 0
   })
   const [loading, setLoading] = useState(true)
   const [showCreateProject, setShowCreateProject] = useState(false)
+  const [showEditProject, setShowEditProject] = useState(false)
+  const [editingProject, setEditingProject] = useState<ProjectWithTimeData | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -188,11 +211,25 @@ export default function ProjectsPage() {
       const { data, error } = await query
 
       if (error) throw error
-      setProjects(data || [])
+      
+      // Fetch time data for each project
+      const projectsWithTimeData = await Promise.all(
+        (data || []).map(async (project) => {
+          const timeData = await fetchProjectTimeData(project.id)
+          const remaining_budget = (project.budget || 0) - (project.spent_budget || 0) - timeData.total_time_cost
+          return {
+            ...project,
+            ...timeData,
+            remaining_budget
+          } as ProjectWithTimeData
+        })
+      )
+      
+      setProjects(projectsWithTimeData)
       
       // Auto-select first project if none selected
-      if (!selectedProject && data && data.length > 0) {
-        setSelectedProject(data[0])
+      if (!selectedProject && projectsWithTimeData.length > 0) {
+        setSelectedProject(projectsWithTimeData[0])
       }
     } catch (error) {
       console.error('Error fetching projects:', error)
@@ -213,10 +250,58 @@ export default function ProjectsPage() {
       ).length,
       totalBudget: projects.reduce((sum, p) => sum + (p.budget || 0), 0),
       spentBudget: projects.reduce((sum, p) => sum + (p.spent_budget || 0), 0),
-      avgProgress: projects.reduce((sum, p) => sum + p.progress, 0) / projects.length
+      avgProgress: projects.reduce((sum, p) => sum + p.progress, 0) / projects.length,
+      totalTimeSpent: projects.reduce((sum, p) => sum + (p.total_time_minutes || 0), 0),
+      totalTimeCost: projects.reduce((sum, p) => sum + (p.total_time_cost || 0), 0)
     }
 
     setProjectStats(stats)
+  }
+
+  const calculateProjectTimeCost = (timeEntries: TimeEntry[], defaultHourlyRate: number = 50): number => {
+    return timeEntries.reduce((total, entry) => {
+      if (!entry.is_billable) return total
+      const hourlyRate = entry.user?.hourly_rate || defaultHourlyRate
+      const hours = entry.duration / 60 // duration is in minutes
+      return total + (hours * hourlyRate)
+    }, 0)
+  }
+
+  const fetchProjectTimeData = async (projectId: string): Promise<{ total_time_minutes: number, total_time_cost: number, time_entries: TimeEntry[] }> => {
+    try {
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select(`
+          id,
+          duration,
+          is_billable,
+          user:profiles!time_entries_user_id_fkey (
+            hourly_rate,
+            full_name
+          )
+        `)
+        .eq('project_id', projectId)
+        .eq('status', 'completed')
+
+      if (error) throw error
+
+      const timeEntries = data || []
+      const totalTimeMinutes = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
+      const totalTimeCost = calculateProjectTimeCost(timeEntries)
+
+      return {
+        total_time_minutes: totalTimeMinutes,
+        total_time_cost: totalTimeCost,
+        time_entries: timeEntries
+      }
+    } catch (error) {
+      console.error('Error fetching project time data:', error)
+      return {
+        total_time_minutes: 0,
+        total_time_cost: 0,
+        time_entries: []
+      }
+    }
   }
 
   const createProject = async () => {
@@ -299,6 +384,83 @@ export default function ProjectsPage() {
     }
   }
 
+  const startEditProject = (project: ProjectWithTimeData) => {
+    setEditingProject(project)
+    setProjectForm({
+      name: project.name,
+      description: project.description || '',
+      status: project.status,
+      priority: project.priority,
+      start_date: project.start_date,
+      end_date: project.end_date || '',
+      budget: project.budget?.toString() || '',
+      team_id: project.team_id || ''
+    })
+    setShowEditProject(true)
+  }
+
+  const updateProject = async () => {
+    if (!editingProject || !projectForm.name || !projectForm.start_date) return
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({
+          name: projectForm.name,
+          description: projectForm.description,
+          status: projectForm.status,
+          priority: projectForm.priority,
+          start_date: projectForm.start_date,
+          end_date: projectForm.end_date || null,
+          budget: projectForm.budget ? parseFloat(projectForm.budget) : null,
+          team_id: projectForm.team_id || null,
+        })
+        .eq('id', editingProject.id)
+        .select(`
+          *,
+          team:teams (
+            name
+          ),
+          project_manager:profiles!projects_project_manager_id_fkey (
+            full_name,
+            email
+          )
+        `)
+        .single()
+
+      if (error) throw error
+
+      // Fetch updated time data
+      const timeData = await fetchProjectTimeData(data.id)
+      const updatedProject = {
+        ...data,
+        ...timeData,
+        remaining_budget: (data.budget || 0) - (data.spent_budget || 0) - timeData.total_time_cost
+      } as ProjectWithTimeData
+
+      setProjects(prev => prev.map(p => p.id === editingProject.id ? updatedProject : p))
+      if (selectedProject?.id === editingProject.id) {
+        setSelectedProject(updatedProject)
+      }
+
+      setProjectForm({
+        name: '',
+        description: '',
+        status: 'planning',
+        priority: 'medium',
+        start_date: '',
+        end_date: '',
+        budget: '',
+        team_id: ''
+      })
+      setShowEditProject(false)
+      setEditingProject(null)
+    } catch (error) {
+      console.error('Error updating project:', error)
+      alert('Failed to update project. Please try again.')
+    }
+  }
+
   const updateProjectProgress = async (projectId: string, progress: number) => {
     try {
       const { error } = await supabase
@@ -329,6 +491,12 @@ export default function ProjectsPage() {
     } catch (error) {
       console.error('Error updating project progress:', error)
     }
+  }
+
+  const addTask = () => {
+    // TODO: Implement task creation functionality
+    // This will be implemented when Tasks module is integrated
+    alert('Task creation feature will be available when Tasks module is fully integrated.')
   }
 
   const deleteProject = async (projectId: string) => {
@@ -422,6 +590,12 @@ export default function ProjectsPage() {
     return `${currencySymbol}${amount.toLocaleString()}`
   }
 
+  const formatTimeSpent = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+  }
+
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter
@@ -443,7 +617,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-9 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <FolderOpen className="h-8 w-8 text-blue-600 mx-auto mb-2" />
@@ -491,6 +665,20 @@ export default function ProjectsPage() {
             <TrendingUp className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
             <div className="text-2xl font-bold">{projectStats.avgProgress.toFixed(0)}%</div>
             <div className="text-sm text-gray-600">Avg Progress</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <Clock className="h-8 w-8 text-teal-600 mx-auto mb-2" />
+            <div className="text-2xl font-bold">{Math.round(projectStats.totalTimeSpent / 60)}h</div>
+            <div className="text-sm text-gray-600">Time Spent</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <DollarSign className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
+            <div className="text-2xl font-bold">{formatCurrency(projectStats.totalTimeCost)}</div>
+            <div className="text-sm text-gray-600">Time Cost</div>
           </CardContent>
         </Card>
       </div>
@@ -580,12 +768,23 @@ export default function ProjectsPage() {
                           </div>
                           <span className="text-xs text-gray-500">{project.progress}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                           <div
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${project.progress}%` }}
                           />
                         </div>
+                        {project.budget && (
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {formatTimeSpent(project.total_time_minutes || 0)}
+                            </span>
+                            <span className={`font-medium ${project.remaining_budget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(project.remaining_budget || 0)} left
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -631,7 +830,11 @@ export default function ProjectsPage() {
                       </div>
                     </div>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => startEditProject(selectedProject)}
+                      >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
                       </Button>
@@ -673,7 +876,7 @@ export default function ProjectsPage() {
                       </div>
                     </div>
 
-                    {/* Budget Information */}
+                    {/* Budget & Time Information */}
                     {selectedProject.budget && (
                       <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                         <div>
@@ -681,33 +884,82 @@ export default function ProjectsPage() {
                           <div className="text-lg font-medium">{formatCurrency(selectedProject.budget)}</div>
                         </div>
                         <div>
-                          <div className="text-sm text-gray-600">Spent</div>
+                          <div className="text-sm text-gray-600">Direct Expenses</div>
                           <div className="text-lg font-medium">{formatCurrency(selectedProject.spent_budget || 0)}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Time Costs</div>
+                          <div className="text-lg font-medium text-blue-600">{formatCurrency(selectedProject.total_time_cost || 0)}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">
+                            <span className={selectedProject.remaining_budget >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              Remaining Budget
+                            </span>
+                          </div>
+                          <div className={`text-lg font-medium ${selectedProject.remaining_budget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(selectedProject.remaining_budget || 0)}
+                          </div>
                         </div>
                         <div className="col-span-2">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm text-gray-600">Budget Usage</span>
                             <span className="text-sm font-medium">
-                              {getBudgetPercentage(selectedProject.spent_budget || 0, selectedProject.budget).toFixed(1)}%
+                              {getBudgetPercentage((selectedProject.spent_budget || 0) + (selectedProject.total_time_cost || 0), selectedProject.budget).toFixed(1)}%
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className={`h-2 rounded-full transition-all duration-300 ${
-                                getBudgetPercentage(selectedProject.spent_budget || 0, selectedProject.budget) > 90
+                                getBudgetPercentage((selectedProject.spent_budget || 0) + (selectedProject.total_time_cost || 0), selectedProject.budget) > 90
                                   ? 'bg-red-600'
-                                  : getBudgetPercentage(selectedProject.spent_budget || 0, selectedProject.budget) > 75
+                                  : getBudgetPercentage((selectedProject.spent_budget || 0) + (selectedProject.total_time_cost || 0), selectedProject.budget) > 75
                                   ? 'bg-yellow-600'
                                   : 'bg-green-600'
                               }`}
                               style={{ 
-                                width: `${getBudgetPercentage(selectedProject.spent_budget || 0, selectedProject.budget)}%` 
+                                width: `${getBudgetPercentage((selectedProject.spent_budget || 0) + (selectedProject.total_time_cost || 0), selectedProject.budget)}%` 
                               }}
                             />
                           </div>
                         </div>
                       </div>
                     )}
+
+                    {/* Time Tracking Summary */}
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                        <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                        Time Tracking Summary
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-sm text-gray-600">Total Time Logged</div>
+                          <div className="text-lg font-medium text-blue-600">
+                            {formatTimeSpent(selectedProject.total_time_minutes || 0)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Billable Time Cost</div>
+                          <div className="text-lg font-medium text-blue-600">
+                            {formatCurrency(selectedProject.total_time_cost || 0)}
+                          </div>
+                        </div>
+                        {selectedProject.time_entries && selectedProject.time_entries.length > 0 && (
+                          <div className="col-span-2">
+                            <div className="text-sm text-gray-600 mb-2">Recent Contributors</div>
+                            <div className="flex flex-wrap gap-2">
+                              {[...new Set(selectedProject.time_entries.map(entry => entry.user?.full_name).filter(Boolean))].slice(0, 5).map(name => (
+                                <span key={name} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                  <User className="h-3 w-3 mr-1" />
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Timeline */}
                     {selectedProject.end_date && (
@@ -744,7 +996,7 @@ export default function ProjectsPage() {
                       <Target className="h-5 w-5 mr-2" />
                       Tasks ({selectedProject._count?.tasks || 0})
                     </span>
-                    <Button size="sm">
+                    <Button size="sm" onClick={addTask}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Task
                     </Button>
@@ -876,6 +1128,131 @@ export default function ProjectsPage() {
                 </Button>
                 <Button onClick={createProject}>
                   Create Project
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Edit Project</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editProjectName">Project Name</Label>
+                  <Input
+                    id="editProjectName"
+                    value={projectForm.name}
+                    onChange={(e) => setProjectForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter project name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editBudget">Budget (Optional)</Label>
+                  <Input
+                    id="editBudget"
+                    type="number"
+                    value={projectForm.budget}
+                    onChange={(e) => setProjectForm(prev => ({ ...prev, budget: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="editDescription">Description</Label>
+                <Textarea
+                  id="editDescription"
+                  value={projectForm.description}
+                  onChange={(e) => setProjectForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter project description"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editStatus">Status</Label>
+                  <Select
+                    value={projectForm.status}
+                    onValueChange={(value: Project['status']) => setProjectForm(prev => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="on_hold">On Hold</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="editPriority">Priority</Label>
+                  <Select
+                    value={projectForm.priority}
+                    onValueChange={(value: Project['priority']) => setProjectForm(prev => ({ ...prev, priority: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editStartDate">Start Date</Label>
+                  <Input
+                    id="editStartDate"
+                    type="date"
+                    value={projectForm.start_date}
+                    onChange={(e) => setProjectForm(prev => ({ ...prev, start_date: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editEndDate">End Date (Optional)</Label>
+                  <Input
+                    id="editEndDate"
+                    type="date"
+                    value={projectForm.end_date}
+                    onChange={(e) => setProjectForm(prev => ({ ...prev, end_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditProject(false)
+                    setEditingProject(null)
+                    setProjectForm({
+                      name: '',
+                      description: '',
+                      status: 'planning',
+                      priority: 'medium',
+                      start_date: '',
+                      end_date: '',
+                      budget: '',
+                      team_id: ''
+                    })
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={updateProject}>
+                  Update Project
                 </Button>
               </div>
             </CardContent>
