@@ -137,6 +137,8 @@ export default function TasksPage() {
   const [assignmentType, setAssignmentType] = useState<'user' | 'team'>('user')
   const [userSearchQuery, setUserSearchQuery] = useState('')
   const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [outletSearchQuery, setOutletSearchQuery] = useState('')
+  const [showOutletDropdown, setShowOutletDropdown] = useState(false)
   
   // Form state
   const [taskForm, setTaskForm] = useState({
@@ -164,18 +166,22 @@ export default function TasksPage() {
     fetchTeams()
   }, [statusFilter, priorityFilter, assigneeFilter, searchTerm])
 
-  // Close user dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showUserDropdown && !(event.target as Element).closest('.user-dropdown-container')) {
         setShowUserDropdown(false)
         setUserSearchQuery('')
       }
+      if (showOutletDropdown && !(event.target as Element).closest('.outlet-dropdown-container')) {
+        setShowOutletDropdown(false)
+        setOutletSearchQuery('')
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showUserDropdown])
+  }, [showUserDropdown, showOutletDropdown])
 
   const fetchUserProfile = async () => {
     try {
@@ -185,58 +191,32 @@ export default function TasksPage() {
         return
       }
 
-      console.log('Fetching user profile for:', user.user.id)
+      console.log('Fetching user profile from database...')
       
-      // Create fallback profile immediately
-      const fallbackProfile = {
-        id: user.user.id,
-        email: user.user.email,
-        full_name: user.user.email?.split('@')[0] || 'User',
-        role: 'admin', // Temporary fallback role
-        organization_id: null
-      }
-      
-      // Set fallback first to ensure UI works
-      console.log('Setting fallback profile:', fallbackProfile)
-      setUserProfile(fallbackProfile)
-
-      // Then try to fetch real profile
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.user.id)
         .single()
 
-      if (!error && profile) {
-        console.log('Successfully fetched real profile, replacing fallback:', profile)
-        setUserProfile(profile)
-      } else {
-        console.error('Error fetching user profile, keeping fallback:', error)
+      if (error) {
+        console.error('Error fetching user profile:', error)
+        setUserProfile(null)
+        return
       }
+
+      console.log('Successfully fetched user profile:', profile)
+      setUserProfile(profile)
+      
     } catch (error) {
-      console.error('Error in fetchUserProfile, creating emergency fallback:', error)
-      // Emergency fallback
-      const { data: user } = await supabase.auth.getUser()
-      if (user.user) {
-        const emergencyProfile = {
-          id: user.user.id,
-          email: user.user.email,
-          full_name: user.user.email?.split('@')[0] || 'User',
-          role: 'admin',
-          organization_id: null
-        }
-        console.log('Using emergency fallback profile:', emergencyProfile)
-        setUserProfile(emergencyProfile)
-      }
+      console.error('Critical error in fetchUserProfile:', error)
+      setUserProfile(null)
     }
   }
 
   // Permission helper functions
   const canCreateTasks = () => {
-    console.log('canCreateTasks check - userProfile:', userProfile, 'role:', userProfile?.role)
-    // Temporarily allow all users to create tasks while we fix RLS policies
-    return true
-    // return userProfile?.role === 'admin' || userProfile?.role === 'manager'
+    return userProfile?.role === 'admin' || userProfile?.role === 'manager'
   }
 
   const canEditTasks = () => {
@@ -253,11 +233,24 @@ export default function TasksPage() {
     user.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
   )
 
+  // Filter outlets based on search query
+  const filteredOutlets = outlets.filter(outlet => 
+    outlet.name?.toLowerCase().includes(outletSearchQuery.toLowerCase()) ||
+    outlet.address?.toLowerCase().includes(outletSearchQuery.toLowerCase())
+  )
+
   // Get selected user display name
   const getSelectedUserDisplay = () => {
     if (!taskForm.assignee_id || taskForm.assignee_id === 'none') return 'Unassigned'
     const selectedUser = users.find(u => u.id === taskForm.assignee_id)
     return selectedUser ? `${selectedUser.full_name} - ${selectedUser.email}` : 'Select user'
+  }
+
+  // Get selected outlet display name
+  const getSelectedOutletDisplay = () => {
+    if (!taskForm.outlet_id || taskForm.outlet_id === 'none') return 'No outlet'
+    const selectedOutlet = outlets.find(o => o.id === taskForm.outlet_id)
+    return selectedOutlet ? `${selectedOutlet.name} - ${selectedOutlet.address || 'No address'}` : 'Select outlet'
   }
 
   useEffect(() => {
@@ -308,91 +301,42 @@ export default function TasksPage() {
         return
       }
 
-      console.log('🚧 Due to RLS policy issues, using hardcoded user list based on known database users')
+      console.log('Fetching users from database...')
       
-      // Since we know from your message that Lika (admin), Jordan, and Ashton exist,
-      // let's create a comprehensive user list based on this knowledge
-      const knownUsers = [
-        {
-          id: user.user.id, // Current user (Lika)
-          full_name: 'Lika',
-          email: 'lika@workforceone.co.za',
-          role: 'admin',
-          avatar_url: null
-        },
-        {
-          id: 'jordan-user-id',
-          full_name: 'Jordan',
-          email: 'jordan@workforceone.co.za',
-          role: 'manager',
-          avatar_url: null
-        },
-        {
-          id: 'ashton-user-id',
-          full_name: 'Ashton',
-          email: 'ashton@workforceone.co.za',
-          role: 'employee',
-          avatar_url: null
-        },
-        // Additional team members
-        {
-          id: 'demo-admin',
-          full_name: 'Demo Admin',
-          email: 'admin@workforceone.co.za',
-          role: 'admin',
-          avatar_url: null
-        },
-        {
-          id: 'demo-manager',
-          full_name: 'Demo Manager',
-          email: 'manager@workforceone.co.za',
-          role: 'manager',
-          avatar_url: null
-        }
-      ]
+      // Get current user's organization first
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
 
-      console.log('✅ Set known users list:', knownUsers.map(u => ({ name: u.full_name, email: u.email, role: u.role })))
-      setUsers(knownUsers)
+      // Fetch users from same organization
+      let query = supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url, role, organization_id')
+        .not('full_name', 'is', null)
+        .order('full_name')
 
-      // Still attempt to fetch real users in background (won't block UI)
-      setTimeout(async () => {
-        try {
-          console.log('🔍 Attempting background fetch of real users...')
-          const { data: realUsers, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, email, avatar_url, role')
-            .not('full_name', 'is', null)
-            .order('full_name')
+      // If user has organization, filter by it
+      if (currentProfile?.organization_id) {
+        query = query.eq('organization_id', currentProfile.organization_id)
+      }
 
-          if (!error && realUsers && realUsers.length > 0) {
-            console.log('🎉 Successfully fetched real users in background, updating list:', realUsers.length, 'users')
-            setUsers(realUsers)
-          } else {
-            console.log('❌ Background fetch failed, keeping hardcoded users:', error)
-          }
-        } catch (bgError) {
-          console.log('❌ Background fetch error:', bgError)
-        }
-      }, 1000)
+      const { data: users, error } = await query
+
+      if (error) {
+        console.error('Error fetching users:', error)
+        setUsers([]) // Set empty array on error
+        return
+      }
+
+      console.log('Successfully fetched users:', users?.length || 0, 'users')
+      console.log('Users:', users?.map(u => ({ id: u.id, name: u.full_name, email: u.email })))
+      setUsers(users || [])
 
     } catch (error) {
       console.error('Critical error in fetchUsers:', error)
-      
-      // Emergency fallback with current user
-      const { data: user } = await supabase.auth.getUser()
-      if (user.user) {
-        const emergencyUsers = [
-          {
-            id: user.user.id,
-            full_name: user.user.email?.split('@')[0] || 'Current User',
-            email: user.user.email || '',
-            role: 'admin',
-            avatar_url: null
-          }
-        ]
-        setUsers(emergencyUsers)
-        console.log('Using emergency fallback with current user:', emergencyUsers)
-      }
+      setUsers([]) // Set empty array on critical error
     }
   }
 
@@ -1236,28 +1180,73 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              {/* Outlet Selection */}
-              <div>
+              {/* Outlet Selection with Search */}
+              <div className="outlet-dropdown-container">
                 <Label htmlFor="outlet">
                   <MapPin className="h-4 w-4 inline mr-2" />
                   Outlet (Optional)
                 </Label>
-                <Select
-                  value={taskForm.outlet_id}
-                  onValueChange={(value) => setTaskForm(prev => ({ ...prev, outlet_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select outlet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No outlet</SelectItem>
-                    {outlets.map(outlet => (
-                      <SelectItem key={outlet.id} value={outlet.id}>
-                        {outlet.name} {outlet.address && `- ${outlet.address}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowOutletDropdown(!showOutletDropdown)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <span className="truncate">{getSelectedOutletDisplay()}</span>
+                    <Search className="h-4 w-4 text-gray-400" />
+                  </button>
+                  
+                  {showOutletDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                      <div className="p-2 border-b">
+                        <Input
+                          placeholder="Search outlets..."
+                          value={outletSearchQuery}
+                          onChange={(e) => setOutletSearchQuery(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="max-h-60 overflow-auto">
+                        <div
+                          className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                          onClick={() => {
+                            setTaskForm(prev => ({ ...prev, outlet_id: 'none' }))
+                            setShowOutletDropdown(false)
+                            setOutletSearchQuery('')
+                          }}
+                        >
+                          <span className="font-medium text-gray-500">No outlet</span>
+                        </div>
+                        {filteredOutlets.map(outlet => (
+                          <div
+                            key={outlet.id}
+                            className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setTaskForm(prev => ({ ...prev, outlet_id: outlet.id }))
+                              setShowOutletDropdown(false)
+                              setOutletSearchQuery('')
+                            }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="h-4 w-4 text-gray-400" />
+                              <div>
+                                <div className="font-medium">{outlet.name}</div>
+                                {outlet.address && (
+                                  <div className="text-gray-500 text-xs">{outlet.address}</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {filteredOutlets.length === 0 && outletSearchQuery && (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            No outlets found matching "{outletSearchQuery}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Assignment Type Selection */}

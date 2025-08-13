@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { 
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions,
+  Transition
+} from '@headlessui/react'
 import { Textarea } from '@/components/ui/textarea'
 import { 
   Play, 
@@ -23,7 +31,9 @@ import {
   Plus,
   Edit,
   Trash2,
-  Filter
+  Filter,
+  ChevronsUpDown,
+  Check
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -59,12 +69,26 @@ export default function TimeTrackingPage() {
   const [selectedProject, setSelectedProject] = useState('')
   const [isBillable, setIsBillable] = useState(false)
   const [showManualEntry, setShowManualEntry] = useState(false)
+  const [projectQuery, setProjectQuery] = useState('')
+  const [manualProjectQuery, setManualProjectQuery] = useState('')
   
   // Manual entry states
   const [manualStartTime, setManualStartTime] = useState('')
   const [manualEndTime, setManualEndTime] = useState('')
   const [manualDescription, setManualDescription] = useState('')
   const [manualProject, setManualProject] = useState('')
+
+  // Filtered projects for search
+  const filteredProjects = projects.filter(project => 
+    project.name.toLowerCase().includes(projectQuery.toLowerCase())
+  )
+  const filteredManualProjects = projects.filter(project => 
+    project.name.toLowerCase().includes(manualProjectQuery.toLowerCase())
+  )
+
+  // Find selected project objects
+  const selectedProjectObj = projects.find(p => p.id === selectedProject)
+  const selectedManualProjectObj = projects.find(p => p.id === manualProject)
 
   const supabase = createClient()
 
@@ -395,18 +419,76 @@ export default function TimeTrackingPage() {
             </div>
             <div>
               <Label htmlFor="project">Project</Label>
-              <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isRunning}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox 
+                value={selectedProject || null} 
+                onChange={(value: string | null) => setSelectedProject(value || '')}
+                disabled={isRunning}
+              >
+                <div className="relative mt-1">
+                  <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 focus-visible:ring-offset-2 focus-visible:ring-offset-teal-300 sm:text-sm">
+                    <ComboboxInput
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      displayValue={(projectId: string) => selectedProjectObj?.name || ''}
+                      onChange={(event) => setProjectQuery(event.target.value)}
+                      placeholder="Search and select a project..."
+                    />
+                    <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronsUpDown
+                        className="h-5 w-5 text-gray-400"
+                        aria-hidden="true"
+                      />
+                    </ComboboxButton>
+                  </div>
+                  <Transition
+                    as={React.Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                    afterLeave={() => setProjectQuery('')}
+                  >
+                    <ComboboxOptions className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm z-10">
+                      {filteredProjects.length === 0 && projectQuery !== '' ? (
+                        <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
+                          No projects found.
+                        </div>
+                      ) : (
+                        filteredProjects.map((project) => (
+                          <ComboboxOption
+                            key={project.id}
+                            className={({ active }) =>
+                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                active ? 'bg-blue-600 text-white' : 'text-gray-900'
+                              }`
+                            }
+                            value={project.id}
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? 'font-medium' : 'font-normal'
+                                  }`}
+                                >
+                                  {project.name}
+                                </span>
+                                {selected ? (
+                                  <span
+                                    className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                                      active ? 'text-white' : 'text-blue-600'
+                                    }`}
+                                  >
+                                    <Check className="h-5 w-5" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </ComboboxOption>
+                        ))
+                      )}
+                    </ComboboxOptions>
+                  </Transition>
+                </div>
+              </Combobox>
             </div>
           </div>
 
@@ -494,18 +576,72 @@ export default function TimeTrackingPage() {
             </div>
             <div>
               <Label htmlFor="manual-project">Project</Label>
-              <Select value={manualProject} onValueChange={setManualProject}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox value={manualProject || null} onChange={(value: string | null) => setManualProject(value || '')}>
+                <div className="relative mt-1">
+                  <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 focus-visible:ring-offset-2 focus-visible:ring-offset-teal-300 sm:text-sm">
+                    <ComboboxInput
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      displayValue={(projectId: string) => selectedManualProjectObj?.name || ''}
+                      onChange={(event) => setManualProjectQuery(event.target.value)}
+                      placeholder="Search and select a project..."
+                    />
+                    <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronsUpDown
+                        className="h-5 w-5 text-gray-400"
+                        aria-hidden="true"
+                      />
+                    </ComboboxButton>
+                  </div>
+                  <Transition
+                    as={React.Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                    afterLeave={() => setManualProjectQuery('')}
+                  >
+                    <ComboboxOptions className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm z-10">
+                      {filteredManualProjects.length === 0 && manualProjectQuery !== '' ? (
+                        <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
+                          No projects found.
+                        </div>
+                      ) : (
+                        filteredManualProjects.map((project) => (
+                          <ComboboxOption
+                            key={project.id}
+                            className={({ active }) =>
+                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                active ? 'bg-blue-600 text-white' : 'text-gray-900'
+                              }`
+                            }
+                            value={project.id}
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? 'font-medium' : 'font-normal'
+                                  }`}
+                                >
+                                  {project.name}
+                                </span>
+                                {selected ? (
+                                  <span
+                                    className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                                      active ? 'text-white' : 'text-blue-600'
+                                    }`}
+                                  >
+                                    <Check className="h-5 w-5" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </ComboboxOption>
+                        ))
+                      )}
+                    </ComboboxOptions>
+                  </Transition>
+                </div>
+              </Combobox>
             </div>
             <Button onClick={addManualEntry}>Add Entry</Button>
           </CardContent>
