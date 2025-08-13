@@ -176,7 +176,64 @@ export default function RoutesPage() {
   // Form states
   const [showCreateRoute, setShowCreateRoute] = useState(false)
   const [showAssignRoute, setShowAssignRoute] = useState(false)
+  const [showTransferRoute, setShowTransferRoute] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+
+  // Memoized markers for map to prevent re-renders
+  const mapMarkers = useMemo(() => {
+    const filteredOutlets = outlets.filter(outlet => outlet.latitude && outlet.longitude)
+    console.log('Creating map markers for', filteredOutlets.length, 'outlets')
+    
+    const markers = filteredOutlets.map(outlet => {
+      // Check if this outlet is part of the route being shown
+      const routeToShow = showRouteOnMap ? optimizedRoutes.get(showRouteOnMap) : null
+      const isPartOfRoute = routeToShow?.stops.some(stop => stop.id === outlet.id)
+      const routeStopIndex = routeToShow?.stops.findIndex(stop => stop.id === outlet.id)
+      
+      return {
+        id: outlet.id,
+        position: { lat: outlet.latitude!, lng: outlet.longitude! },
+        title: `${outlet.name}${isPartOfRoute && routeStopIndex !== undefined && routeStopIndex >= 0 ? ` (Stop ${routeStopIndex + 1})` : ''}`,
+        icon: {
+          color: isPartOfRoute ? '#2563eb' : // Blue for route outlets
+                 outlet.status === 'active' ? '#10b981' : 
+                 outlet.status === 'inactive' ? '#ef4444' : '#f59e0b',
+          scale: isPartOfRoute ? 14 : 12 // Larger for route outlets
+        },
+        infoContent: `
+          <div class="p-4 min-w-[240px] bg-white rounded-lg shadow-lg">
+            <div class="flex items-center space-x-3 mb-3">
+              <div class="w-4 h-4 rounded-full" style="background-color: ${
+                outlet.status === 'active' ? '#10b981' : 
+                outlet.status === 'inactive' ? '#ef4444' : '#f59e0b'
+              }"></div>
+              <span class="font-semibold text-gray-900">${outlet.name}</span>
+            </div>
+            <div class="text-sm text-gray-600 space-y-2">
+              <p><span class="font-medium">Address:</span> ${outlet.address}</p>
+              ${outlet.province ? `<p><span class="font-medium">Province:</span> ${outlet.province}</p>` : ''}
+              ${outlet.phone ? `<p><span class="font-medium">Phone:</span> ${outlet.phone}</p>` : ''}
+              ${outlet.manager_name ? `<p><span class="font-medium">Manager:</span> ${outlet.manager_name}</p>` : ''}
+              <p><span class="font-medium">Status:</span> <span class="capitalize">${outlet.status}</span></p>
+              ${isPartOfRoute && routeStopIndex !== undefined && routeStopIndex >= 0 ? `<p><span class="font-medium">Route Stop:</span> #${routeStopIndex + 1}</p>` : ''}
+            </div>
+          </div>
+        `,
+        onClick: () => {
+          // Toggle outlet selection for route creation
+          setSelectedOutlets(prev => {
+            const newSelection = prev.find(o => o.id === outlet.id)
+              ? prev.filter(o => o.id !== outlet.id)
+              : [...prev, outlet]
+            return newSelection
+          })
+        }
+      }
+    })
+    
+    console.log('Generated', markers.length, 'map markers:', markers)
+    return markers
+  }, [outlets, showRouteOnMap, optimizedRoutes])
   const [routeForm, setRouteForm] = useState({
     name: '',
     description: '',
@@ -273,12 +330,12 @@ export default function RoutesPage() {
 
       if (error) throw error
       
-      console.log('Fetched outlets:', data)
+      console.log('Fetched outlets from database:', data?.length || 0, data)
       setOutlets(data || [])
 
       // Set map center to first outlet with coordinates
       const outletWithLocation = data?.find(o => o.latitude && o.longitude)
-      console.log('Outlet with location:', outletWithLocation)
+      // console.log('Outlet with location:', outletWithLocation)
       if (outletWithLocation) {
         setMapCenter({ lat: outletWithLocation.latitude!, lng: outletWithLocation.longitude! })
       }
@@ -563,6 +620,77 @@ This will calculate the best order for visiting all outlets.`)
     }
   }
 
+  const transferRoute = async () => {
+    try {
+      if (!selectedRoute || !assignmentForm.assignee_id) {
+        alert('Please select a route and new assignee')
+        return
+      }
+
+      const profile = await getCurrentUserProfile()
+      if (!profile) {
+        alert('User profile not found')
+        return
+      }
+
+      // Get current assignment
+      const currentAssignment = selectedRoute.route_assignments?.[0]
+      if (!currentAssignment) {
+        alert('No current assignment found for this route')
+        return
+      }
+
+      // Update current assignment status to 'transferred'
+      const { error: updateError } = await supabase
+        .from('route_assignments')
+        .update({ 
+          status: 'transferred',
+          notes: currentAssignment.notes + 
+            `\n--- TRANSFERRED on ${new Date().toLocaleDateString()} ---\n` +
+            `From: ${currentAssignment.assignee_name || currentAssignment.assignee_id}\n` +
+            `Reason: ${assignmentForm.notes || 'No reason provided'}`
+        })
+        .eq('id', currentAssignment.id)
+
+      if (updateError) throw updateError
+
+      // Create new assignment
+      const assignmentData = {
+        route_id: selectedRoute.id,
+        assignee_type: assignmentForm.assignee_type,
+        assignee_id: assignmentForm.assignee_id,
+        assigned_by: profile.id,
+        assigned_date: assignmentForm.assigned_date || new Date().toISOString().split('T')[0],
+        status: 'assigned',
+        completion_percentage: 0,
+        notes: `TRANSFERRED FROM: ${currentAssignment.assignee_name || currentAssignment.assignee_id}\n` + 
+               (assignmentForm.notes || 'Route transfer')
+      }
+
+      const { error } = await supabase
+        .from('route_assignments')
+        .insert(assignmentData)
+
+      if (error) throw error
+
+      // Reset form and refresh data
+      setAssignmentForm({
+        assignee_type: 'user',
+        assignee_id: '',
+        assigned_date: '',
+        notes: ''
+      })
+      setShowTransferRoute(false)
+      setSelectedRoute(null)
+      
+      await fetchRoutes()
+      alert('Route transferred successfully!')
+    } catch (error) {
+      console.error('Error transferring route:', error)
+      alert('Failed to transfer route. Please try again.')
+    }
+  }
+
   const optimizeRoute = async (routeId: string) => {
     try {
       console.log('Starting route optimization for route:', routeId)
@@ -833,59 +961,19 @@ This will calculate the best order for visiting all outlets.`)
                 <GoogleMapComponent
                   center={mapCenter}
                   zoom={12}
-                  markers={useMemo(() => {
-                    const filteredOutlets = outlets.filter(outlet => outlet.latitude && outlet.longitude)
-                    
-                    return filteredOutlets.map(outlet => {
-                      // Check if this outlet is part of the route being shown
-                      const routeToShow = showRouteOnMap ? optimizedRoutes.get(showRouteOnMap) : null
-                      const isPartOfRoute = routeToShow?.stops.some(stop => stop.id === outlet.id)
-                      const routeStopIndex = routeToShow?.stops.findIndex(stop => stop.id === outlet.id)
-                      
-                      return {
-                        id: outlet.id,
-                        position: { lat: outlet.latitude!, lng: outlet.longitude! },
-                        title: `${outlet.name}${isPartOfRoute && routeStopIndex !== undefined && routeStopIndex >= 0 ? ` (Stop ${routeStopIndex + 1})` : ''}`,
-                        icon: {
-                          color: isPartOfRoute ? '#2563eb' : // Blue for route outlets
-                                 outlet.status === 'active' ? '#10b981' : 
-                                 outlet.status === 'inactive' ? '#ef4444' : '#f59e0b',
-                          scale: isPartOfRoute ? 14 : 12 // Larger for route outlets
-                        },
-                        infoContent: `
-                          <div class="p-4 min-w-[240px] bg-white rounded-lg shadow-lg">
-                            <div class="flex items-center space-x-3 mb-3">
-                              <div class="w-4 h-4 rounded-full" style="background-color: ${
-                                outlet.status === 'active' ? '#10b981' : 
-                                outlet.status === 'inactive' ? '#ef4444' : '#f59e0b'
-                              }"></div>
-                              <span class="font-semibold text-gray-900">${outlet.name}</span>
-                            </div>
-                            <div class="text-sm text-gray-600 space-y-2">
-                              <p><span class="font-medium">Address:</span> ${outlet.address}</p>
-                              ${outlet.province ? `<p><span class="font-medium">Province:</span> ${outlet.province}</p>` : ''}
-                              ${outlet.phone ? `<p><span class="font-medium">Phone:</span> ${outlet.phone}</p>` : ''}
-                              ${outlet.manager_name ? `<p><span class="font-medium">Manager:</span> ${outlet.manager_name}</p>` : ''}
-                              <p><span class="font-medium">Status:</span> <span class="capitalize">${outlet.status}</span></p>
-                              ${isPartOfRoute && routeStopIndex !== undefined && routeStopIndex >= 0 ? `<p><span class="font-medium">Route Stop:</span> #${routeStopIndex + 1}</p>` : ''}
-                            </div>
-                          </div>
-                        `,
-                        onClick: () => {
-                          // Toggle outlet selection for route creation
-                          setSelectedOutlets(prev => {
-                            const newSelection = prev.find(o => o.id === outlet.id)
-                              ? prev.filter(o => o.id !== outlet.id)
-                              : [...prev, outlet]
-                            return newSelection
-                          })
-                        }
-                      }
-                    })
-                  }, [outlets, showRouteOnMap, optimizedRoutes])}
+                  markers={mapMarkers}
                   style={{ height: '500px' }}
                   className="rounded-lg"
-                  optimizedRoute={showRouteOnMap ? optimizedRoutes.get(showRouteOnMap) : undefined}
+                  optimizedRoute={(() => {
+                    const route = showRouteOnMap ? optimizedRoutes.get(showRouteOnMap) : undefined
+                    console.log('Passing to GoogleMapComponent:', {
+                      showRouteOnMap,
+                      hasRoute: !!route,
+                      routeStops: route?.stops?.length || 0,
+                      showRoutePolyline: !!showRouteOnMap
+                    })
+                    return route
+                  })()}
                   showRoutePolyline={!!showRouteOnMap}
                 />
                 
@@ -991,17 +1079,31 @@ This will calculate the best order for visiting all outlets.`)
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setSelectedRoute(route)
-                        setShowAssignRoute(true)
-                      }}
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Assign
-                    </Button>
+                    {route.route_assignments && route.route_assignments.length > 0 ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedRoute(route)
+                          setShowTransferRoute(true)
+                        }}
+                      >
+                        <Users className="h-4 w-4 mr-1" />
+                        Transfer
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedRoute(route)
+                          setShowAssignRoute(true)
+                        }}
+                      >
+                        <Users className="h-4 w-4 mr-1" />
+                        Assign
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -1015,7 +1117,16 @@ This will calculate the best order for visiting all outlets.`)
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        setShowRouteOnMap(showRouteOnMap === route.id ? null : route.id)
+                        const newRouteId = showRouteOnMap === route.id ? null : route.id
+                        console.log('Show/Hide route clicked:', { 
+                          routeId: route.id, 
+                          routeName: route.name,
+                          currentlyShowing: showRouteOnMap, 
+                          newSelection: newRouteId,
+                          hasOptimizedRoute: optimizedRoutes.has(route.id),
+                          optimizedRoute: optimizedRoutes.get(route.id)
+                        })
+                        setShowRouteOnMap(newRouteId)
                         setActiveTab('overview') // Switch to map tab
                       }}
                     >
@@ -1073,7 +1184,7 @@ This will calculate the best order for visiting all outlets.`)
       </Tabs>
 
       {/* Create Route Modal - Enhanced with outlet selection */}
-      {console.log('Create Route Modal isOpen:', showCreateRoute)}
+      {/* {console.log('Create Route Modal isOpen:', showCreateRoute)} */}
       {showCreateRoute && (
         <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -1141,7 +1252,7 @@ This will calculate the best order for visiting all outlets.`)
 
               <div>
                 <Label>Select Outlets for Route</Label>
-                {console.log('Outlets in modal:', outlets.length, outlets.map(o => o.name))}
+                {/* {console.log('Outlets in modal:', outlets.length, outlets.map(o => o.name))} */}
                 <div className="mt-2 space-y-2">
                   {/* Search box */}
                   <div className="relative">
@@ -1282,84 +1393,128 @@ This will calculate the best order for visiting all outlets.`)
         </div>
       )}
 
-      {/* Assign Route Modal */}
-      <Modal 
-        isOpen={showAssignRoute} 
-        onClose={() => setShowAssignRoute(false)}
-        title="Assign Route"
-      >
-        <div className="space-y-4 mb-4">
-          <p className="text-sm text-gray-600">
-            Assign "{selectedRoute?.name}" to a user or team
-          </p>
+      {/* Assign Route Modal - Inline version */}
+      {showAssignRoute && (
+        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Assign Route</h2>
+              <button
+                onClick={() => setShowAssignRoute(false)}
+                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-2"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-1">Route Details</h3>
+                <p className="text-sm text-blue-700">
+                  <strong>Name:</strong> {selectedRoute?.name}
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>Stops:</strong> {selectedRoute?.total_stops || 0} outlets
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>Distance:</strong> {selectedRoute?.total_estimated_distance?.toFixed(1) || 0} km
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>Duration:</strong> {selectedRoute ? Math.round((selectedRoute.total_estimated_duration || 0) / 60) : 0}h {selectedRoute ? Math.round((selectedRoute.total_estimated_duration || 0) % 60) : 0}m
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Assignment Type</Label>
+                <Select value={assignmentForm.assignee_type} onValueChange={(value: any) => setAssignmentForm({ ...assignmentForm, assignee_type: value, assignee_id: '' })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select assignment type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">👤 Individual User</SelectItem>
+                    <SelectItem value="team">👥 Team</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>{assignmentForm.assignee_type === 'user' ? 'Select User' : 'Select Team'}</Label>
+                <Select value={assignmentForm.assignee_id} onValueChange={(value) => setAssignmentForm({ ...assignmentForm, assignee_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Choose ${assignmentForm.assignee_type === 'user' ? 'a user' : 'a team'}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignmentForm.assignee_type === 'user' 
+                      ? users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center space-x-2">
+                              <span>👤</span>
+                              <span>{user.full_name}</span>
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                {user.role}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))
+                      : teams.map(team => (
+                          <SelectItem key={team.id} value={team.id}>
+                            <div className="flex items-center space-x-2">
+                              <span>👥</span>
+                              <span>{team.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Assignment Date</Label>
+                <Input
+                  type="date"
+                  value={assignmentForm.assigned_date}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, assigned_date: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-500 mt-1">When should this route be completed?</p>
+              </div>
+
+              <div>
+                <Label>Assignment Notes</Label>
+                <Textarea
+                  value={assignmentForm.notes}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, notes: e.target.value })}
+                  placeholder="Any special instructions or notes for the assignee..."
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center mt-8 pt-4 border-t">
+              <div className="text-sm text-gray-500">
+                Route will be assigned with "assigned" status
+              </div>
+              <div className="flex space-x-2">
+                <Button variant="outline" onClick={() => setShowAssignRoute(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={assignRoute}
+                  disabled={!assignmentForm.assignee_id}
+                  className="min-w-[120px]"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Assign Route
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <div className="space-y-4">
-            <div>
-              <Label>Assign To</Label>
-              <Select value={assignmentForm.assignee_type} onValueChange={(value: any) => setAssignmentForm({ ...assignmentForm, assignee_type: value, assignee_id: '' })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Individual User</SelectItem>
-                  <SelectItem value="team">Team</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>{assignmentForm.assignee_type === 'user' ? 'User' : 'Team'}</Label>
-              <Select value={assignmentForm.assignee_id} onValueChange={(value) => setAssignmentForm({ ...assignmentForm, assignee_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder={`Select ${assignmentForm.assignee_type}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignmentForm.assignee_type === 'user' 
-                    ? users.map(user => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.full_name} ({user.role})
-                        </SelectItem>
-                      ))
-                    : teams.map(team => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.name}
-                        </SelectItem>
-                      ))
-                  }
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Assignment Date</Label>
-              <Input
-                type="date"
-                value={assignmentForm.assigned_date}
-                onChange={(e) => setAssignmentForm({ ...assignmentForm, assigned_date: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                value={assignmentForm.notes}
-                onChange={(e) => setAssignmentForm({ ...assignmentForm, notes: e.target.value })}
-                placeholder="Assignment notes (optional)"
-                rows={3}
-              />
-            </div>
-        </div>
-
-        <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">
-          <Button variant="outline" onClick={() => setShowAssignRoute(false)}>
-            Cancel
-          </Button>
-          <Button onClick={assignRoute}>
-            Assign Route
-          </Button>
-        </div>
-      </Modal>
+      )}
 
       {/* Settings Modal - Using inline modal for testing */}
       {showSettings && (

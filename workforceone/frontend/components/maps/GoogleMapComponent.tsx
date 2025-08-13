@@ -93,18 +93,65 @@ export default function GoogleMapComponent({
       })
 
       mapInstanceRef.current = map
+      console.log('Map instance set, ready for markers')
+      
       const infoWindow = await simpleGoogleMapsService.createInfoWindow()
       infoWindowRef.current = infoWindow
+      console.log('InfoWindow created, map fully ready')
 
       onMapLoad?.(map)
       setIsLoading(false)
+      
+      // Trigger marker update now that map is ready
+      setTimeout(() => {
+        if (markers.length > 0) {
+          console.log('Map ready, updating markers with', markers.length, 'markers')
+          // Call updateMarkers directly without depending on the callback
+          if (mapInstanceRef.current && infoWindowRef.current) {
+            console.log('Updating markers directly after map initialization')
+            // Clear existing markers
+            markersRef.current.forEach(marker => marker.setMap(null))
+            markersRef.current = []
+
+            // Add new markers
+            markers.forEach(async (markerData) => {
+              const marker = await simpleGoogleMapsService.createMarker({
+                position: markerData.position,
+                map: mapInstanceRef.current,
+                title: markerData.title,
+                icon: markerData.icon ? {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: markerData.icon.scale || 12,
+                  fillColor: markerData.icon.color,
+                  fillOpacity: 0.8,
+                  strokeColor: '#ffffff',
+                  strokeWeight: 2,
+                } : undefined
+              })
+
+              marker.addListener('click', () => {
+                if (markerData.infoContent && infoWindowRef.current) {
+                  infoWindowRef.current.setContent(markerData.infoContent)
+                  infoWindowRef.current.open(mapInstanceRef.current, marker)
+                }
+                markerData.onClick?.()
+                onMarkerClick?.(markerData)
+              })
+
+              markersRef.current.push(marker)
+            })
+          }
+        }
+        
+        // Route display will be handled by the separate useEffect
+      }, 100)
     } catch (err) {
       console.error('Failed to initialize Google Maps:', err)
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       setError(`Failed to load Google Maps: ${errorMessage}`)
       setIsLoading(false)
     }
-  }, [center, zoom, onMapLoad])
+  }, [center, zoom, onMapLoad, markers, optimizedRoute, showRoutePolyline, onMarkerClick])
 
   // Initialize map
   useEffect(() => {
@@ -113,10 +160,20 @@ export default function GoogleMapComponent({
     }
   }, [initializeMap])
 
+  // This useEffect will be moved after displayRoute is defined
+
   const updateMarkers = useCallback(async () => {
-    if (!mapInstanceRef.current || !infoWindowRef.current) return
+    if (!mapInstanceRef.current || !infoWindowRef.current) {
+      console.log('Map not ready for markers:', { 
+        mapReady: !!mapInstanceRef.current, 
+        infoWindowReady: !!infoWindowRef.current 
+      })
+      return
+    }
 
     try {
+      console.log('Updating markers, received', markers.length, 'markers')
+      
       // Clear existing markers
       markersRef.current.forEach(marker => marker.setMap(null))
       markersRef.current = []
@@ -171,12 +228,15 @@ export default function GoogleMapComponent({
 
   // Function to display route polyline on map
   const displayRoute = useCallback(async () => {
+    console.log('displayRoute called with:', {
+      mapReady: !!mapInstanceRef.current,
+      optimizedRoute: !!optimizedRoute,
+      showRoutePolyline,
+      routeStops: optimizedRoute?.stops?.length || 0
+    })
+    
     if (!mapInstanceRef.current || !optimizedRoute || !showRoutePolyline) {
-      console.log('Route display conditions not met:', {
-        mapReady: !!mapInstanceRef.current,
-        optimizedRoute: !!optimizedRoute,
-        showRoutePolyline
-      })
+      console.log('Route display conditions not met - skipping display')
       return
     }
 
@@ -281,27 +341,32 @@ export default function GoogleMapComponent({
       })
       mapInstanceRef.current.fitBounds(bounds)
 
-      console.log('Route displayed successfully')
+      console.log('Route displayed successfully with Directions API')
     } catch (err) {
       console.error('Failed to display route using Directions API:', err)
       console.log('Attempting fallback simple polyline...')
       
       // Fallback: Create simple polyline connecting stops
       try {
+        console.log('Creating fallback polyline with stops:', optimizedRoute.stops)
         const path = optimizedRoute.stops.map(stop => 
           new google.maps.LatLng(stop.latitude, stop.longitude)
         )
+        
+        console.log('Polyline path created with', path.length, 'points')
         
         const polyline = new google.maps.Polyline({
           path: path,
           geodesic: true,
           strokeColor: '#2563eb',
           strokeOpacity: 0.8,
-          strokeWeight: 4,
+          strokeWeight: 6,
         })
         
         polyline.setMap(mapInstanceRef.current)
         polylineRef.current = polyline
+        
+        console.log('Fallback polyline set on map')
         
         // Fit map to show all points
         const bounds = new google.maps.LatLngBounds()
@@ -315,8 +380,27 @@ export default function GoogleMapComponent({
     }
   }, [optimizedRoute, showRoutePolyline])
 
+  // Separate effect to trigger route display when map becomes ready (after displayRoute is defined)
+  useEffect(() => {
+    if (mapInstanceRef.current && !isLoading && optimizedRoute && showRoutePolyline) {
+      console.log('Map is ready and we have route data - triggering route display')
+      setTimeout(() => {
+        if (mapInstanceRef.current && optimizedRoute && showRoutePolyline) {
+          console.log('Delayed route display call')
+          displayRoute()
+        }
+      }, 300)
+    }
+  }, [isLoading, optimizedRoute, showRoutePolyline, displayRoute])
+
   // Update markers, center, and zoom
   useEffect(() => {
+    console.log('GoogleMapComponent useEffect triggered', { 
+      mapReady: !!mapInstanceRef.current, 
+      markersCount: markers.length,
+      center,
+      zoom 
+    })
     if (mapInstanceRef.current) {
       updateMarkers()
       mapInstanceRef.current.setCenter(center)
@@ -326,9 +410,18 @@ export default function GoogleMapComponent({
 
   // Update route display when route changes
   useEffect(() => {
-    if (mapInstanceRef.current && showRoutePolyline) {
+    console.log('Route display useEffect triggered:', {
+      mapReady: !!mapInstanceRef.current,
+      showRoutePolyline,
+      hasOptimizedRoute: !!optimizedRoute,
+      routeStopsCount: optimizedRoute?.stops?.length || 0
+    })
+    
+    if (mapInstanceRef.current && showRoutePolyline && optimizedRoute) {
+      console.log('Calling displayRoute function...')
       displayRoute()
     } else {
+      console.log('Clearing route display')
       // Clear route display when not showing
       if (directionsRendererRef.current) {
         directionsRendererRef.current.setMap(null)
