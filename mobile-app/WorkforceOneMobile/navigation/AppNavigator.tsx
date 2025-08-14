@@ -14,6 +14,7 @@ import DailyCallsScreen from '../screens/DailyCallsScreen'
 import TasksScreen from '../screens/TasksScreen'
 import LeaveScreen from '../screens/LeaveScreen'
 import FormsScreen from '../screens/FormsScreen'
+import FormCompletionScreen from '../screens/FormCompletionScreen'
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -115,6 +116,14 @@ function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen 
+        name="FormCompletion" 
+        component={FormCompletionScreen}
+        options={{
+          presentation: 'modal',
+          gestureEnabled: true
+        }}
+      />
     </Stack.Navigator>
   )
 }

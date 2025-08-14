@@ -20,10 +20,14 @@ import {
   Plus,
   ChevronRight,
   MapPin,
-  ClipboardList
+  ClipboardList,
+  Phone,
+  CheckSquare,
+  UserCheck
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface DashboardStats {
   totalEmployees: number
@@ -36,6 +40,10 @@ interface DashboardStats {
     absent: number
     late: number
   }
+  myTasks: number
+  checkedInToday: number
+  checkedInThisWeek: number
+  dailyCalls: number
 }
 
 interface RecentActivity {
@@ -54,6 +62,7 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<any>(null)
   
   const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     fetchDashboardData()
@@ -258,13 +267,59 @@ export default function DashboardPage() {
         .in('status', ['active', 'planning'])
         .lte('end_date', oneWeekFromNow.toISOString().split('T')[0])
 
+      // Get my tasks (assigned to current user)
+      const { count: myTasks } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('assignee_id', user.id)
+        .in('status', ['assigned', 'in_progress'])
+
+      // Get check-ins for current user today
+      const { count: checkedInToday } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .eq('status', 'present')
+
+      // Get check-ins for current user this week
+      const startOfWeek = new Date()
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+      const startOfWeekStr = format(startOfWeek, 'yyyy-MM-dd')
+      
+      const { count: checkedInThisWeek } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('date', startOfWeekStr)
+        .eq('status', 'present')
+
+      // Get daily calls (outlet visits) for current user today
+      let dailyCalls = 0
+      try {
+        const { count } = await supabase
+          .from('outlet_visits')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('check_in_time', `${today}T00:00:00`)
+          .lt('check_in_time', `${today}T23:59:59`)
+        dailyCalls = count || 0
+      } catch (error) {
+        console.log('Outlet visits table not available:', error)
+        dailyCalls = 0
+      }
+
       setStats({
         totalEmployees: totalEmployees || 0,
         activeProjects: activeProjects || 0,
         completedTasks: completedTasks || 0,
         pendingForms: pendingForms,
         projectsDueThisWeek: projectsDueThisWeek || 0,
-        todayAttendance: attendanceStats
+        todayAttendance: attendanceStats,
+        myTasks: myTasks || 0,
+        checkedInToday: checkedInToday || 0,
+        checkedInThisWeek: checkedInThisWeek || 0,
+        dailyCalls: dailyCalls
       })
 
       // Get real recent activity
@@ -326,72 +381,90 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+        {/* My Tasks - Clickable */}
+        <Card 
+          className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm cursor-pointer group"
+          onClick={() => router.push('/dashboard/tasks')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Team Members</p>
-                <p className="text-2xl font-bold">{stats?.totalEmployees || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">My Tasks</p>
+                <p className="text-2xl font-bold text-blue-600">{stats?.myTasks || 0}</p>
               </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                <CheckSquare className="h-6 w-6 text-blue-600" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-muted-foreground">Active team members</span>
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Active assignments</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-600 transition-colors" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+        {/* Checked In Today - Clickable */}
+        <Card 
+          className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm cursor-pointer group"
+          onClick={() => router.push('/dashboard/attendance')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Present Today</p>
-                <p className="text-2xl font-bold text-green-600">{stats?.todayAttendance.present || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">Checked In Today</p>
+                <p className="text-2xl font-bold text-green-600">{stats?.checkedInToday || 0}</p>
               </div>
-              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
+              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                <UserCheck className="h-6 w-6 text-green-600" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-muted-foreground">
-                {stats?.todayAttendance.late || 0} late, {stats?.todayAttendance.absent || 0} absent
-              </span>
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Your attendance</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-green-600 transition-colors" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+        {/* This Week Attendance - Clickable */}
+        <Card 
+          className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm cursor-pointer group"
+          onClick={() => router.push('/dashboard/attendance?period=week')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
-                <p className="text-2xl font-bold">{stats?.activeProjects || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">This Week</p>
+                <p className="text-2xl font-bold text-purple-600">{stats?.checkedInThisWeek || 0}</p>
               </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <Activity className="h-6 w-6 text-purple-600" />
+              <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                <Calendar className="h-6 w-6 text-purple-600" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-purple-600">{stats?.projectsDueThisWeek || 0} due this week</span>
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Days attended</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-purple-600 transition-colors" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+        {/* Daily Calls - Clickable */}
+        <Card 
+          className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm cursor-pointer group"
+          onClick={() => router.push('/dashboard/daily-calls')}
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Forms</p>
-                <p className="text-2xl font-bold text-orange-600">{stats?.pendingForms || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">Daily Calls</p>
+                <p className="text-2xl font-bold text-orange-600">{stats?.dailyCalls || 0}</p>
               </div>
-              <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-orange-600" />
+              <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center group-hover:bg-orange-200 transition-colors">
+                <Phone className="h-6 w-6 text-orange-600" />
               </div>
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-muted-foreground">Requires attention</span>
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Visits today</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-orange-600 transition-colors" />
             </div>
           </CardContent>
         </Card>
@@ -475,21 +548,29 @@ export default function DashboardPage() {
 
           <Card className="bg-white/80 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle>Today's Summary</CardTitle>
+              <CardTitle>Your Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Check-ins</span>
-                <Badge variant="secondary">{stats?.todayAttendance.present || 0}</Badge>
+                <span className="text-sm text-muted-foreground">My Tasks</span>
+                <Badge variant={stats?.myTasks ? "destructive" : "secondary"}>
+                  {stats?.myTasks || 0}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Active Forms</span>
-                <Badge variant="outline">{stats?.pendingForms || 0}</Badge>
+                <span className="text-sm text-muted-foreground">Daily Calls</span>
+                <Badge variant="outline">{stats?.dailyCalls || 0}</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Projects Due</span>
-                <Badge variant={stats?.projectsDueThisWeek ? "destructive" : "secondary"}>
-                  {stats?.projectsDueThisWeek || 0}
+                <span className="text-sm text-muted-foreground">This Week</span>
+                <Badge variant="secondary">
+                  {stats?.checkedInThisWeek || 0} days
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Checked In</span>
+                <Badge variant={stats?.checkedInToday ? "default" : "secondary"}>
+                  {stats?.checkedInToday ? 'Yes' : 'No'}
                 </Badge>
               </div>
             </CardContent>

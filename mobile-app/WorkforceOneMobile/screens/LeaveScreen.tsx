@@ -14,6 +14,8 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { offlineStorage } from '../services/OfflineStorage'
+import { syncService } from '../services/SyncService'
 
 interface LeaveRequest {
   id: string
@@ -90,21 +92,37 @@ export default function LeaveScreen() {
     }
 
     try {
-      const { error } = await supabase
-        .from('leave_requests')
-        .insert({
-          user_id: user?.id,
-          organization_id: profile?.organization_id,
-          start_date: newRequest.start_date,
-          end_date: newRequest.end_date,
-          leave_type: newRequest.leave_type,
+      const timestamp = new Date().toISOString()
+
+      // Add leave request to outbox for offline sync
+      await offlineStorage.addToOutbox({
+        type: 'leave_request',
+        data: {
+          userId: user!.id,
+          organizationId: profile!.organization_id,
+          type: newRequest.leave_type,
+          startDate: newRequest.start_date,
+          endDate: newRequest.end_date,
           reason: newRequest.reason,
-          status: 'pending'
-        })
+          timestamp
+        },
+        timestamp,
+        userId: user!.id,
+        organizationId: profile!.organization_id
+      })
 
-      if (error) throw error
+      // Try to sync if online
+      const syncStatus = syncService.getSyncStatus()
+      if (syncStatus.isOnline) {
+        const syncResult = await syncService.forcSync()
+        Alert.alert(
+          'Success', 
+          syncResult ? 'Leave request submitted successfully!' : 'Leave request saved! It will be submitted when connection is stable.'
+        )
+      } else {
+        Alert.alert('Success', 'Leave request saved! It will be submitted when you\'re back online.')
+      }
 
-      Alert.alert('Success', 'Leave request submitted successfully')
       setShowNewRequestModal(false)
       setNewRequest({
         start_date: '',

@@ -14,6 +14,8 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { offlineStorage } from '../services/OfflineStorage'
+import { syncService } from '../services/SyncService'
 
 // Configuration for form completion
 const CONFIG = {
@@ -401,7 +403,7 @@ export default function DailyCallsScreen({ navigation }: any) {
             },
             {
               text: 'Complete Form Now',
-              onPress: () => openOutletForm(formToUse, visitData.id, stop)
+              onPress: () => openOutletForm(formToUse, visitData.id, stop, navigation)
             },
             // Add development option if configured
             ...(CONFIG.SHOW_DEV_OPTIONS ? [{
@@ -445,29 +447,24 @@ export default function DailyCallsScreen({ navigation }: any) {
     }
   }
 
-  const openOutletForm = (form: any, visitId: string, stop: RouteStop) => {
-    // Construct the web form URL using configuration
-    const formUrl = `${CONFIG.WEB_APP_URL}/dashboard/outlets/complete-form?form=${form.id}&outlet=${stop.outlet.id}&visit=${visitId}`
-    
-    // Directly open the form in the web browser
-    Linking.openURL(formUrl).catch(err => {
-      console.error('Error opening web form:', err)
-      // Fall back to showing options if direct opening fails
+  const openOutletForm = async (form: any, visitId: string, stop: RouteStop, navigation: any) => {
+    try {
+      // Navigate to native form completion screen
+      navigation.navigate('FormCompletion', {
+        formId: form.id,
+        outletId: stop.outlet.id,
+        visitId: visitId,
+        routeStopId: stop.id
+      })
+    } catch (error) {
+      console.error('Error opening form:', error)
       Alert.alert(
-        'Error Opening Form',
-        'Could not open the form directly. What would you like to do?',
+        'Error',
+        'Could not open the form. Would you like to simulate completion instead?',
         [
           {
             text: 'Cancel',
             style: 'cancel'
-          },
-          {
-            text: 'Try Again',
-            onPress: () => {
-              Linking.openURL(formUrl).catch(() => {
-                Alert.alert('Error', 'Could not open web form. Please ensure you have a web browser installed.')
-              })
-            }
           },
           {
             text: 'Simulate Completion',
@@ -476,53 +473,69 @@ export default function DailyCallsScreen({ navigation }: any) {
           }
         ]
       )
-    })
+    }
   }
 
   const simulateFormCompletion = async (formId: string, visitId: string, stopId: string) => {
     setActionLoading(true)
     try {
-      // Create a form response (using actual schema)
-      const { data: responseData, error: responseError } = await supabase
-        .from('form_responses')
-        .insert({
-          form_id: formId,
-          organization_id: profile!.organization_id,
-          respondent_id: user!.id,
+      const timestamp = new Date().toISOString()
+
+      // Add form response to outbox for syncing
+      await offlineStorage.addToOutbox({
+        type: 'form_response',
+        data: {
+          formId,
+          outletId: '', // Will be filled from visit data
+          visitId,
+          userId: user!.id,
+          organizationId: profile!.organization_id,
           responses: {
             'simulated': true,
-            'completed_at': new Date().toISOString(),
+            'completed_at': timestamp,
             '_metadata': {
               'outlet_visit_id': visitId,
-              'simulation': true
+              'simulation': true,
+              'offline_submitted': true
             }
           },
-          status: 'completed',
-          submitted_at: new Date().toISOString()
-        })
-        .select()
-        .single()
+          timestamp
+        },
+        timestamp,
+        userId: user!.id,
+        organizationId: profile!.organization_id
+      })
 
-      if (responseError) throw responseError
-
-      // Update the outlet visit to mark form as completed
-      const { error: visitUpdateError } = await supabase
-        .from('outlet_visits')
-        .update({
-          form_completed: true,
-          form_response_id: responseData.id
-        })
-        .eq('id', visitId)
-
-      if (visitUpdateError) throw visitUpdateError
+      // Add outlet visit update to outbox
+      await offlineStorage.addToOutbox({
+        type: 'outlet_visit',
+        data: {
+          visitId,
+          formCompleted: true,
+          checkOutTime: timestamp,
+          userId: user!.id,
+          organizationId: profile!.organization_id
+        },
+        timestamp,
+        userId: user!.id,
+        organizationId: profile!.organization_id
+      })
 
       // Mark the route stop as completed
       await markStopCompleted(stopId)
 
-      Alert.alert('Success!', 'Form completed and outlet visit finished.')
+      // Try to sync if online
+      const syncStatus = syncService.getSyncStatus()
+      if (syncStatus.isOnline) {
+        await syncService.forcSync()
+        Alert.alert('Success!', 'Form simulation completed and synced!')
+      } else {
+        Alert.alert('Success!', 'Form simulation completed! It will sync when you\'re back online.')
+      }
 
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to complete form')
+      console.error('Error simulating form completion:', error)
+      Alert.alert('Error', error.message || 'Failed to complete form simulation')
     } finally {
       setActionLoading(false)
     }
