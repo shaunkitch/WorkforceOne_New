@@ -15,6 +15,17 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
+// Configuration for form completion
+const CONFIG = {
+  // Change this to your actual web app URL when testing on a real device
+  // Examples: 
+  // - Local network: 'http://192.168.1.100:3001'
+  // - Production: 'https://your-workforceone-app.com'
+  WEB_APP_URL: 'http://localhost:3001',
+  // Set to true to show simulation options in development
+  SHOW_DEV_OPTIONS: false
+}
+
 interface Outlet {
   id: string
   name: string
@@ -391,7 +402,13 @@ export default function DailyCallsScreen({ navigation }: any) {
             {
               text: 'Complete Form Now',
               onPress: () => openOutletForm(formToUse, visitData.id, stop)
-            }
+            },
+            // Add development option if configured
+            ...(CONFIG.SHOW_DEV_OPTIONS ? [{
+              text: 'Dev: Simulate',
+              onPress: () => simulateFormCompletion(formToUse.id, visitData.id, stop.id),
+              style: 'destructive' as const
+            }] : [])
           ]
         )
       } else {
@@ -429,33 +446,37 @@ export default function DailyCallsScreen({ navigation }: any) {
   }
 
   const openOutletForm = (form: any, visitId: string, stop: RouteStop) => {
-    // Construct the web form URL
-    const formUrl = `http://localhost:3001/dashboard/outlets/complete-form?form=${form.id}&outlet=${stop.outlet.id}&visit=${visitId}`
+    // Construct the web form URL using configuration
+    const formUrl = `${CONFIG.WEB_APP_URL}/dashboard/outlets/complete-form?form=${form.id}&outlet=${stop.outlet.id}&visit=${visitId}`
     
-    Alert.alert(
-      form.title,
-      `Form: ${form.description || 'Complete this form for the outlet visit'}\n\nChoose how to complete the form:`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Open Web Form',
-          onPress: () => {
-            Linking.openURL(formUrl).catch(err => {
-              console.error('Error opening web form:', err)
-              Alert.alert('Error', 'Could not open web form. Please ensure you have a web browser installed.')
-            })
+    // Directly open the form in the web browser
+    Linking.openURL(formUrl).catch(err => {
+      console.error('Error opening web form:', err)
+      // Fall back to showing options if direct opening fails
+      Alert.alert(
+        'Error Opening Form',
+        'Could not open the form directly. What would you like to do?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Try Again',
+            onPress: () => {
+              Linking.openURL(formUrl).catch(() => {
+                Alert.alert('Error', 'Could not open web form. Please ensure you have a web browser installed.')
+              })
+            }
+          },
+          {
+            text: 'Simulate Completion',
+            onPress: () => simulateFormCompletion(form.id, visitId, stop.id),
+            style: 'destructive'
           }
-        },
-        {
-          text: 'Simulate Completion',
-          onPress: () => simulateFormCompletion(form.id, visitId, stop.id),
-          style: 'destructive'
-        }
-      ]
-    )
+        ]
+      )
+    })
   }
 
   const simulateFormCompletion = async (formId: string, visitId: string, stopId: string) => {
@@ -467,11 +488,11 @@ export default function DailyCallsScreen({ navigation }: any) {
         .insert({
           form_id: formId,
           organization_id: profile!.organization_id,
+          respondent_id: user!.id,
           responses: {
             'simulated': true,
             'completed_at': new Date().toISOString(),
             '_metadata': {
-              'user_id': user!.id,
               'outlet_visit_id': visitId,
               'simulation': true
             }

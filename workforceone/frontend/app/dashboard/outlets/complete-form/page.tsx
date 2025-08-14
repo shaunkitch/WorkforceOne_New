@@ -287,13 +287,13 @@ export default function CompleteFormPage() {
       }
 
       // Save or update form response (using actual schema)
-      const responseData = {
+      const responseData: any = {
         form_id: form.id,
         organization_id: userProfile.organization_id,
+        respondent_id: userProfile.id,
         responses: {
           ...formResponses,
           _metadata: {
-            user_id: userProfile.id,
             user_name: userProfile.full_name,
             outlet_visit_id: currentVisit.id,
             outlet_id: outlet.id,
@@ -302,6 +302,9 @@ export default function CompleteFormPage() {
         },
         status: 'draft'
       }
+      
+      // Add user_id if the column exists (for compatibility)
+      responseData.user_id = userProfile.id
 
       let formResponseId = currentVisit.form_response_id
 
@@ -372,13 +375,13 @@ export default function CompleteFormPage() {
       }
 
       // Submit form response (using actual schema)
-      const responseData = {
+      const responseData: any = {
         form_id: form.id,
         organization_id: userProfile.organization_id,
+        respondent_id: userProfile.id,
         responses: {
           ...formResponses,
           _metadata: {
-            user_id: userProfile.id,
             user_name: userProfile.full_name,
             outlet_visit_id: currentVisit.id,
             outlet_id: outlet.id,
@@ -388,6 +391,9 @@ export default function CompleteFormPage() {
         status: 'completed',
         submitted_at: new Date().toISOString()
       }
+      
+      // Add user_id if the column exists (for compatibility)
+      responseData.user_id = userProfile.id
 
       let formResponseId = currentVisit.form_response_id
 
