@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Linking,
+  Platform,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
@@ -211,12 +213,12 @@ export default function DailyCallsScreen({ navigation }: any) {
   const handleStopPress = (stop: RouteStop) => {
     Alert.alert(
       stop.outlet.name,
-      `Address: ${stop.outlet.address}\n\nWhat would you like to do?`,
+      `Address: ${stop.outlet.address}${stop.outlet.contact_person ? `\nContact: ${stop.outlet.contact_person}` : ''}${stop.outlet.phone ? `\nPhone: ${stop.outlet.phone}` : ''}\n\nWhat would you like to do?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Get Directions', 
-          onPress: () => getDirections(stop.outlet)
+          onPress: () => showDirectionsOptions(stop.outlet)
         },
         { 
           text: 'Check In', 
@@ -227,11 +229,94 @@ export default function DailyCallsScreen({ navigation }: any) {
     )
   }
 
-  const getDirections = (outlet: Outlet) => {
-    // This would integrate with maps app for directions
-    Alert.alert('Directions', `Opening directions to ${outlet.name}`)
-    // TODO: Implement actual directions using Linking and maps
+  const showDirectionsOptions = (outlet: Outlet) => {
+    const options: any[] = [
+      { text: 'Cancel', style: 'cancel' }
+    ]
+
+    if (Platform.OS === 'ios') {
+      options.unshift({ 
+        text: 'Apple Maps', 
+        onPress: () => openAppleMaps(outlet) 
+      })
+    }
+    
+    options.unshift({ 
+      text: 'Google Maps', 
+      onPress: () => openGoogleMaps(outlet) 
+    })
+
+    Alert.alert(
+      'Choose Maps App',
+      `Get directions to ${outlet.name}`,
+      options
+    )
   }
+
+  const openAppleMaps = async (outlet: Outlet) => {
+    try {
+      let url: string
+      if (outlet.latitude && outlet.longitude) {
+        url = `maps://app?daddr=${outlet.latitude},${outlet.longitude}&dirflg=d`
+      } else {
+        const address = encodeURIComponent(outlet.address)
+        url = `maps://app?daddr=${address}&dirflg=d`
+      }
+      
+      const canOpen = await Linking.canOpenURL(url)
+      if (canOpen) {
+        await Linking.openURL(url)
+      } else {
+        Alert.alert('Error', 'Apple Maps is not available on this device.')
+      }
+    } catch (error) {
+      console.error('Error opening Apple Maps:', error)
+      Alert.alert('Error', 'Failed to open Apple Maps')
+    }
+  }
+
+  const openGoogleMaps = async (outlet: Outlet) => {
+    try {
+      let url: string
+      
+      if (Platform.OS === 'android') {
+        // Try Google Maps app first on Android
+        if (outlet.latitude && outlet.longitude) {
+          url = `google.navigation:q=${outlet.latitude},${outlet.longitude}&mode=d`
+        } else {
+          const address = encodeURIComponent(outlet.address)
+          url = `google.navigation:q=${address}&mode=d`
+        }
+        
+        const canOpenApp = await Linking.canOpenURL(url)
+        if (canOpenApp) {
+          await Linking.openURL(url)
+          return
+        }
+      }
+      
+      // Fallback to web Google Maps
+      let destination: string
+      if (outlet.latitude && outlet.longitude) {
+        destination = `${outlet.latitude},${outlet.longitude}`
+      } else {
+        destination = encodeURIComponent(outlet.address)
+      }
+      
+      url = `https://maps.google.com?daddr=${destination}&directionsmode=driving`
+      
+      const canOpenWeb = await Linking.canOpenURL(url)
+      if (canOpenWeb) {
+        await Linking.openURL(url)
+      } else {
+        Alert.alert('Error', 'Google Maps is not available')
+      }
+    } catch (error) {
+      console.error('Error opening Google Maps:', error)
+      Alert.alert('Error', 'Failed to open Google Maps')
+    }
+  }
+
 
   const checkInToOutlet = async (stop: RouteStop) => {
     setActionLoading(true)
@@ -263,23 +348,41 @@ export default function DailyCallsScreen({ navigation }: any) {
 
       if (updateError) throw updateError
 
-      // Check if outlet has a required form
-      const { data: outletData, error: outletError } = await supabase
-        .from('outlets')
-        .select('required_form_id, forms:required_form_id(id, title, description, fields)')
-        .eq('id', stop.outlet.id)
+      // Check if outlet requires a form using the enhanced system
+      const { data: outletFormData, error: outletFormError } = await supabase
+        .from('outlet_form_requirements')
+        .select('*')
+        .eq('outlet_id', stop.outlet.id)
         .single()
 
-      if (outletError) {
-        console.error('Error fetching outlet form info:', outletError)
+      if (outletFormError) {
+        console.error('Error fetching outlet form requirements:', outletFormError)
       }
 
-      const hasRequiredForm = outletData?.required_form_id != null
+      const hasRequiredForm = outletFormData?.form_required === true && outletFormData?.effective_form_id != null
 
-      if (hasRequiredForm && outletData?.forms) {
+      if (hasRequiredForm && outletFormData) {
+        // Get the full form details for the effective form
+        const { data: formDetails, error: formError } = await supabase
+          .from('forms')
+          .select('*')
+          .eq('id', outletFormData.effective_form_id)
+          .single()
+
+        if (formError) {
+          console.error('Error fetching form details:', formError)
+        }
+
+        const formToUse = formDetails || {
+          id: outletFormData.effective_form_id,
+          title: outletFormData.effective_form_title || 'Required Form',
+          description: 'Please complete this form for the outlet visit',
+          fields: []
+        }
+
         Alert.alert(
           'Checked In Successfully!',
-          `You've checked in to ${stop.outlet.name}. Please complete the required form: "${outletData.forms.title}"`,
+          `You've checked in to ${stop.outlet.name}. Please complete the required form: "${formToUse.title}"${outletFormData.group_form_id ? ' (Group Required)' : ''}`,
           [
             {
               text: 'Complete Form Later',
@@ -287,14 +390,25 @@ export default function DailyCallsScreen({ navigation }: any) {
             },
             {
               text: 'Complete Form Now',
-              onPress: () => openOutletForm(outletData.forms, visitData.id, stop)
+              onPress: () => openOutletForm(formToUse, visitData.id, stop)
             }
           ]
         )
       } else {
+        // Determine the reason no form is required
+        let message = `You've checked in to ${stop.outlet.name}.`
+        
+        if (outletFormData?.form_required === false) {
+          message += ' Form requirement disabled for this outlet.'
+        } else if (outletFormData?.form_required === true) {
+          message += ' No form assigned to this outlet or group.'
+        } else {
+          message += ' No form required for this outlet.'
+        }
+
         Alert.alert(
           'Checked In Successfully!',
-          `You've checked in to ${stop.outlet.name}. No form required for this outlet.`,
+          message,
           [
             {
               text: 'Mark as Completed',
@@ -315,19 +429,30 @@ export default function DailyCallsScreen({ navigation }: any) {
   }
 
   const openOutletForm = (form: any, visitId: string, stop: RouteStop) => {
-    // For now, simulate form completion
-    // In a real implementation, this would navigate to a form screen
+    // Construct the web form URL
+    const formUrl = `http://localhost:3001/dashboard/outlets/complete-form?form=${form.id}&outlet=${stop.outlet.id}&visit=${visitId}`
+    
     Alert.alert(
       form.title,
-      `Form: ${form.description || 'Complete this form for the outlet visit'}\n\nThis would open the actual form interface.`,
+      `Form: ${form.description || 'Complete this form for the outlet visit'}\n\nChoose how to complete the form:`,
       [
         {
           text: 'Cancel',
           style: 'cancel'
         },
         {
-          text: 'Simulate Form Completion',
-          onPress: () => simulateFormCompletion(form.id, visitId, stop.id)
+          text: 'Open Web Form',
+          onPress: () => {
+            Linking.openURL(formUrl).catch(err => {
+              console.error('Error opening web form:', err)
+              Alert.alert('Error', 'Could not open web form. Please ensure you have a web browser installed.')
+            })
+          }
+        },
+        {
+          text: 'Simulate Completion',
+          onPress: () => simulateFormCompletion(form.id, visitId, stop.id),
+          style: 'destructive'
         }
       ]
     )

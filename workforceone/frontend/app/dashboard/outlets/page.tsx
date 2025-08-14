@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 
 interface Outlet {
   id: string
@@ -32,8 +33,32 @@ interface Outlet {
   latitude: number | null
   longitude: number | null
   organization_id: string
+  form_required: boolean
+  required_form_id: string | null
   created_at: string
   updated_at: string
+}
+
+interface Form {
+  id: string
+  title: string
+  description: string | null
+  organization_id: string
+  status: 'draft' | 'active' | 'paused' | 'completed' | 'archived'
+  fields?: any[]
+  settings?: any
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+interface OutletGroupForm {
+  id: string
+  organization_id: string
+  group_name: string
+  form_id: string
+  is_active: boolean
+  form?: Form
 }
 
 interface Profile {
@@ -41,6 +66,7 @@ interface Profile {
   full_name: string
   email: string
   role: string
+  organization_id: string
 }
 
 interface Team {
@@ -70,12 +96,19 @@ export default function OutletsPage() {
   const [selectedGroup, setSelectedGroup] = useState<string>('all')
   const [hiddenGroups, setHiddenGroups] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // Form management state
+  const [forms, setForms] = useState<Form[]>([])
+  const [groupForms, setGroupForms] = useState<OutletGroupForm[]>([])
+  const [showGroupFormModal, setShowGroupFormModal] = useState(false)
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchUserProfile()
     fetchOutlets()
+    fetchForms()
+    fetchGroupForms()
   }, [])
 
   const fetchUserProfile = async () => {
@@ -111,10 +144,10 @@ export default function OutletsPage() {
 
       if (!profile?.organization_id) throw new Error('No organization found')
 
-      // Fetch outlets
+      // Fetch outlets with form information
       const { data: outletsData, error: outletsError } = await supabase
         .from('outlets')
-        .select('*')
+        .select('*, forms:required_form_id(id, title)')
         .eq('organization_id', profile.organization_id)
         .order('name')
 
@@ -161,6 +194,60 @@ export default function OutletsPage() {
     }
   }
 
+  const fetchForms = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: formsData, error } = await supabase
+        .from('forms')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .in('status', ['active', 'draft']) // Include active and draft forms
+        .order('title')
+
+      if (error) throw error
+      setForms(formsData || [])
+    } catch (error) {
+      console.error('Error fetching forms:', error)
+    }
+  }
+
+  const fetchGroupForms = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: groupFormsData, error } = await supabase
+        .from('outlet_group_forms')
+        .select('*, form:forms(id, title, description)')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true)
+        .order('group_name')
+
+      if (error) throw error
+      setGroupForms(groupFormsData || [])
+    } catch (error) {
+      console.error('Error fetching group forms:', error)
+    }
+  }
+
   const canManageOutlets = () => {
     return userProfile?.role === 'admin' || userProfile?.role === 'manager'
   }
@@ -168,6 +255,89 @@ export default function OutletsPage() {
   const canDeleteOutlets = () => {
     return userProfile?.role === 'admin'
   }
+
+  const toggleFormRequired = async (outlet: Outlet, formRequired: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('outlets')
+        .update({ form_required: formRequired })
+        .eq('id', outlet.id)
+
+      if (error) throw error
+
+      // Update local state
+      setOutlets(outlets.map(o => 
+        o.id === outlet.id ? { ...o, form_required: formRequired } : o
+      ))
+
+    } catch (error) {
+      console.error('Error updating form requirement:', error)
+      alert('Failed to update form requirement')
+    }
+  }
+
+  const updateOutletForm = async (outlet: Outlet, formId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('outlets')
+        .update({ required_form_id: formId })
+        .eq('id', outlet.id)
+
+      if (error) throw error
+
+      // Update local state
+      setOutlets(outlets.map(o => 
+        o.id === outlet.id ? { ...o, required_form_id: formId } : o
+      ))
+
+    } catch (error) {
+      console.error('Error updating outlet form:', error)
+      alert('Failed to update outlet form')
+    }
+  }
+
+  // Legacy functions - keeping for reference
+  // const assignFormToGroup = async (groupName: string, formId: string) => {
+  //   try {
+  //     if (!userProfile?.organization_id) return
+
+  //     const { error } = await supabase
+  //       .from('outlet_group_forms')
+  //       .upsert({
+  //         organization_id: userProfile.organization_id,
+  //         group_name: groupName,
+  //         form_id: formId,
+  //         created_by: userProfile.id,
+  //         is_active: true
+  //       })
+
+  //     if (error) throw error
+
+  //     await fetchGroupForms()
+  //     alert('Form assigned to group successfully!')
+
+  //   } catch (error) {
+  //     console.error('Error assigning form to group:', error)
+  //     alert('Failed to assign form to group')
+  //   }
+  // }
+
+  // const removeGroupForm = async (groupFormId: string) => {
+  //   try {
+  //     const { error } = await supabase
+  //       .from('outlet_group_forms')
+  //       .delete()
+  //       .eq('id', groupFormId)
+
+  //     if (error) throw error
+
+  //     await fetchGroupForms()
+
+  //   } catch (error) {
+  //     console.error('Error removing group form:', error)
+  //     alert('Failed to remove group form')
+  //   }
+  // }
 
   const handleCreateOutlet = () => {
     setSelectedOutlet(null)
@@ -310,6 +480,14 @@ export default function OutletsPage() {
               <Button onClick={handleCreateOutlet} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Create Outlet
+              </Button>
+              <Button 
+                onClick={() => setShowGroupFormModal(true)}
+                variant="outline" 
+                className="border-blue-200 hover:bg-blue-50"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Manage Group Forms
               </Button>
             </div>
           )}
@@ -481,6 +659,77 @@ export default function OutletsPage() {
                             <p className="text-xs text-gray-500 border-t pt-2">
                               Coordinates: {outlet.latitude}, {outlet.longitude}
                             </p>
+                          )}
+
+                          {/* Form Requirements Section */}
+                          {canManageOutlets() && (
+                            <div className="pt-3 border-t border-gray-100 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-700">Form Required</span>
+                                <Switch
+                                  checked={outlet.form_required || false}
+                                  onCheckedChange={(checked) => toggleFormRequired(outlet, checked)}
+                                />
+                              </div>
+                              
+                              {outlet.form_required && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-gray-600">Individual Form Assignment</Label>
+                                  <Select
+                                    value={outlet.required_form_id || 'none'}
+                                    onValueChange={(value) => updateOutletForm(outlet, value === 'none' ? null : value)}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Select form..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No individual form</SelectItem>
+                                      {forms.map((form) => (
+                                        <SelectItem key={form.id} value={form.id}>
+                                          {form.title}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  
+                                  {/* Show group form if applicable */}
+                                  {outlet.group_name && (() => {
+                                    const groupForm = groupForms.find(gf => gf.group_name === outlet.group_name)
+                                    if (groupForm) {
+                                      return (
+                                        <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center justify-between">
+                                          <span>📋 Group Form: {groupForm.form?.title}</span>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => window.open(`/dashboard/outlets/complete-form?form=${groupForm.form_id}&outlet=${outlet.id}`, '_blank')}
+                                            className="text-xs h-6 px-2"
+                                          >
+                                            Test Form
+                                          </Button>
+                                        </div>
+                                      )
+                                    }
+                                    return null
+                                  })()}
+
+                                  {/* Show individual form if assigned */}
+                                  {outlet.required_form_id && (
+                                    <div className="text-xs text-green-600 bg-green-50 p-2 rounded flex items-center justify-between">
+                                      <span>📝 Individual Form Required</span>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => window.open(`/dashboard/outlets/complete-form?form=${outlet.required_form_id}&outlet=${outlet.id}`, '_blank')}
+                                        className="text-xs h-6 px-2"
+                                      >
+                                        Test Form
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
 
                           <div className="flex items-center justify-between pt-2 border-t border-gray-100">
@@ -713,6 +962,18 @@ export default function OutletsPage() {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onSuccess={fetchOutlets}
+        />
+      )}
+
+      {/* Group Forms Management Modal */}
+      {showGroupFormModal && (
+        <GroupFormsModal
+          isOpen={showGroupFormModal}
+          onClose={() => setShowGroupFormModal(false)}
+          onSuccess={() => {
+            fetchGroupForms()
+            fetchOutlets()
+          }}
         />
       )}
     </div>
@@ -1034,7 +1295,7 @@ function AssignmentModal({ isOpen, onClose, onSuccess, outlet }: AssignmentModal
       const [usersResult, teamsResult, userAssignmentsResult, teamAssignmentsResult] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, email, role')
+          .select('id, full_name, email, role, organization_id')
           .eq('organization_id', profile.organization_id)
           .eq('is_active', true)
           .order('full_name'),
@@ -1347,7 +1608,7 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
     const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
     
     return lines.slice(1).map(line => {
-      const values = []
+      const values: string[] = []
       let current = ''
       let inQuotes = false
       
@@ -1714,6 +1975,321 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Group Forms Management Modal Component
+interface GroupFormsModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+function GroupFormsModal({ isOpen, onClose, onSuccess }: GroupFormsModalProps) {
+  const [selectedGroup, setSelectedGroup] = useState('')
+  const [selectedForm, setSelectedForm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+  
+  // Get unique group names from outlets
+  const [outlets, setOutlets] = useState<Outlet[]>([])
+  const [forms, setForms] = useState<Form[]>([])
+  const [groupForms, setGroupForms] = useState<OutletGroupForm[]>([])
+  const [userProfile, setUserProfile] = useState<Profile | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchData()
+    }
+  }, [isOpen])
+
+  const fetchData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+      setUserProfile(profile)
+
+      // Fetch outlets for group names
+      const { data: outletsData } = await supabase
+        .from('outlets')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .order('name')
+
+      setOutlets(outletsData || [])
+
+      // Fetch forms (using status instead of is_active)
+      const { data: formsData, error: formsError } = await supabase
+        .from('forms')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .in('status', ['active', 'draft']) // Include active and draft forms
+        .order('title')
+
+      if (formsError) {
+        console.error('Error fetching forms:', formsError)
+      } else {
+        console.log('Fetched forms:', formsData)
+      }
+
+      setForms(formsData || [])
+
+      // Fetch existing group forms
+      const { data: groupFormsData } = await supabase
+        .from('outlet_group_forms')
+        .select('*, form:forms(id, title, description)')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true)
+        .order('group_name')
+
+      setGroupForms(groupFormsData || [])
+
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    }
+  }
+
+  const createSampleForms = async () => {
+    if (!userProfile?.organization_id) return
+    
+    try {
+      const sampleForms = [
+        {
+          title: 'Daily Visit Report',
+          description: 'Standard daily outlet visit report form',
+          organization_id: userProfile.organization_id,
+          created_by: userProfile.id,
+          is_active: true,
+          fields: [
+            { type: 'text', label: 'Outlet Condition', required: true },
+            { type: 'select', label: 'Service Quality', options: ['Excellent', 'Good', 'Fair', 'Poor'], required: true },
+            { type: 'textarea', label: 'Notes', required: false }
+          ]
+        },
+        {
+          title: 'Quality Inspection Form',
+          description: 'Form for quality inspection visits',
+          organization_id: userProfile.organization_id,
+          created_by: userProfile.id,
+          is_active: true,
+          fields: [
+            { type: 'checkbox', label: 'Safety Standards Met', required: true },
+            { type: 'number', label: 'Cleanliness Score (1-10)', required: true },
+            { type: 'textarea', label: 'Improvement Recommendations', required: false }
+          ]
+        },
+        {
+          title: 'Customer Feedback Collection',
+          description: 'Form to collect customer feedback during visits',
+          organization_id: userProfile.organization_id,
+          created_by: userProfile.id,
+          is_active: true,
+          fields: [
+            { type: 'text', label: 'Customer Name', required: false },
+            { type: 'select', label: 'Overall Satisfaction', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied'], required: true },
+            { type: 'textarea', label: 'Customer Comments', required: false }
+          ]
+        }
+      ]
+
+      const { error } = await supabase
+        .from('forms')
+        .insert(sampleForms)
+
+      if (error) throw error
+
+      await fetchData()
+      alert('Sample forms created successfully!')
+
+    } catch (error) {
+      console.error('Error creating sample forms:', error)
+      alert('Failed to create sample forms')
+    }
+  }
+
+  const handleAssignForm = async () => {
+    if (!selectedGroup || !selectedForm || !userProfile) return
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('outlet_group_forms')
+        .upsert({
+          organization_id: userProfile.organization_id,
+          group_name: selectedGroup,
+          form_id: selectedForm,
+          created_by: userProfile.id,
+          is_active: true
+        })
+
+      if (error) throw error
+
+      setSelectedGroup('')
+      setSelectedForm('')
+      await fetchData()
+      onSuccess()
+      alert('Form assigned to group successfully!')
+
+    } catch (error) {
+      console.error('Error assigning form:', error)
+      alert('Failed to assign form to group')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRemoveGroupForm = async (groupFormId: string) => {
+    try {
+      const { error } = await supabase
+        .from('outlet_group_forms')
+        .delete()
+        .eq('id', groupFormId)
+
+      if (error) throw error
+
+      await fetchData()
+      onSuccess()
+
+    } catch (error) {
+      console.error('Error removing group form:', error)
+      alert('Failed to remove group form')
+    }
+  }
+
+  // Get unique group names
+  const uniqueGroups = Array.from(
+    new Set(outlets.filter(o => o.group_name).map(o => o.group_name))
+  ).filter(Boolean)
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-semibold">Manage Group Forms</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Assign forms to entire outlet groups
+          </p>
+        </div>
+
+        <div className="p-6 max-h-[60vh] overflow-y-auto">
+          {/* Assign New Group Form */}
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-medium mb-3">Assign Form to Group</h3>
+            {/* Debug info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 mb-2">
+                Debug: {uniqueGroups.length} groups, {forms.length} forms available
+                {forms.length === 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={createSampleForms}
+                    className="ml-2 text-xs h-6"
+                  >
+                    Create Sample Forms
+                  </Button>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <Label className="text-sm">Select Group</Label>
+                <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose group..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uniqueGroups.map((group) => (
+                      <SelectItem key={group} value={group!}>
+                        {group}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Select Form</Label>
+                <Select value={selectedForm} onValueChange={setSelectedForm}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose form..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {forms.length === 0 ? (
+                      <SelectItem value="no-forms" disabled>
+                        No forms available
+                      </SelectItem>
+                    ) : (
+                      forms.map((form) => (
+                        <SelectItem key={form.id} value={form.id}>
+                          {form.title}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button 
+              onClick={handleAssignForm}
+              disabled={!selectedGroup || !selectedForm || loading}
+              className="w-full"
+            >
+              {loading ? 'Assigning...' : 'Assign Form to Group'}
+            </Button>
+          </div>
+
+          {/* Current Group Forms */}
+          <div>
+            <h3 className="font-medium mb-3">Current Group Form Assignments</h3>
+            {groupForms.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4 text-center">
+                No group forms assigned yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {groupForms.map((groupForm) => (
+                  <div key={groupForm.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">{groupForm.group_name}</div>
+                      <div className="text-sm text-gray-600">
+                        📋 {groupForm.form?.title}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {outlets.filter(o => o.group_name === groupForm.group_name).length} outlets in group
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRemoveGroupForm(groupForm.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-6 border-t flex justify-end space-x-3">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
         </div>
       </div>
     </div>
