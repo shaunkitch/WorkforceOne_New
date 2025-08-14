@@ -2,7 +2,7 @@
   "expo": {
     "name": "WorkforceOne Mobile",
     "slug": "workforceone-nt4ygzvok9o8koo87qspm",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -40,7 +40,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.workforceone.mobile",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses location to track attendance check-ins and verify work locations.",
         "NSCameraUsageDescription": "This app uses the camera to capture profile photos and attach images to reports.",
@@ -55,7 +55,7 @@
         "backgroundColor": "#3b82f6"
       },
       "package": "com.workforceone.mobile",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
