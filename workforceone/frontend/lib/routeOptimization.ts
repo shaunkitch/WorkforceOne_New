@@ -350,13 +350,15 @@ class RouteOptimizationService {
             stops: optimizedStops,
             totalDistance: Math.round(totalDistance * 100) / 100,
             totalDuration: Math.round((totalDuration + stopDuration) * 100) / 100,
-            polyline: route.overview_polyline.points,
-            waypoints: route.overview_path,
+            polyline: route.overview_polyline?.points || null,
+            waypoints: route.overview_path || [],
             estimatedFuel: this.calculateFuelConsumption(totalDistance),
             estimatedCost: this.calculateRouteCost(totalDistance, totalDuration)
           }
 
           console.log('Optimized route generated:', optimizedRoute)
+          console.log('Polyline available:', !!route.overview_polyline?.points)
+          console.log('Waypoints count:', route.overview_path?.length || 0)
           resolve(optimizedRoute)
         } else {
           reject(new Error(`Directions request failed: ${status}`))
