@@ -17,9 +17,15 @@ import { Attendance } from '../types/database'
 export default function AttendanceScreen() {
   const { user, profile } = useAuth()
   const [isCheckedIn, setIsCheckedIn] = useState(false)
+  const [isOnBreak, setIsOnBreak] = useState(false)
   const [currentAttendance, setCurrentAttendance] = useState<Attendance | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [breakLoading, setBreakLoading] = useState(false)
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [workStartTime, setWorkStartTime] = useState<Date | null>(null)
+  const [breakStartTime, setBreakStartTime] = useState<Date | null>(null)
+  const [totalBreakTime, setTotalBreakTime] = useState(0) // in minutes
   const [todayStats, setTodayStats] = useState({
     checkInTime: null as string | null,
     workHours: 0,
@@ -29,6 +35,22 @@ export default function AttendanceScreen() {
   useEffect(() => {
     fetchTodayAttendance()
   }, [])
+
+  // Live timer update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  // Set work start time when checked in
+  useEffect(() => {
+    if (isCheckedIn && todayStats.checkInTime && !workStartTime) {
+      setWorkStartTime(new Date(todayStats.checkInTime))
+    }
+  }, [isCheckedIn, todayStats.checkInTime, workStartTime])
 
   const fetchTodayAttendance = async () => {
     if (!user || !profile?.organization_id) return
@@ -110,7 +132,8 @@ export default function AttendanceScreen() {
       const now = new Date().toISOString()
       const checkInTime = new Date(currentAttendance.check_in_time)
       const checkOutTime = new Date(now)
-      const workHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
+      const totalMinutes = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60)
+      const workHours = (totalMinutes - totalBreakTime) / 60
 
       const { error } = await supabase
         .from('attendance')
@@ -123,6 +146,10 @@ export default function AttendanceScreen() {
       if (error) throw error
 
       setIsCheckedIn(false)
+      setIsOnBreak(false)
+      setWorkStartTime(null)
+      setBreakStartTime(null)
+      setTotalBreakTime(0)
       setTodayStats(prev => ({
         ...prev,
         workHours: Math.round(workHours * 100) / 100,
@@ -137,13 +164,91 @@ export default function AttendanceScreen() {
     }
   }
 
+  const handleBreakStart = async () => {
+    setBreakLoading(true)
+    try {
+      setIsOnBreak(true)
+      setBreakStartTime(new Date())
+      Alert.alert('Break Started', 'Enjoy your break! Remember to end it when you return to work.')
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to start break')
+    } finally {
+      setBreakLoading(false)
+    }
+  }
+
+  const handleBreakEnd = async () => {
+    if (!breakStartTime) return
+
+    setBreakLoading(true)
+    try {
+      const breakEnd = new Date()
+      const breakDuration = (breakEnd.getTime() - breakStartTime.getTime()) / (1000 * 60) // in minutes
+      
+      setTotalBreakTime(prev => prev + breakDuration)
+      setIsOnBreak(false)
+      setBreakStartTime(null)
+      
+      Alert.alert('Break Ended', `Break duration: ${Math.round(breakDuration)} minutes. Back to work!`)
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to end break')
+    } finally {
+      setBreakLoading(false)
+    }
+  }
+
   const formatTime = (timeString: string | null) => {
     if (!timeString) return '--:--'
     return new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   const getCurrentTime = () => {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
+  const getWorkDuration = () => {
+    if (!workStartTime) return '00:00:00'
+    
+    const now = currentTime.getTime()
+    const workStart = workStartTime.getTime()
+    let workTime = now - workStart
+    
+    // Subtract current break time if on break
+    if (isOnBreak && breakStartTime) {
+      const currentBreakTime = now - breakStartTime.getTime()
+      workTime -= (totalBreakTime * 60 * 1000) + currentBreakTime
+    } else {
+      workTime -= (totalBreakTime * 60 * 1000)
+    }
+    
+    if (workTime < 0) workTime = 0
+    
+    const hours = Math.floor(workTime / (1000 * 60 * 60))
+    const minutes = Math.floor((workTime % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((workTime % (1000 * 60)) / 1000)
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const getBreakDuration = () => {
+    if (!isOnBreak || !breakStartTime) return '00:00:00'
+    
+    const breakTime = currentTime.getTime() - breakStartTime.getTime()
+    const hours = Math.floor(breakTime / (1000 * 60 * 60))
+    const minutes = Math.floor((breakTime % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((breakTime % (1000 * 60)) / 1000)
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const getTotalBreakTime = () => {
+    let total = totalBreakTime
+    if (isOnBreak && breakStartTime) {
+      total += (currentTime.getTime() - breakStartTime.getTime()) / (1000 * 60)
+    }
+    const hours = Math.floor(total / 60)
+    const minutes = Math.floor(total % 60)
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   }
 
   if (loading) {
@@ -166,62 +271,101 @@ export default function AttendanceScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Current Time */}
+        {/* Current Time & Status */}
         <View style={styles.timeCard}>
           <Text style={styles.currentTime}>{getCurrentTime()}</Text>
-          <Text style={styles.currentDate}>{new Date().toDateString()}</Text>
-        </View>
-
-        {/* Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <Ionicons 
-              name={isCheckedIn ? "checkmark-circle" : "time-outline"} 
-              size={32} 
-              color={isCheckedIn ? "#10b981" : "#6b7280"} 
-            />
-            <Text style={[styles.statusText, { color: isCheckedIn ? "#10b981" : "#6b7280" }]}>
-              {todayStats.status}
+          <Text style={styles.currentDate}>{currentTime.toDateString()}</Text>
+          
+          <View style={styles.statusIndicator}>
+            <View style={[
+              styles.statusDot,
+              { backgroundColor: isOnBreak ? "#f59e0b" : isCheckedIn ? "#10b981" : "#6b7280" }
+            ]} />
+            <Text style={styles.statusText}>
+              {isOnBreak ? "On Break" : isCheckedIn ? "Working" : "Not Checked In"}
             </Text>
           </View>
-          
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Check In</Text>
-              <Text style={styles.statValue}>{formatTime(todayStats.checkInTime)}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Work Hours</Text>
-              <Text style={styles.statValue}>{todayStats.workHours.toFixed(1)}h</Text>
-            </View>
-          </View>
         </View>
 
-        {/* Action Button */}
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            { backgroundColor: isCheckedIn ? "#ef4444" : "#10b981" },
-            actionLoading && styles.buttonDisabled
-          ]}
-          onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
-          disabled={actionLoading}
-        >
-          {actionLoading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <>
-              <Ionicons 
-                name={isCheckedIn ? "log-out-outline" : "log-in-outline"} 
-                size={24} 
-                color="white" 
-              />
-              <Text style={styles.actionButtonText}>
-                {isCheckedIn ? 'Check Out' : 'Check In'}
-              </Text>
-            </>
+        {/* Live Timer (when checked in) */}
+        {isCheckedIn && (
+          <View style={styles.timerCard}>
+            <Text style={styles.timerLabel}>
+              {isOnBreak ? "Break Time" : "Work Time"}
+            </Text>
+            <Text style={styles.timerValue}>
+              {isOnBreak ? getBreakDuration() : getWorkDuration()}
+            </Text>
+            
+            <View style={styles.timerStats}>
+              <View style={styles.timerStat}>
+                <Text style={styles.timerStatLabel}>Total Work</Text>
+                <Text style={styles.timerStatValue}>{getWorkDuration()}</Text>
+              </View>
+              <View style={styles.timerStat}>
+                <Text style={styles.timerStatLabel}>Total Break</Text>
+                <Text style={styles.timerStatValue}>{getTotalBreakTime()}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
+          {/* Main Action Button */}
+          <TouchableOpacity
+            style={[
+              styles.mainActionButton,
+              { backgroundColor: isCheckedIn ? "#ef4444" : "#10b981" },
+              actionLoading && styles.buttonDisabled
+            ]}
+            onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
+            disabled={actionLoading}
+          >
+            {actionLoading ? (
+              <ActivityIndicator color="white" size="large" />
+            ) : (
+              <>
+                <Ionicons 
+                  name={isCheckedIn ? "log-out" : "log-in"} 
+                  size={28} 
+                  color="white" 
+                />
+                <Text style={styles.mainActionButtonText}>
+                  {isCheckedIn ? 'Check Out' : 'Check In'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Break Button (only when checked in) */}
+          {isCheckedIn && (
+            <TouchableOpacity
+              style={[
+                styles.breakButton,
+                { backgroundColor: isOnBreak ? "#10b981" : "#f59e0b" },
+                breakLoading && styles.buttonDisabled
+              ]}
+              onPress={isOnBreak ? handleBreakEnd : handleBreakStart}
+              disabled={breakLoading}
+            >
+              {breakLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Ionicons 
+                    name={isOnBreak ? "play" : "pause"} 
+                    size={20} 
+                    color="white" 
+                  />
+                  <Text style={styles.breakButtonText}>
+                    {isOnBreak ? 'End Break' : 'Take Break'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
 
         {/* Today's Summary */}
         <View style={styles.summaryCard}>
@@ -229,35 +373,47 @@ export default function AttendanceScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Ionicons name="time-outline" size={20} color="#3b82f6" />
-              <Text style={styles.summaryLabel}>Hours Worked</Text>
-              <Text style={styles.summaryValue}>{todayStats.workHours.toFixed(1)}</Text>
+              <Text style={styles.summaryLabel}>Work Time</Text>
+              <Text style={styles.summaryValue}>
+                {isCheckedIn ? getWorkDuration().substring(0, 5) : `${todayStats.workHours.toFixed(1)}h`}
+              </Text>
             </View>
             <View style={styles.summaryItem}>
-              <Ionicons name="calendar-outline" size={20} color="#10b981" />
+              <Ionicons name="pause-circle-outline" size={20} color="#f59e0b" />
+              <Text style={styles.summaryLabel}>Break Time</Text>
+              <Text style={styles.summaryValue}>{getTotalBreakTime()}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#10b981" />
               <Text style={styles.summaryLabel}>Status</Text>
-              <Text style={styles.summaryValue}>{todayStats.status}</Text>
+              <Text style={styles.summaryValue}>{isOnBreak ? "Break" : isCheckedIn ? "Working" : "Off"}</Text>
             </View>
           </View>
         </View>
 
-        {/* Quick Stats */}
-        <View style={styles.quickStatsCard}>
-          <Text style={styles.cardTitle}>Quick Stats</Text>
-          <View style={styles.quickStatsGrid}>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatNumber}>8.0</Text>
-              <Text style={styles.quickStatLabel}>Weekly Avg</Text>
-            </View>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatNumber}>22</Text>
-              <Text style={styles.quickStatLabel}>Days This Month</Text>
-            </View>
-            <View style={styles.quickStatItem}>
-              <Text style={styles.quickStatNumber}>98%</Text>
-              <Text style={styles.quickStatLabel}>Attendance Rate</Text>
+        {/* Quick Actions */}
+        {isCheckedIn && (
+          <View style={styles.quickActionsCard}>
+            <Text style={styles.cardTitle}>Quick Actions</Text>
+            <View style={styles.quickActionsGrid}>
+              <TouchableOpacity style={styles.quickActionItem}>
+                <Ionicons name="list-outline" size={24} color="#3b82f6" />
+                <Text style={styles.quickActionLabel}>My Tasks</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionItem}>
+                <Ionicons name="document-outline" size={24} color="#10b981" />
+                <Text style={styles.quickActionLabel}>Forms</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionItem}>
+                <Ionicons name="time-outline" size={24} color="#f59e0b" />
+                <Text style={styles.quickActionLabel}>Time Track</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
+        )}
+
+        {/* Bottom spacing for scroll */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   )
@@ -301,10 +457,10 @@ const styles = StyleSheet.create({
   },
   timeCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -312,14 +468,27 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   currentTime: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#111827',
+    fontVariant: ['tabular-nums'],
   },
   currentDate: {
     fontSize: 16,
     color: '#6b7280',
     marginTop: 4,
+    marginBottom: 16,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
   },
   statusCard: {
     backgroundColor: 'white',
@@ -338,9 +507,92 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statusText: {
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  timerCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  timerLabel: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  timerValue: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#111827',
+    fontVariant: ['tabular-nums'],
+    marginBottom: 20,
+  },
+  timerStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  timerStat: {
+    alignItems: 'center',
+  },
+  timerStatLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  timerStatValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    fontVariant: ['tabular-nums'],
+  },
+  actionButtonsContainer: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  mainActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  mainActionButtonText: {
+    color: 'white',
+    fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 12,
+  },
+  breakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  breakButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   statsRow: {
     flexDirection: 'row',
@@ -399,6 +651,7 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     alignItems: 'center',
+    flex: 1,
   },
   summaryLabel: {
     fontSize: 12,
@@ -443,5 +696,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 4,
+  },
+  quickActionsCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  quickActionItem: {
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f9fafb',
+    minWidth: 80,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    color: '#374151',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  bottomSpacing: {
+    height: 100, // Extra space at bottom to ensure full scroll
   },
 })

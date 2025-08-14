@@ -13,11 +13,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 
-interface DashboardStats {
-  totalEmployees: number
-  activeProjects: number
-  pendingTasks: number
-  todayAttendance: number
+interface MemberStats {
+  myTasksCount: number
+  todayAttendance: boolean
+  weeklyHours: number
+  pendingLeaveRequests: number
 }
 
 interface QuickAction {
@@ -29,24 +29,20 @@ interface QuickAction {
 
 export default function DashboardScreen({ navigation }: any) {
   const { user, profile, signOut } = useAuth()
-  const [stats, setStats] = useState<DashboardStats>({
-    totalEmployees: 0,
-    activeProjects: 0,
-    pendingTasks: 0,
-    todayAttendance: 0,
+  const [stats, setStats] = useState<MemberStats>({
+    myTasksCount: 0,
+    todayAttendance: false,
+    weeklyHours: 0,
+    pendingLeaveRequests: 0,
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const quickActions: QuickAction[] = [
-    { title: 'Clock In', icon: 'time-outline', color: '#10b981', screen: 'Attendance' },
+    { title: 'Clock In/Out', icon: 'time-outline', color: '#10b981', screen: 'Attendance' },
+    { title: 'My Tasks', icon: 'checkmark-circle-outline', color: '#f59e0b', screen: 'Tasks' },
     { title: 'Time Track', icon: 'stopwatch-outline', color: '#3b82f6', screen: 'TimeTracking' },
-    { title: 'Tasks', icon: 'checkmark-circle-outline', color: '#f59e0b', screen: 'Tasks' },
-    { title: 'Leave', icon: 'calendar-outline', color: '#8b5cf6', screen: 'Leave' },
-    { title: 'Teams', icon: 'people-outline', color: '#06b6d4', screen: 'Teams' },
-    { title: 'Routes', icon: 'navigate-outline', color: '#10b981', screen: 'Routes' },
-    { title: 'Analytics', icon: 'analytics-outline', color: '#f59e0b', screen: 'Analytics' },
-    { title: 'Projects', icon: 'folder-outline', color: '#ef4444', screen: 'Projects' },
+    { title: 'Request Leave', icon: 'calendar-outline', color: '#8b5cf6', screen: 'Leave' },
   ]
 
   useEffect(() => {
@@ -54,44 +50,56 @@ export default function DashboardScreen({ navigation }: any) {
   }, [])
 
   const fetchDashboardData = async () => {
-    if (!profile?.organization_id) return
+    if (!user?.id || !profile?.organization_id) return
 
     try {
-      // Fetch employees count
-      const { data: employees } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact' })
-        .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
-
-      // Fetch active projects count
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('id', { count: 'exact' })
-        .eq('organization_id', profile.organization_id)
-        .eq('status', 'active')
-
-      // Fetch pending tasks count
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('id', { count: 'exact' })
-        .eq('organization_id', profile.organization_id)
-        .in('status', ['todo', 'in_progress'])
-
-      // Fetch today's attendance count
       const today = new Date().toISOString().split('T')[0]
-      const { data: attendance } = await supabase
-        .from('attendance')
-        .select('id', { count: 'exact' })
-        .eq('organization_id', profile.organization_id)
-        .gte('created_at', `${today}T00:00:00.000Z`)
-        .lt('created_at', `${today}T23:59:59.999Z`)
+      const startOfWeek = new Date()
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+      const weekStart = startOfWeek.toISOString().split('T')[0]
+
+      // Run queries in parallel for better performance
+      const [tasksResult, attendanceResult, timeEntriesResult, leaveResult] = await Promise.all([
+        // Fetch my pending tasks count
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact' })
+          .eq('assigned_to', user.id)
+          .in('status', ['todo', 'in_progress']),
+
+        // Check if I've clocked in today
+        supabase
+          .from('attendance')
+          .select('id')
+          .eq('user_id', user.id)
+          .gte('created_at', `${today}T00:00:00.000Z`)
+          .lt('created_at', `${today}T23:59:59.999Z`)
+          .limit(1),
+
+        // Get my weekly hours
+        supabase
+          .from('time_entries')
+          .select('duration')
+          .eq('user_id', user.id)
+          .gte('date', weekStart),
+
+        // Get my pending leave requests
+        supabase
+          .from('leave_requests')
+          .select('id', { count: 'exact' })
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+      ])
+
+      // Calculate weekly hours
+      const weeklyMinutes = timeEntriesResult.data?.reduce((total, entry) => total + (entry.duration || 0), 0) || 0
+      const weeklyHours = Math.round((weeklyMinutes / 60) * 10) / 10
 
       setStats({
-        totalEmployees: employees?.length || 0,
-        activeProjects: projects?.length || 0,
-        pendingTasks: tasks?.length || 0,
-        todayAttendance: attendance?.length || 0,
+        myTasksCount: tasksResult.count || 0,
+        todayAttendance: (attendanceResult.data?.length || 0) > 0,
+        weeklyHours,
+        pendingLeaveRequests: leaveResult.count || 0,
       })
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -145,27 +153,31 @@ export default function DashboardScreen({ navigation }: any) {
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#dbeafe' }]}>
-              <Ionicons name="people-outline" size={32} color="#3b82f6" />
-              <Text style={styles.statNumber}>{stats.totalEmployees}</Text>
-              <Text style={styles.statLabel}>Employees</Text>
+            <View style={[styles.statCard, { backgroundColor: '#fef3c7' }]}>
+              <Ionicons name="checkmark-circle-outline" size={32} color="#f59e0b" />
+              <Text style={styles.statNumber}>{stats.myTasksCount}</Text>
+              <Text style={styles.statLabel}>My Tasks</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: '#dcfce7' }]}>
-              <Ionicons name="folder-outline" size={32} color="#10b981" />
-              <Text style={styles.statNumber}>{stats.activeProjects}</Text>
-              <Text style={styles.statLabel}>Active Projects</Text>
+            <View style={[styles.statCard, { backgroundColor: stats.todayAttendance ? '#dcfce7' : '#fee2e2' }]}>
+              <Ionicons 
+                name={stats.todayAttendance ? "checkmark-circle-outline" : "time-outline"} 
+                size={32} 
+                color={stats.todayAttendance ? "#10b981" : "#ef4444"} 
+              />
+              <Text style={styles.statNumber}>{stats.todayAttendance ? "✓" : "✗"}</Text>
+              <Text style={styles.statLabel}>Clocked In Today</Text>
             </View>
           </View>
           <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#fef3c7' }]}>
-              <Ionicons name="checkmark-circle-outline" size={32} color="#f59e0b" />
-              <Text style={styles.statNumber}>{stats.pendingTasks}</Text>
-              <Text style={styles.statLabel}>Pending Tasks</Text>
+            <View style={[styles.statCard, { backgroundColor: '#dbeafe' }]}>
+              <Ionicons name="stopwatch-outline" size={32} color="#3b82f6" />
+              <Text style={styles.statNumber}>{stats.weeklyHours}h</Text>
+              <Text style={styles.statLabel}>This Week</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: '#f3e8ff' }]}>
-              <Ionicons name="time-outline" size={32} color="#8b5cf6" />
-              <Text style={styles.statNumber}>{stats.todayAttendance}</Text>
-              <Text style={styles.statLabel}>Today's Attendance</Text>
+              <Ionicons name="calendar-outline" size={32} color="#8b5cf6" />
+              <Text style={styles.statNumber}>{stats.pendingLeaveRequests}</Text>
+              <Text style={styles.statLabel}>Pending Leave</Text>
             </View>
           </View>
         </View>
@@ -187,37 +199,53 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Recent Activity */}
+        {/* Today's Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.activityCard}>
-            <View style={styles.activityItem}>
-              <View style={styles.activityIcon}>
-                <Ionicons name="checkmark" size={16} color="white" />
+          <Text style={styles.sectionTitle}>Today's Summary</Text>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryIcon, { backgroundColor: stats.todayAttendance ? '#10b981' : '#ef4444' }]}>
+                <Ionicons name={stats.todayAttendance ? "checkmark" : "close"} size={16} color="white" />
               </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Task completed</Text>
-                <Text style={styles.activityTime}>2 hours ago</Text>
-              </View>
-            </View>
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#3b82f6' }]}>
-                <Ionicons name="folder" size={16} color="white" />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Project updated</Text>
-                <Text style={styles.activityTime}>4 hours ago</Text>
+              <View style={styles.summaryContent}>
+                <Text style={styles.summaryTitle}>
+                  {stats.todayAttendance ? "Attendance marked" : "Not clocked in yet"}
+                </Text>
+                <Text style={styles.summaryDescription}>
+                  {stats.todayAttendance ? "You're all set for today" : "Remember to clock in when you arrive"}
+                </Text>
               </View>
             </View>
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#f59e0b' }]}>
-                <Ionicons name="time" size={16} color="white" />
+            
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryIcon, { backgroundColor: stats.myTasksCount > 0 ? '#f59e0b' : '#10b981' }]}>
+                <Ionicons name="list" size={16} color="white" />
               </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Time tracked</Text>
-                <Text style={styles.activityTime}>Yesterday</Text>
+              <View style={styles.summaryContent}>
+                <Text style={styles.summaryTitle}>
+                  {stats.myTasksCount === 0 ? "No pending tasks" : `${stats.myTasksCount} tasks pending`}
+                </Text>
+                <Text style={styles.summaryDescription}>
+                  {stats.myTasksCount === 0 ? "Great job! All caught up" : "Check your task list to get started"}
+                </Text>
               </View>
             </View>
+
+            {stats.pendingLeaveRequests > 0 && (
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryIcon, { backgroundColor: '#8b5cf6' }]}>
+                  <Ionicons name="calendar" size={16} color="white" />
+                </View>
+                <View style={styles.summaryContent}>
+                  <Text style={styles.summaryTitle}>
+                    {stats.pendingLeaveRequests} leave request{stats.pendingLeaveRequests > 1 ? 's' : ''} pending
+                  </Text>
+                  <Text style={styles.summaryDescription}>
+                    Waiting for approval from your manager
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -329,7 +357,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
   },
-  activityCard: {
+  summaryCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
@@ -342,14 +370,14 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  activityItem: {
+  summaryItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  activityIcon: {
+  summaryIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -357,18 +385,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    marginTop: 2,
   },
-  activityContent: {
+  summaryContent: {
     flex: 1,
   },
-  activityTitle: {
-    fontSize: 14,
+  summaryTitle: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#111827',
+    marginBottom: 4,
   },
-  activityTime: {
-    fontSize: 12,
+  summaryDescription: {
+    fontSize: 13,
     color: '#6b7280',
-    marginTop: 2,
+    lineHeight: 18,
   },
 })

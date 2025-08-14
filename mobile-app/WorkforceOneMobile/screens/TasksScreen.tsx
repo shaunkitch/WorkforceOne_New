@@ -43,6 +43,7 @@ export default function TasksScreen() {
         .from('tasks')
         .select('*')
         .eq('organization_id', profile.organization_id)
+        .eq('assignee_id', user.id) // Only fetch tasks assigned to the current user
         .order('created_at', { ascending: false })
 
       if (filter !== 'all') {
@@ -76,7 +77,8 @@ export default function TasksScreen() {
           title: newTask.title.trim(),
           description: newTask.description.trim() || null,
           priority: newTask.priority,
-          assigned_to: user.id,
+          assignee_id: user.id,
+          reporter_id: user.id,
           organization_id: profile.organization_id,
           status: 'todo',
           due_date: newTask.due_date || null,
@@ -189,8 +191,8 @@ export default function TasksScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Tasks</Text>
-          <Text style={styles.headerSubtitle}>Manage your tasks</Text>
+          <Text style={styles.headerTitle}>My Tasks</Text>
+          <Text style={styles.headerSubtitle}>Tasks assigned to you</Text>
         </View>
         <TouchableOpacity 
           style={styles.addButton}

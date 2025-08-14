@@ -372,10 +372,16 @@ export default function TasksPage() {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
 
-      // First try to fetch tasks without joins to check if table exists
+      // Fetch tasks with assignee information
       let query = supabase
         .from('tasks')
-        .select('*')
+        .select(`
+          *,
+          assignee:profiles!assignee_id(full_name, email, avatar_url),
+          reporter:profiles!reporter_id(full_name, email),
+          project:projects(name),
+          outlet:outlets(name, address)
+        `)
         .order('created_at', { ascending: false })
 
       if (statusFilter !== 'all') {

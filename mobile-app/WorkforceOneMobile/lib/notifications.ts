@@ -33,7 +33,7 @@ class NotificationService {
     if (Device.isDevice) {
       try {
         const token = await Notifications.getExpoPushTokenAsync({
-          projectId: 'your-expo-project-id', // Replace with your Expo project ID
+          projectId: 'e450cb6a-8add-4ce0-b2a4-f513cce316ee',
         })
         this.expoPushToken = token.data
         console.log('Expo push token:', this.expoPushToken)

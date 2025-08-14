@@ -3,19 +3,17 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '../contexts/AuthContext'
 import LoginScreen from '../screens/auth/LoginScreen'
 import SignupScreen from '../screens/auth/SignupScreen'
 import DashboardScreen from '../screens/dashboard/DashboardScreen'
 import AttendanceScreen from '../screens/AttendanceScreen'
-import TimeTrackingScreen from '../screens/TimeTrackingScreen'
+import DailyCallsScreen from '../screens/DailyCallsScreen'
 import TasksScreen from '../screens/TasksScreen'
-import ProjectsScreen from '../screens/ProjectsScreen'
-import TeamsScreen from '../screens/TeamsScreen'
-import RoutesScreen from '../screens/RoutesScreen'
-import AnalyticsScreen from '../screens/AnalyticsScreen'
 import LeaveScreen from '../screens/LeaveScreen'
+import FormsScreen from '../screens/FormsScreen'
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -30,7 +28,7 @@ function AuthStack() {
 }
 
 function MainTabs() {
-  const { profile } = useAuth()
+  const insets = useSafeAreaInsets()
   
   return (
     <Tab.Navigator
@@ -45,14 +43,11 @@ function MainTabs() {
             case 'Attendance':
               iconName = focused ? 'time' : 'time-outline'
               break
-            case 'TimeTracking':
-              iconName = focused ? 'stopwatch' : 'stopwatch-outline'
-              break
             case 'Tasks':
               iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline'
               break
-            case 'Projects':
-              iconName = focused ? 'folder' : 'folder-outline'
+            case 'DailyCalls':
+              iconName = focused ? 'map' : 'map-outline'
               break
             case 'Leave':
               iconName = focused ? 'calendar' : 'calendar-outline'
@@ -66,14 +61,52 @@ function MainTabs() {
         tabBarActiveTintColor: '#3b82f6',
         tabBarInactiveTintColor: '#6b7280',
         headerShown: false,
-        tabBarLabelStyle: { fontSize: 10 },
+        tabBarLabelStyle: { 
+          fontSize: 10,
+          marginBottom: 2,
+        },
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#e5e7eb',
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: 8,
+          elevation: 8,
+          shadowOffset: {
+            width: 0,
+            height: -2,
+          },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+        },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Attendance" component={AttendanceScreen} />
-      <Tab.Screen name="TimeTracking" component={TimeTrackingScreen} options={{ title: 'Time' }} />
-      <Tab.Screen name="Tasks" component={TasksScreen} />
-      <Tab.Screen name="Leave" component={LeaveScreen} />
+      <Tab.Screen 
+        name="Dashboard" 
+        component={DashboardScreen} 
+        options={{ title: 'Home' }}
+      />
+      <Tab.Screen 
+        name="Attendance" 
+        component={AttendanceScreen} 
+        options={{ title: 'Clock In' }}
+      />
+      <Tab.Screen 
+        name="Tasks" 
+        component={TasksScreen} 
+        options={{ title: 'My Tasks' }}
+      />
+      <Tab.Screen 
+        name="DailyCalls" 
+        component={DailyCallsScreen} 
+        options={{ title: 'Daily Calls' }}
+      />
+      <Tab.Screen 
+        name="Leave" 
+        component={LeaveScreen} 
+        options={{ title: 'Leave' }}
+      />
     </Tab.Navigator>
   )
 }
@@ -82,10 +115,6 @@ function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
-      <Stack.Screen name="Teams" component={TeamsScreen} />
-      <Stack.Screen name="Projects" component={ProjectsScreen} />
-      <Stack.Screen name="Routes" component={RoutesScreen} />
-      <Stack.Screen name="Analytics" component={AnalyticsScreen} />
     </Stack.Navigator>
   )
 }
