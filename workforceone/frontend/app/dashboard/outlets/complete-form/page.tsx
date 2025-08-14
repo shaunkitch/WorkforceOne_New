@@ -286,14 +286,21 @@ export default function CompleteFormPage() {
         setVisit(newVisit)
       }
 
-      // Save or update form response
+      // Save or update form response (using actual schema)
       const responseData = {
         form_id: form.id,
-        user_id: userProfile.id,
         organization_id: userProfile.organization_id,
-        responses: formResponses,
-        status: 'draft',
-        outlet_visit_id: currentVisit.id
+        responses: {
+          ...formResponses,
+          _metadata: {
+            user_id: userProfile.id,
+            user_name: userProfile.full_name,
+            outlet_visit_id: currentVisit.id,
+            outlet_id: outlet.id,
+            completed_at: new Date().toISOString()
+          }
+        },
+        status: 'draft'
       }
 
       let formResponseId = currentVisit.form_response_id
@@ -364,15 +371,22 @@ export default function CompleteFormPage() {
         setVisit(newVisit)
       }
 
-      // Submit form response
+      // Submit form response (using actual schema)
       const responseData = {
         form_id: form.id,
-        user_id: userProfile.id,
         organization_id: userProfile.organization_id,
-        responses: formResponses,
+        responses: {
+          ...formResponses,
+          _metadata: {
+            user_id: userProfile.id,
+            user_name: userProfile.full_name,
+            outlet_visit_id: currentVisit.id,
+            outlet_id: outlet.id,
+            completed_at: new Date().toISOString()
+          }
+        },
         status: 'completed',
-        submitted_at: new Date().toISOString(),
-        outlet_visit_id: currentVisit.id
+        submitted_at: new Date().toISOString()
       }
 
       let formResponseId = currentVisit.form_response_id

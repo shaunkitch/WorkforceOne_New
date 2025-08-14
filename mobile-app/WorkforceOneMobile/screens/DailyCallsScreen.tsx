@@ -461,18 +461,23 @@ export default function DailyCallsScreen({ navigation }: any) {
   const simulateFormCompletion = async (formId: string, visitId: string, stopId: string) => {
     setActionLoading(true)
     try {
-      // Create a form response
+      // Create a form response (using actual schema)
       const { data: responseData, error: responseError } = await supabase
         .from('form_responses')
         .insert({
           form_id: formId,
-          user_id: user!.id,
           organization_id: profile!.organization_id,
           responses: {
             'simulated': true,
             'completed_at': new Date().toISOString(),
-            'outlet_visit_id': visitId
-          }
+            '_metadata': {
+              'user_id': user!.id,
+              'outlet_visit_id': visitId,
+              'simulation': true
+            }
+          },
+          status: 'completed',
+          submitted_at: new Date().toISOString()
         })
         .select()
         .single()
