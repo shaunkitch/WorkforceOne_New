@@ -187,23 +187,23 @@ export default function AnalyticsPage() {
           .gte('created_at', startDateStr)
           .lte('created_at', endDateStr),
 
-        // Late check-ins (assuming check-in after 9 AM is late)
+        // Late check-ins (check-in after 9 AM is late)
         supabase
           .from('attendance')
           .select('*', { count: 'exact' })
           .eq('organization_id', organizationId)
-          .eq('type', 'check_in')
-          .gte('created_at', startDateStr)
-          .lte('created_at', endDateStr),
+          .not('check_in_time', 'is', null)
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0]),
 
         // Detailed attendance records for calculations
         supabase
           .from('attendance')
           .select('*')
           .eq('organization_id', organizationId)
-          .gte('created_at', startDateStr)
-          .lte('created_at', endDateStr)
-          .order('created_at'),
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0])
+          .order('date'),
 
         // Total employees
         supabase
@@ -214,10 +214,10 @@ export default function AnalyticsPage() {
         // Active employees (checked in today)
         supabase
           .from('attendance')
-          .select('employee_id')
+          .select('user_id')
           .eq('organization_id', organizationId)
-          .eq('type', 'check_in')
-          .gte('created_at', new Date().toISOString().split('T')[0] + 'T00:00:00.000Z'),
+          .not('check_in_time', 'is', null)
+          .eq('date', new Date().toISOString().split('T')[0]),
 
         // Tasks data
         supabase
@@ -240,26 +240,18 @@ export default function AnalyticsPage() {
       const totalCheckIns = totalCheckInsResult.count || 0
       const attendanceRecords = attendanceRecordsResult.data || []
       
-      // Calculate average hours per day
-      const checkInOutPairs = new Map()
-      attendanceRecords.forEach(record => {
-        const key = `${record.employee_id}-${record.created_at.split('T')[0]}`
-        if (!checkInOutPairs.has(key)) {
-          checkInOutPairs.set(key, { checkIn: null, checkOut: null })
-        }
-        
-        if (record.type === 'check_in') {
-          checkInOutPairs.get(key).checkIn = new Date(record.created_at)
-        } else if (record.type === 'check_out') {
-          checkInOutPairs.get(key).checkOut = new Date(record.created_at)
-        }
-      })
+      // Calculate average hours per day from attendance records
+      const validRecords = attendanceRecords.filter(record => 
+        record.check_in_time && record.check_out_time
+      )
 
       let totalHours = 0
       let validDays = 0
-      checkInOutPairs.forEach(pair => {
-        if (pair.checkIn && pair.checkOut && pair.checkOut > pair.checkIn) {
-          const hours = (pair.checkOut.getTime() - pair.checkIn.getTime()) / (1000 * 60 * 60)
+      validRecords.forEach(record => {
+        const checkIn = new Date(record.check_in_time)
+        const checkOut = new Date(record.check_out_time)
+        if (checkOut > checkIn) {
+          const hours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60)
           if (hours > 0 && hours <= 16) { // Reasonable work day
             totalHours += hours
             validDays++
@@ -295,10 +287,28 @@ export default function AnalyticsPage() {
         chartLabels.push(date.toLocaleDateString('en-US', { weekday: 'short' }))
         
         const dayAttendance = attendanceRecords.filter(record => 
-          record.created_at.startsWith(dateStr) && record.type === 'check_in'
+          record.date === dateStr && record.check_in_time
         )
         chartData.push(dayAttendance.length)
       }
+
+      // Calculate attendance trend (compare first half vs second half of period)
+      const midPoint = Math.floor(chartData.length / 2)
+      const firstHalf = chartData.slice(0, midPoint)
+      const secondHalf = chartData.slice(midPoint)
+      const firstHalfAvg = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : 0
+      const secondHalfAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0
+      const attendanceTrend = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0
+
+      // Calculate late check-ins (after 9 AM)
+      const lateCheckIns = attendanceRecords.filter(record => {
+        if (!record.check_in_time) return false
+        const checkInTime = new Date(record.check_in_time)
+        const checkInHour = checkInTime.getHours()
+        const checkInMinutes = checkInTime.getMinutes()
+        // Consider late if check-in is after 9:00 AM
+        return checkInHour > 9 || (checkInHour === 9 && checkInMinutes > 0)
+      }).length
 
       setAttendanceChartData({
         labels: chartLabels,
@@ -315,10 +325,10 @@ export default function AnalyticsPage() {
         attendance: {
           totalCheckIns,
           averageHoursPerDay: Math.round(averageHoursPerDay * 10) / 10,
-          lateCheckIns: Math.floor(totalCheckIns * 0.15), // Mock calculation
+          lateCheckIns: lateCheckIns,
           earlyCheckOuts: Math.floor(totalCheckIns * 0.08), // Mock calculation
-          attendanceRate: employeesResult.count ? Math.round((totalCheckIns / (employeesResult.count * 7)) * 100) : 0,
-          trend: 5.2 // Mock trend
+          attendanceRate: employeesResult.count ? Math.min(100, Math.round((totalCheckIns / employeesResult.count) * 100)) : 0,
+          trend: Math.round(attendanceTrend * 10) / 10
         },
         productivity: {
           tasksCompleted: completedTasks.length,
@@ -329,7 +339,7 @@ export default function AnalyticsPage() {
         },
         workforce: {
           totalEmployees: employeesResult.count || 0,
-          activeEmployees: new Set(activeEmployeesResult.data?.map(a => a.employee_id)).size,
+          activeEmployees: new Set(activeEmployeesResult.data?.map(a => a.user_id)).size,
           newHires: Math.floor((employeesResult.count || 0) * 0.05), // Mock calculation
           turnoverRate: 3.2, // Mock rate
           trend: 1.8 // Mock trend
@@ -532,24 +542,50 @@ export default function AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-              {/* Placeholder for actual chart component */}
-              <div className="text-center">
-                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Daily check-in trends over time</p>
-                <div className="mt-4 space-y-2">
-                  {attendanceChartData.labels.map((label, index) => (
-                    <div key={label} className="flex items-center justify-between text-sm">
-                      <span>{label}</span>
-                      <div className="flex items-center">
-                        <div 
-                          className="bg-blue-500 h-2 rounded mr-2" 
-                          style={{ width: `${(attendanceChartData.datasets[0]?.data[index] || 0) * 10}px` }}
-                        ></div>
-                        <span className="w-8 text-right">{attendanceChartData.datasets[0]?.data[index] || 0}</span>
-                      </div>
-                    </div>
-                  ))}
+            <div className="h-64 bg-white rounded-lg border border-gray-100 p-4">
+              <div className="h-full flex flex-col">
+                <div className="text-sm text-gray-600 mb-4">Daily Check-ins Over Time</div>
+                <div className="flex-1 space-y-3">
+                  {(() => {
+                    const daysWithCheckIns = attendanceChartData.labels.map((label, index) => {
+                      const value = attendanceChartData.datasets[0]?.data[index] || 0
+                      return value > 0 ? { label, value, index } : null
+                    }).filter(Boolean)
+                    
+                    if (daysWithCheckIns.length === 0) {
+                      return (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          <div className="text-center">
+                            <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-sm">No check-ins recorded</p>
+                          </div>
+                        </div>
+                      )
+                    }
+                    
+                    const maxValue = Math.max(...daysWithCheckIns.map(d => d.value))
+                    
+                    return daysWithCheckIns.map(({ label, value }) => {
+                      const barWidth = maxValue > 0 ? (value / maxValue) * 100 : 0
+                      
+                      return (
+                        <div key={label} className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700 w-12">{label}</span>
+                          <div className="flex-1 mx-3">
+                            <div className="bg-gray-100 h-6 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-blue-500 h-full rounded-full transition-all duration-300 flex items-center justify-end pr-2" 
+                                style={{ width: `${Math.max(barWidth, 5)}%` }}
+                              >
+                                <span className="text-xs font-semibold text-white">{value}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-sm text-gray-600 w-8 text-right">{value}</span>
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
             </div>

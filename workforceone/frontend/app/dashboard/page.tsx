@@ -133,36 +133,41 @@ export default function DashboardPage() {
         }
       })
 
-      // Get recent form submissions (last 7 days)
-      const { data: formData } = await supabase
-        .from('form_responses')
-        .select(`
-          id,
-          created_at,
-          form:forms!form_responses_form_id_fkey (
-            title
-          ),
-          user:profiles!form_responses_user_id_fkey (
-            full_name
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .gte('created_at', weekAgo.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(5)
+      // Get recent form submissions (last 7 days) - with error handling
+      try {
+        const { data: formData } = await supabase
+          .from('form_responses')
+          .select(`
+            id,
+            created_at,
+            form:forms!form_responses_form_id_fkey (
+              title
+            ),
+            user:profiles!form_responses_user_id_fkey (
+              full_name
+            )
+          `)
+          .eq('organization_id', organizationId)
+          .gte('created_at', weekAgo.toISOString())
+          .order('created_at', { ascending: false })
+          .limit(5)
 
-      formData?.forEach(response => {
-        if (response.user?.full_name && response.form?.title) {
-          activities.push({
-            id: `form_${response.id}`,
-            type: 'form',
-            user: response.user.full_name,
-            action: `submitted ${response.form.title}`,
-            time: format(new Date(response.created_at), 'h:mm a'),
-            timestamp: response.created_at
-          })
-        }
-      })
+        formData?.forEach(response => {
+          if (response.user?.full_name && response.form?.title) {
+            activities.push({
+              id: `form_${response.id}`,
+              type: 'form',
+              user: response.user.full_name,
+              action: `submitted ${response.form.title}`,
+              time: format(new Date(response.created_at), 'h:mm a'),
+              timestamp: response.created_at
+            })
+          }
+        })
+      } catch (error) {
+        console.log('Form responses table not available:', error)
+        // Skip form submissions if table doesn't exist
+      }
 
       // Sort all activities by most recent first and limit to 8
       const sortedActivities = activities
@@ -216,12 +221,19 @@ export default function DashboardPage() {
         return acc
       }, { present: 0, absent: 0, late: 0 }) || { present: 0, absent: 0, late: 0 }
 
-      // Get pending forms
-      const { count: pendingForms } = await supabase
-        .from('form_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', profile.organization_id)
-        .eq('status', 'pending')
+      // Get pending forms (with error handling for missing table)
+      let pendingForms = 0
+      try {
+        const { count } = await supabase
+          .from('form_assignments')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', profile.organization_id)
+          .eq('status', 'pending')
+        pendingForms = count || 0
+      } catch (error) {
+        console.log('Form assignments table not available:', error)
+        pendingForms = 0
+      }
 
       // Get active projects
       const { count: activeProjects } = await supabase
@@ -250,7 +262,7 @@ export default function DashboardPage() {
         totalEmployees: totalEmployees || 0,
         activeProjects: activeProjects || 0,
         completedTasks: completedTasks || 0,
-        pendingForms: pendingForms || 0,
+        pendingForms: pendingForms,
         projectsDueThisWeek: projectsDueThisWeek || 0,
         todayAttendance: attendanceStats
       })

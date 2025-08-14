@@ -1139,15 +1139,34 @@ interface FeatureManagementProps {
 }
 
 const ALL_FEATURES = [
-  { id: 'time_tracking', name: 'Time Tracking' },
-  { id: 'attendance', name: 'Attendance' },
-  { id: 'maps', name: 'Team Map' },
-  { id: 'teams', name: 'Teams' },
-  { id: 'projects', name: 'Projects' },
-  { id: 'tasks', name: 'Tasks' },
-  { id: 'forms', name: 'Forms' },
-  { id: 'leave', name: 'Leave Requests' },
-  { id: 'outlets', name: 'Outlets' },
+  // Core Features
+  { id: 'dashboard', name: 'Dashboard Overview', category: 'Core', description: 'Main dashboard with statistics and insights' },
+  
+  // Human Resources
+  { id: 'leave', name: 'Leave Requests', category: 'Human Resources', description: 'Time off requests and approvals' },
+  { id: 'teams', name: 'Teams Management', category: 'Human Resources', description: 'Team structure and member management' },
+  
+  // Time Management
+  { id: 'attendance', name: 'Attendance Tracking', category: 'Time Management', description: 'Check-in/out and attendance monitoring' },
+  { id: 'time_tracking', name: 'Time Tracking', category: 'Time Management', description: 'Track work hours and productivity' },
+  
+  // Operations
+  { id: 'routes', name: 'Route Management', category: 'Operations', description: 'Route planning and optimization', requiresRole: ['admin', 'manager'] },
+  { id: 'tasks', name: 'Task Management', category: 'Operations', description: 'Task assignments and tracking' },
+  { id: 'projects', name: 'Project Management', category: 'Operations', description: 'Project tracking and management' },
+  { id: 'maps', name: 'Team Location Map', category: 'Operations', description: 'Real-time team location tracking' },
+  { id: 'outlets', name: 'Outlets Management', category: 'Operations', description: 'Manage office and outlet locations', requiresRole: ['admin', 'manager'] },
+  
+  // Analytics & Reports
+  { id: 'analytics', name: 'Advanced Analytics', category: 'Analytics', description: 'Comprehensive workforce analytics and insights', requiresRole: ['admin', 'manager'] },
+  
+  // Forms & Processes
+  { id: 'forms', name: 'Dynamic Forms', category: 'Forms', description: 'Form builder and response management' },
+  
+  // Administration (Admin/Manager only)
+  { id: 'automation', name: 'Workflow Automation', category: 'Administration', description: 'Automated workflows and triggers', requiresRole: ['admin', 'manager'] },
+  { id: 'integrations', name: 'Third-party Integrations', category: 'Administration', description: 'Slack, Teams, and other integrations', requiresRole: ['admin', 'manager'] },
+  { id: 'payroll', name: 'Payroll Export', category: 'Administration', description: 'Payroll generation and export', requiresRole: ['admin'] },
 ]
 
 interface BrandingManagementProps {
@@ -2073,25 +2092,100 @@ function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManag
       <CardContent className="space-y-6">
         {activeTab === 'organization' ? (
           /* Organization Features Tab */
-          <div className="space-y-4">
-            <p className="text-gray-600">
-              Enable or disable features for all users in your organization. These settings serve as defaults for new users.
-            </p>
+          <div className="space-y-6">
             <div className="space-y-4">
-              {ALL_FEATURES.map(feature => (
-                <div key={feature.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                  <div>
-                    <Label htmlFor={`org-feature-${feature.id}`} className="font-medium">{feature.name}</Label>
-                    <p className="text-sm text-gray-500">Default setting for all users</p>
+              <p className="text-gray-600">
+                Enable or disable features for all users in your organization. These settings serve as defaults for new users.
+              </p>
+              
+              {/* New Features Notice */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 text-sm font-medium">!</span>
+                    </div>
                   </div>
-                  <Switch
-                    id={`org-feature-${feature.id}`}
-                    checked={featureFlags[feature.id] ?? true}
-                    onCheckedChange={(checked) => handleFlagChange(feature.id, checked)}
-                  />
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-900">New Features Available</h4>
+                    <p className="text-sm text-blue-800 mt-1">
+                      We've added new features including Route Management, Advanced Analytics, and Workflow Automation. 
+                      Some features require specific roles (Manager/Admin) for security and organizational control.
+                    </p>
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
+            
+            {/* Group features by category */}
+            {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Administration'].map(category => {
+              const categoryFeatures = ALL_FEATURES.filter(f => f.category === category)
+              if (categoryFeatures.length === 0) return null
+              
+              return (
+                <div key={category} className="space-y-3">
+                  <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
+                    {category}
+                  </h3>
+                  <div className="space-y-3">
+                    {categoryFeatures.map(feature => (
+                      <div key={feature.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`org-feature-${feature.id}`} className="font-medium">{feature.name}</Label>
+                            {feature.requiresRole && (
+                              <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                                {feature.requiresRole.includes('admin') && feature.requiresRole.includes('manager') 
+                                  ? 'Admin/Manager Only' 
+                                  : feature.requiresRole.includes('admin') 
+                                    ? 'Admin Only'
+                                    : 'Manager+'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">{feature.description}</p>
+                        </div>
+                        <Switch
+                          id={`org-feature-${feature.id}`}
+                          checked={featureFlags[feature.id] ?? true}
+                          onCheckedChange={(checked) => handleFlagChange(feature.id, checked)}
+                          className="ml-4"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            {/* Feature Summary */}
+            <div className="bg-gray-50 rounded-lg p-4 border">
+              <h4 className="font-medium text-gray-900 mb-3">Feature Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-500">Total Features</div>
+                  <div className="font-medium">{ALL_FEATURES.length}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Enabled</div>
+                  <div className="font-medium text-green-600">
+                    {Object.values(featureFlags).filter(v => v === true).length || ALL_FEATURES.length}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Admin Only</div>
+                  <div className="font-medium text-amber-600">
+                    {ALL_FEATURES.filter(f => f.requiresRole?.includes('admin')).length}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Manager+</div>
+                  <div className="font-medium text-blue-600">
+                    {ALL_FEATURES.filter(f => f.requiresRole?.includes('manager')).length}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end">
               <Button onClick={() => onUpdateFlags(featureFlags)} disabled={saving}>
                 <Save className="h-4 w-4 mr-2" />
@@ -2152,40 +2246,73 @@ function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManag
                     <p className="text-sm text-gray-500 mb-4">
                       Customize which features this user can access
                     </p>
-                    <div className="space-y-3">
-                      {ALL_FEATURES.map(feature => {
-                        const userHasFeature = userFeatures[feature.id]
-                        const orgDefault = featureFlags[feature.id] ?? true
-                        const isOverridden = userHasFeature !== undefined
+                    <div className="space-y-4">
+                      {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Administration'].map(category => {
+                        const categoryFeatures = ALL_FEATURES.filter(f => {
+                          // Filter by role if user doesn't have required permissions
+                          if (f.requiresRole && selectedUser?.role) {
+                            return f.requiresRole.includes(selectedUser.role) && f.category === category
+                          }
+                          return f.category === category
+                        })
+                        
+                        if (categoryFeatures.length === 0) return null
                         
                         return (
-                          <div key={feature.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="font-medium">{feature.name}</div>
-                              <div className="text-sm text-gray-500">
-                                Org default: {orgDefault ? 'Enabled' : 'Disabled'}
-                                {isOverridden && (
-                                  <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">
-                                    Overridden
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Switch
-                                checked={userHasFeature ?? orgDefault}
-                                onCheckedChange={(checked) => handleUserFeatureChange(feature.id, checked)}
-                              />
-                              {isOverridden && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleUserFeatureChange(feature.id, undefined as any)}
-                                  className="text-xs"
-                                >
-                                  Reset
-                                </Button>
-                              )}
+                          <div key={category}>
+                            <h4 className="font-medium text-gray-900 mb-2">{category}</h4>
+                            <div className="space-y-2">
+                              {categoryFeatures.map(feature => {
+                                const userHasFeature = userFeatures[feature.id]
+                                const orgDefault = featureFlags[feature.id] ?? true
+                                const isOverridden = userHasFeature !== undefined
+                                
+                                return (
+                                  <div key={feature.id} className="flex items-start justify-between p-3 border rounded-lg">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <div className="font-medium">{feature.name}</div>
+                                        {feature.requiresRole && (
+                                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs">
+                                            {feature.requiresRole.includes('admin') && feature.requiresRole.includes('manager') 
+                                              ? 'Admin/Manager' 
+                                              : feature.requiresRole.includes('admin') 
+                                                ? 'Admin Only'
+                                                : 'Manager+'}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-gray-500 mt-1">
+                                        {feature.description}
+                                      </div>
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        Org default: {orgDefault ? 'Enabled' : 'Disabled'}
+                                        {isOverridden && (
+                                          <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                                            Overridden
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2 ml-4">
+                                      <Switch
+                                        checked={userHasFeature ?? orgDefault}
+                                        onCheckedChange={(checked) => handleUserFeatureChange(feature.id, checked)}
+                                      />
+                                      {isOverridden && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleUserFeatureChange(feature.id, undefined as any)}
+                                          className="text-xs"
+                                        >
+                                          Reset
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )

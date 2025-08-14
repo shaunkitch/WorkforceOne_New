@@ -15,150 +15,340 @@ import {
   Home, Clock, Calendar, Users, Briefcase, CheckSquare,
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
-  User, UserCheck, Zap, Route
+  User, UserCheck, Zap, Route, ChevronRight,
+  BarChart3, Cog, UserPlus, FolderOpen
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
 
-// Navigation arrays with modern icons and descriptions
-const allNavigation = [
-  { 
-    name: 'Dashboard', 
-    href: '/dashboard', 
-    icon: Home, 
-    feature: 'dashboard',
-    description: 'Overview and quick stats'
+// Grouped navigation structure
+const navigationGroups = [
+  {
+    name: 'Dashboard',
+    items: [
+      { 
+        name: 'Overview', 
+        href: '/dashboard', 
+        icon: Home, 
+        feature: 'dashboard',
+        description: 'Overview and quick stats'
+      }
+    ]
   },
-  { 
-    name: 'Time Tracking', 
-    href: '/dashboard/time', 
-    icon: Clock, 
-    feature: 'time_tracking',
-    description: 'Track work hours and productivity'
+  {
+    name: 'Human Resources',
+    icon: UserPlus,
+    items: [
+      { 
+        name: 'Leave Requests', 
+        href: '/dashboard/leave', 
+        icon: FileText, 
+        feature: 'leave',
+        description: 'Time off requests and approvals'
+      },
+      { 
+        name: 'Teams', 
+        href: '/dashboard/teams', 
+        icon: Users, 
+        feature: 'teams',
+        description: 'Team management and structure'
+      },
+    ]
   },
-  { 
-    name: 'Attendance', 
-    href: '/dashboard/attendance', 
-    icon: Calendar, 
-    feature: 'attendance',
-    description: 'Check-in and attendance records'
+  {
+    name: 'Time Management',
+    icon: Clock,
+    items: [
+      { 
+        name: 'Attendance', 
+        href: '/dashboard/attendance', 
+        icon: Calendar, 
+        feature: 'attendance',
+        description: 'Check-in and attendance records'
+      },
+      { 
+        name: 'Time Tracking', 
+        href: '/dashboard/time', 
+        icon: Clock, 
+        feature: 'time_tracking',
+        description: 'Track work hours and productivity'
+      },
+      { 
+        name: 'Attendance Management', 
+        href: '/dashboard/attendance/manage', 
+        icon: UserCheck, 
+        feature: 'attendance',
+        requiresRole: ['admin', 'manager'],
+        description: 'Monitor team attendance and send reminders'
+      },
+    ]
   },
-  { 
-    name: 'Attendance Management', 
-    href: '/dashboard/attendance/manage', 
-    icon: UserCheck, 
-    feature: 'attendance',
-    requiresRole: ['admin', 'manager'],
-    description: 'Monitor team attendance and send reminders'
+  {
+    name: 'Operations',
+    icon: Route,
+    items: [
+      { 
+        name: 'Routes', 
+        href: '/dashboard/routes', 
+        icon: Route, 
+        feature: 'routes',
+        description: 'Route optimization and planning'
+      },
+      { 
+        name: 'Tasks', 
+        href: '/dashboard/tasks', 
+        icon: CheckSquare, 
+        feature: 'tasks',
+        description: 'Task assignments and progress'
+      },
+      { 
+        name: 'Projects', 
+        href: '/dashboard/projects', 
+        icon: Briefcase, 
+        feature: 'projects',
+        description: 'Project tracking and management'
+      },
+      { 
+        name: 'Team Map', 
+        href: '/dashboard/maps', 
+        icon: MapPin, 
+        feature: 'maps',
+        description: 'Real-time team locations'
+      },
+      { 
+        name: 'Outlets', 
+        href: '/dashboard/outlets', 
+        icon: Building, 
+        feature: 'outlets',
+        description: 'Manage office locations'
+      },
+    ]
   },
-  { 
-    name: 'Team Map', 
-    href: '/dashboard/maps', 
-    icon: MapPin, 
-    feature: 'maps',
-    description: 'Real-time team locations'
+  {
+    name: 'Analytics & Reports',
+    icon: BarChart3,
+    items: []  // Will be populated from advancedNavigation
   },
-  { 
-    name: 'Routes', 
-    href: '/dashboard/routes', 
-    icon: Route, 
-    feature: 'routes',
-    description: 'Route optimization and planning'
+  {
+    name: 'Forms & Processes',
+    icon: FolderOpen,
+    items: [
+      { 
+        name: 'Forms', 
+        href: '/dashboard/forms', 
+        icon: ClipboardList, 
+        feature: 'forms',
+        description: 'Dynamic form builder and responses'
+      },
+    ]
   },
-  { 
-    name: 'Outlets', 
-    href: '/dashboard/outlets', 
-    icon: Building, 
-    feature: 'outlets',
-    description: 'Manage office locations'
-  },
-  { 
-    name: 'Teams', 
-    href: '/dashboard/teams', 
-    icon: Users, 
-    feature: 'teams',
-    description: 'Team management and structure'
-  },
-  { 
-    name: 'Projects', 
-    href: '/dashboard/projects', 
-    icon: Briefcase, 
-    feature: 'projects',
-    description: 'Project tracking and management'
-  },
-  { 
-    name: 'Tasks', 
-    href: '/dashboard/tasks', 
-    icon: CheckSquare, 
-    feature: 'tasks',
-    description: 'Task assignments and progress'
-  },
-  { 
-    name: 'Forms', 
-    href: '/dashboard/forms', 
-    icon: ClipboardList, 
-    feature: 'forms',
-    description: 'Dynamic form builder and responses'
-  },
-  { 
-    name: 'Leave Requests', 
-    href: '/dashboard/leave', 
-    icon: FileText, 
-    feature: 'leave',
-    description: 'Time off requests and approvals'
-  },
+  {
+    name: 'Administration',
+    icon: Cog,
+    items: []  // Will be populated from advancedNavigation
+  }
 ]
 
-// Advanced features navigation
-const advancedNavigation = [
-  {
-    name: 'Automation',
-    href: '/dashboard/automation',
-    icon: ({ className }: { className?: string }) => (
-      <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2L2 7v10c0 5.55 3.84 10 9 10s9-4.45 9-10V7l-10-5z"/>
-        <path d="M8 11h8l-4 4-4-4z"/>
-      </svg>
-    ),
-    feature: 'automation',
-    requiresRole: ['admin', 'manager'],
-    description: 'Workflow automation and triggers'
-  },
-  {
-    name: 'Analytics',
-    href: '/dashboard/analytics',
-    icon: ({ className }: { className?: string }) => (
-      <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M3 3v18h18v-2H5V3H3zm16 5h-2v8h2v-8zm-4-3h-2v11h2V5zm-4 6h-2v5h2v-5z"/>
-      </svg>
-    ),
-    feature: 'analytics',
-    requiresRole: ['admin', 'manager'],
-    description: 'Advanced reporting and insights'
-  },
-  {
-    name: 'Integrations',
-    href: '/dashboard/integrations',
-    icon: Zap,
-    feature: 'integrations',
-    requiresRole: ['admin', 'manager'],
-    description: 'Slack and Teams integrations'
-  },
-  {
-    name: 'Payroll Export',
-    href: '/dashboard/payroll',
-    icon: ({ className }: { className?: string }) => (
-      <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-      </svg>
-    ),
-    feature: 'payroll',
-    requiresRole: ['admin'],
-    description: 'Payroll generation and export'
-  },
-]
+// Legacy flat navigation for backward compatibility
+const allNavigation = navigationGroups.flatMap(group => group.items)
+
+// Advanced features - will be distributed into groups
+const advancedFeatures = {
+  analytics: [
+    {
+      name: 'Analytics',
+      href: '/dashboard/analytics',
+      icon: ({ className }: { className?: string }) => (
+        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+          <path d="M3 3v18h18v-2H5V3H3zm16 5h-2v8h2v-8zm-4-3h-2v11h2V5zm-4 6h-2v5h2v-5z"/>
+        </svg>
+      ),
+      feature: 'analytics',
+      requiresRole: ['admin', 'manager'],
+      description: 'Advanced reporting and insights'
+    }
+  ],
+  administration: [
+    {
+      name: 'Automation',
+      href: '/dashboard/automation',
+      icon: ({ className }: { className?: string }) => (
+        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2L2 7v10c0 5.55 3.84 10 9 10s9-4.45 9-10V7l-10-5z"/>
+          <path d="M8 11h8l-4 4-4-4z"/>
+        </svg>
+      ),
+      feature: 'automation',
+      requiresRole: ['admin', 'manager'],
+      description: 'Workflow automation and triggers'
+    },
+    {
+      name: 'Integrations',
+      href: '/dashboard/integrations',
+      icon: Zap,
+      feature: 'integrations',
+      requiresRole: ['admin', 'manager'],
+      description: 'Slack and Teams integrations'
+    },
+    {
+      name: 'Payroll Export',
+      href: '/dashboard/payroll',
+      icon: ({ className }: { className?: string }) => (
+        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      ),
+      feature: 'payroll',
+      requiresRole: ['admin'],
+      description: 'Payroll generation and export'
+    }
+  ]
+}
+
+// Legacy advanced navigation for backward compatibility
+const advancedNavigation = [...advancedFeatures.analytics, ...advancedFeatures.administration]
 
 
-// Modern Sidebar Navigation Component
+// Modern Grouped Sidebar Navigation Component
+function GroupedSidebarNav({ 
+  navigationGroups, 
+  pathname, 
+  mobile = false,
+  userProfile,
+  featureFlags
+}: { 
+  navigationGroups: typeof navigationGroups,
+  pathname: string,
+  mobile?: boolean,
+  userProfile: any,
+  featureFlags: any
+}) {
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([
+    'Dashboard', 'Human Resources', 'Time Management', 'Operations'
+  ])
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(groupName) 
+        ? prev.filter(g => g !== groupName)
+        : [...prev, groupName]
+    )
+  }
+
+  // Filter and populate groups with advanced features
+  const processedGroups = navigationGroups.map(group => {
+    let items = [...group.items]
+    
+    // Add advanced features to appropriate groups
+    if (group.name === 'Analytics & Reports') {
+      items = [...items, ...advancedFeatures.analytics]
+    }
+    if (group.name === 'Administration') {
+      items = [...items, ...advancedFeatures.administration]
+    }
+
+    // Filter items based on feature flags and user role
+    const filteredItems = items.filter(item => {
+      // Check feature flag
+      const hasFeature = featureFlags?.featureFlags?.[item.feature] !== false
+      
+      // Check role requirement if specified
+      if (item.requiresRole && userProfile) {
+        const hasRole = item.requiresRole.includes(userProfile.role)
+        return hasFeature && hasRole
+      }
+      
+      return hasFeature
+    })
+
+    return {
+      ...group,
+      items: filteredItems
+    }
+  }).filter(group => group.items.length > 0) // Only show groups with visible items
+
+  return (
+    <nav className="space-y-2 px-3">
+      {processedGroups.map((group) => {
+        const isExpanded = expandedGroups.includes(group.name)
+        const hasIcon = group.icon
+
+        return (
+          <div key={group.name} className="space-y-1">
+            {/* Group Header */}
+            <button
+              onClick={() => toggleGroup(group.name)}
+              className={`
+                w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-left rounded-lg
+                transition-colors hover:bg-gray-100/50
+                ${mobile ? 'text-base py-2.5' : 'text-xs'}
+              `}
+            >
+              <div className="flex items-center">
+                {hasIcon && (
+                  <group.icon className={`flex-shrink-0 mr-2 text-gray-500 ${mobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                )}
+                <span className="text-gray-700 uppercase tracking-wider">
+                  {group.name}
+                </span>
+              </div>
+              <ChevronRight 
+                className={`h-4 w-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+              />
+            </button>
+
+            {/* Group Items */}
+            {isExpanded && (
+              <div className="space-y-0.5 ml-2">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={`
+                        group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
+                        ${isActive 
+                          ? 'bg-blue-600 text-white shadow-sm' 
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
+                        }
+                        ${mobile ? 'text-base py-2.5' : ''}
+                      `}
+                    >
+                      <item.icon 
+                        className={`
+                          flex-shrink-0 h-4 w-4 mr-3 transition-colors
+                          ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}
+                          ${mobile ? 'h-5 w-5' : ''}
+                        `} 
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{item.name}</div>
+                        {!mobile && (
+                          <div className={`text-xs mt-0.5 truncate ${
+                            isActive 
+                              ? 'text-blue-100' 
+                              : 'text-gray-500 group-hover:text-gray-600'
+                          }`}>
+                            {item.description}
+                          </div>
+                        )}
+                      </div>
+                      {isActive && (
+                        <div className="w-1.5 h-1.5 bg-white rounded-full ml-2" />
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </nav>
+  )
+}
+
+// Legacy Sidebar Navigation Component (for backward compatibility)
 function SidebarNav({ navigation, pathname, mobile = false }: { 
   navigation: typeof allNavigation, 
   pathname: string,
@@ -416,17 +606,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </button>
                   </div>
                   <nav className="flex flex-1 flex-col">
-                    <SidebarNav navigation={enabledNavigation} pathname={pathname} mobile />
-                    {enabledAdvancedNavigation.length > 0 && (
-                      <div className="mt-6 space-y-1">
-                        <div className="px-3 py-2">
-                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Advanced Features
-                          </h3>
-                        </div>
-                        <SidebarNav navigation={enabledAdvancedNavigation} pathname={pathname} mobile />
-                      </div>
-                    )}
+                    <GroupedSidebarNav 
+                      navigationGroups={navigationGroups} 
+                      pathname={pathname} 
+                      mobile={true}
+                      userProfile={userProfile}
+                      featureFlags={featureFlags}
+                    />
                     <div className="mt-auto pt-6 border-t border-border">
                       {userProfile && <UserProfile profile={userProfile} />}
                     </div>
@@ -445,17 +631,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <LogoBrand organization={organization} />
           </div>
           <nav className="flex flex-1 flex-col gap-y-7">
-            <SidebarNav navigation={enabledNavigation} pathname={pathname} />
-            {enabledAdvancedNavigation.length > 0 && (
-              <div className="space-y-1">
-                <div className="px-3 py-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Advanced Features
-                  </h3>
-                </div>
-                <SidebarNav navigation={enabledAdvancedNavigation} pathname={pathname} />
-              </div>
-            )}
+            <GroupedSidebarNav 
+              navigationGroups={navigationGroups} 
+              pathname={pathname} 
+              mobile={false}
+              userProfile={userProfile}
+              featureFlags={featureFlags}
+            />
             <div className="mt-auto space-y-4">
               <div className="border-t border-border pt-4">
                 {userProfile && <UserProfile profile={userProfile} />}

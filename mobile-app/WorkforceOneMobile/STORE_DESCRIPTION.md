@@ -1,13 +1,13 @@
 # WorkforceOne Mobile - Google Play Store Description
 
 ## Short Description (80 characters)
-Complete workforce management: attendance, time tracking, tasks & team collaboration
+Complete workforce management: attendance, routes, analytics & team collaboration
 
 ## Full Description
 
 **Transform Your Workforce Management with WorkforceOne Mobile**
 
-WorkforceOne Mobile is the ultimate workforce management solution designed for modern businesses. Streamline attendance tracking, time management, task coordination, and team collaboration all in one powerful mobile app.
+WorkforceOne Mobile is the ultimate workforce management solution designed for modern businesses. Streamline attendance tracking, route planning, advanced analytics, leave management, time tracking, task coordination, and team collaboration all in one powerful mobile app.
 
 ### 🎯 **Key Features**
 
@@ -23,6 +23,26 @@ WorkforceOne Mobile is the ultimate workforce management solution designed for m
 - Break time management
 - Weekly and monthly summaries
 
+**🗺️ Route Planning & Optimization**
+- Smart route optimization for field teams and deliveries
+- Real-time GPS tracking and navigation
+- Multi-stop route planning with estimated times
+- Route analytics and performance metrics
+- Outlet and location management
+
+**📊 Advanced Analytics Dashboard**
+- Comprehensive workforce performance insights
+- Attendance trends and productivity analytics
+- Route efficiency and cost analysis
+- Real-time reporting and data visualization
+- Executive dashboards with key metrics
+
+**📅 Leave Management System**
+- Submit and track leave requests on-the-go
+- Approval workflow for managers
+- Leave balance tracking and calendar integration
+- Multiple leave types (vacation, sick, personal, emergency)
+
 **✅ Task & Project Management**
 - Create and assign tasks to team members
 - Track project progress in real-time
@@ -35,12 +55,6 @@ WorkforceOne Mobile is the ultimate workforce management solution designed for m
 - Manager dashboards for oversight
 - Real-time notifications and updates
 
-**📊 Comprehensive Reporting**
-- Detailed attendance reports
-- Time tracking analytics
-- Productivity insights
-- Export data for payroll processing
-
 **🔔 Smart Notifications**
 - Check-in reminders
 - Task deadlines
@@ -52,7 +66,9 @@ WorkforceOne Mobile is the ultimate workforce management solution designed for m
 Whether you're managing a small team or a large organization, WorkforceOne Mobile adapts to your needs:
 
 - **Remote Teams**: Track distributed workforce with GPS verification
-- **Field Workers**: Mobile-first design for on-the-go management
+- **Field Workers**: Mobile-first design with route optimization
+- **Delivery Teams**: Route planning and real-time tracking
+- **Sales Teams**: Territory management and analytics
 - **Office Teams**: Streamlined attendance and task management
 - **Multi-location Businesses**: Centralized management across locations
 
@@ -90,7 +106,7 @@ Whether you're managing a small team or a large organization, WorkforceOne Mobil
 ---
 
 ### Keywords
-workforce management, attendance tracking, time tracker, employee management, team collaboration, HR app, business productivity, GPS attendance, project management, task management
+workforce management, attendance tracking, time tracker, employee management, team collaboration, HR app, business productivity, GPS attendance, project management, task management, route planning, route optimization, analytics dashboard, leave management, field service
 
 ### Category
 Business

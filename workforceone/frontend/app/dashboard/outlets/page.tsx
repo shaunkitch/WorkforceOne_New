@@ -7,13 +7,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { PlusCircle, MapPin, Users, User, Edit, Trash2, Settings, Loader2, Upload, Download } from 'lucide-react'
+import { PlusCircle, MapPin, Users, User, Edit, Trash2, Settings, Loader2, Upload, Download, Grid, List, Filter, Eye, EyeOff } from 'lucide-react'
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 
 interface Outlet {
   id: string
   name: string
   outlet_code: string | null
+  group_name: string | null
   address: string | null
   province: string | null
   phone: string | null
@@ -56,6 +64,12 @@ export default function OutletsPage() {
   const [selectedOutlet, setSelectedOutlet] = useState<Outlet | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [error, setError] = useState<string | null>(null)
+  
+  // New state for enhanced functionality
+  const [viewMode, setViewMode] = useState<'tiles' | 'table'>('tiles')
+  const [selectedGroup, setSelectedGroup] = useState<string>('all')
+  const [hiddenGroups, setHiddenGroups] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
 
   const supabase = createClient()
 
@@ -188,6 +202,62 @@ export default function OutletsPage() {
   const handleAssignUsers = (outlet: Outlet) => {
     setSelectedOutlet(outlet)
     setShowAssignModal(true)
+  }
+
+  // Helper functions for grouping and filtering
+  const getUniqueGroups = () => {
+    const groups = [...new Set(outlets.map(outlet => outlet.group_name || 'Ungrouped'))]
+    return groups.sort()
+  }
+
+  const getFilteredOutlets = () => {
+    let filtered = outlets
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(outlet => 
+        outlet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        outlet.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        outlet.group_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Filter by selected group
+    if (selectedGroup !== 'all') {
+      filtered = filtered.filter(outlet => 
+        (outlet.group_name || 'Ungrouped') === selectedGroup
+      )
+    }
+
+    return filtered
+  }
+
+  const getGroupedOutlets = () => {
+    const filtered = getFilteredOutlets()
+    const grouped: Record<string, Outlet[]> = {}
+
+    filtered.forEach(outlet => {
+      const groupName = outlet.group_name || 'Ungrouped'
+      if (!grouped[groupName]) {
+        grouped[groupName] = []
+      }
+      grouped[groupName].push(outlet)
+    })
+
+    // Sort outlets within each group
+    Object.keys(grouped).forEach(group => {
+      grouped[group].sort((a, b) => a.name.localeCompare(b.name))
+    })
+
+    return grouped
+  }
+
+  const toggleGroupVisibility = (groupName: string) => {
+    setHiddenGroups(prev => 
+      prev.includes(groupName)
+        ? prev.filter(g => g !== groupName)
+        : [...prev, groupName]
+    )
   }
 
   if (loading) {

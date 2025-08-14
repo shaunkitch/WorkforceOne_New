@@ -13,6 +13,9 @@ import TimeTrackingScreen from '../screens/TimeTrackingScreen'
 import TasksScreen from '../screens/TasksScreen'
 import ProjectsScreen from '../screens/ProjectsScreen'
 import TeamsScreen from '../screens/TeamsScreen'
+import RoutesScreen from '../screens/RoutesScreen'
+import AnalyticsScreen from '../screens/AnalyticsScreen'
+import LeaveScreen from '../screens/LeaveScreen'
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -27,6 +30,8 @@ function AuthStack() {
 }
 
 function MainTabs() {
+  const { profile } = useAuth()
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -49,6 +54,9 @@ function MainTabs() {
             case 'Projects':
               iconName = focused ? 'folder' : 'folder-outline'
               break
+            case 'Leave':
+              iconName = focused ? 'calendar' : 'calendar-outline'
+              break
             default:
               iconName = 'ellipse-outline'
           }
@@ -58,13 +66,14 @@ function MainTabs() {
         tabBarActiveTintColor: '#3b82f6',
         tabBarInactiveTintColor: '#6b7280',
         headerShown: false,
+        tabBarLabelStyle: { fontSize: 10 },
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Attendance" component={AttendanceScreen} />
-      <Tab.Screen name="TimeTracking" component={TimeTrackingScreen} />
+      <Tab.Screen name="TimeTracking" component={TimeTrackingScreen} options={{ title: 'Time' }} />
       <Tab.Screen name="Tasks" component={TasksScreen} />
-      <Tab.Screen name="Projects" component={ProjectsScreen} />
+      <Tab.Screen name="Leave" component={LeaveScreen} />
     </Tab.Navigator>
   )
 }
@@ -74,6 +83,9 @@ function AppStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="Teams" component={TeamsScreen} />
+      <Stack.Screen name="Projects" component={ProjectsScreen} />
+      <Stack.Screen name="Routes" component={RoutesScreen} />
+      <Stack.Screen name="Analytics" component={AnalyticsScreen} />
     </Stack.Navigator>
   )
 }

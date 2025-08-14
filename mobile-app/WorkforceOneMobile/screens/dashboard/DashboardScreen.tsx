@@ -42,7 +42,11 @@ export default function DashboardScreen({ navigation }: any) {
     { title: 'Clock In', icon: 'time-outline', color: '#10b981', screen: 'Attendance' },
     { title: 'Time Track', icon: 'stopwatch-outline', color: '#3b82f6', screen: 'TimeTracking' },
     { title: 'Tasks', icon: 'checkmark-circle-outline', color: '#f59e0b', screen: 'Tasks' },
-    { title: 'Projects', icon: 'folder-outline', color: '#8b5cf6', screen: 'Projects' },
+    { title: 'Leave', icon: 'calendar-outline', color: '#8b5cf6', screen: 'Leave' },
+    { title: 'Teams', icon: 'people-outline', color: '#06b6d4', screen: 'Teams' },
+    { title: 'Routes', icon: 'navigate-outline', color: '#10b981', screen: 'Routes' },
+    { title: 'Analytics', icon: 'analytics-outline', color: '#f59e0b', screen: 'Analytics' },
+    { title: 'Projects', icon: 'folder-outline', color: '#ef4444', screen: 'Projects' },
   ]
 
   useEffect(() => {
@@ -306,10 +310,10 @@ const styles = StyleSheet.create({
   quickActionCard: {
     width: '48%',
     backgroundColor: 'white',
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
     borderLeftWidth: 4,
-    marginBottom: 12,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

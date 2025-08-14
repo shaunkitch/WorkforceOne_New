@@ -2,12 +2,12 @@
   "expo": {
     "name": "WorkforceOne Mobile",
     "slug": "workforceone-nt4ygzvok9o8koo87qspm",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "description": "Complete workforce management solution for attendance tracking, time management, task coordination, and team collaboration. Features real-time notifications, location-based check-ins, and comprehensive reporting for modern businesses.",
+    "description": "Complete workforce management solution featuring attendance tracking, time management, task coordination, team collaboration, route planning, advanced analytics, and leave management. Includes real-time notifications, location-based check-ins, route optimization, and comprehensive reporting for modern businesses.",
     "privacy": "public",
     "platforms": [
       "ios",
@@ -22,7 +22,12 @@
       "business",
       "productivity",
       "management",
-      "hr"
+      "hr",
+      "route planning",
+      "analytics",
+      "leave management",
+      "team collaboration",
+      "mobile workforce"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -35,7 +40,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.workforceone.mobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses location to track attendance check-ins and verify work locations.",
         "NSCameraUsageDescription": "This app uses the camera to capture profile photos and attach images to reports.",
@@ -50,7 +55,7 @@
         "backgroundColor": "#3b82f6"
       },
       "package": "com.workforceone.mobile",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

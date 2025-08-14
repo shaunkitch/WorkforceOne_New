@@ -168,6 +168,7 @@ export default function RoutesPage() {
   const [settings, setSettings] = useState<RouteOptimizationSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [routesLastUpdated, setRoutesLastUpdated] = useState(Date.now())
 
   // Map state
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 })
@@ -577,6 +578,7 @@ export default function RoutesPage() {
       setShowCreateRoute(false)
       
       await fetchRoutes()
+      setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
 
       // Ask if user wants to optimize the route immediately
       const shouldOptimize = confirm(`Route "${routeForm.name}" created successfully! 
@@ -636,6 +638,7 @@ This will calculate the best order for visiting all outlets.`)
       setSelectedRoute(null)
       
       await fetchRoutes()
+      setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
       alert('Route assigned successfully!')
     } catch (error) {
       console.error('Error assigning route:', error)
@@ -765,6 +768,7 @@ This will calculate the best order for visiting all outlets.`)
       if (createdCount > 0) {
         alert(`✅ Created ${createdCount} recurring route assignments!`)
         await fetchRoutes()
+        setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
       } else {
         alert('No new recurring assignments needed at this time.')
       }
@@ -789,6 +793,7 @@ This will calculate the best order for visiting all outlets.`)
       if (error) throw error
 
       await fetchRoutes()
+      setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
       alert('Route deleted successfully!')
     } catch (error) {
       console.error('Error deleting route:', error)
@@ -847,6 +852,40 @@ This will calculate the best order for visiting all outlets.`)
 
       if (error) throw error
 
+      // If route_date was changed, update the route assignment as well
+      if (routeForm.route_date && selectedRoute.route_assignments && selectedRoute.route_assignments.length > 0) {
+        const newDate = new Date(routeForm.route_date)
+        const newDayOfWeek = newDate.getDay() === 0 ? 7 : newDate.getDay() // Convert Sunday (0) to 7
+        
+        console.log('Updating route assignment for date change:', {
+          oldDate: selectedRoute.route_date,
+          newDate: routeForm.route_date,
+          newDayOfWeek,
+          assignmentId: selectedRoute.route_assignments[0].id,
+          wasRecurring: selectedRoute.route_assignments[0].is_recurring
+        })
+
+        // Update the route assignment - convert to one-time assignment with specific date
+        const { error: assignmentError } = await supabase
+          .from('route_assignments')
+          .update({
+            assigned_date: routeForm.route_date,
+            day_of_week: null, // Clear recurring day
+            is_recurring: false, // Convert to one-time assignment
+            updated_at: new Date().toISOString()
+          })
+          .eq('route_id', selectedRoute.id)
+
+        if (assignmentError) {
+          console.error('Error updating route assignment:', assignmentError)
+          // Don't throw here - route was already updated successfully
+        } else {
+          console.log('Successfully updated route assignment to one-time assignment for', routeForm.route_date)
+          // Force another refresh since we updated the assignment
+          setRoutesLastUpdated(Date.now())
+        }
+      }
+
       // Reset form
       setRouteForm({
         name: '',
@@ -864,6 +903,7 @@ This will calculate the best order for visiting all outlets.`)
       setSelectedRoute(null)
       
       await fetchRoutes()
+      setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
       alert('Route updated successfully!')
     } catch (error) {
       console.error('Error updating route:', error)
@@ -942,6 +982,7 @@ This will calculate the best order for visiting all outlets.`)
       setSelectedRoute(null)
       
       await fetchRoutes()
+      setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
       alert('Route transferred successfully!')
     } catch (error) {
       console.error('Error transferring route:', error)
@@ -1060,6 +1101,7 @@ This will calculate the best order for visiting all outlets.`)
 
       // Refresh routes data
       await fetchRoutes()
+      setRoutesLastUpdated(Date.now()) // Trigger MemberRoutes refresh
 
       // Show detailed optimization results
       const hours = Math.floor(optimizedRoute.totalDuration / 60)
@@ -1489,7 +1531,7 @@ This will calculate the best order for visiting all outlets.`)
 
         {/* Member Routes Tab */}
         <TabsContent value="member-routes" className="space-y-6">
-          <MemberRoutes />
+          <MemberRoutes key={routesLastUpdated} />
         </TabsContent>
 
         {/* Assignments & Tracking Tab */}
