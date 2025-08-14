@@ -286,143 +286,235 @@ export default function OutletsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Outlets Management
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Manage your organization's outlets and assign teams or users
-          </p>
+      {/* Enhanced Header */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Outlets Management
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your organization's outlets and assign teams or users
+            </p>
+          </div>
+          {canManageOutlets() && (
+            <div className="flex items-center space-x-3">
+              <Button 
+                onClick={() => setShowImportModal(true)} 
+                variant="outline"
+                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
+              <Button onClick={handleCreateOutlet} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Create Outlet
+              </Button>
+            </div>
+          )}
         </div>
-        {canManageOutlets() && (
-          <div className="flex items-center space-x-3">
-            <Button 
-              onClick={() => setShowImportModal(true)} 
-              variant="outline"
-              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+
+        {/* Controls Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-white p-4 rounded-lg border">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            {/* Search */}
+            <div className="relative">
+              <Input
+                placeholder="Search outlets..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64 pl-10"
+              />
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            </div>
+
+            {/* Group Filter */}
+            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Groups" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Groups</SelectItem>
+                {getUniqueGroups().map(group => (
+                  <SelectItem key={group} value={group}>
+                    {group} ({outlets.filter(o => (o.group_name || 'Ungrouped') === group).length})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+            <Button
+              variant={viewMode === 'tiles' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('tiles')}
+              className="flex items-center space-x-2"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Import CSV
+              <Grid className="h-4 w-4" />
+              <span>Tiles</span>
             </Button>
-            <Button onClick={handleCreateOutlet} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Create Outlet
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="flex items-center space-x-2"
+            >
+              <List className="h-4 w-4" />
+              <span>Table</span>
             </Button>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Outlets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {outlets.map((outlet) => (
-          <Card key={outlet.id} className="group hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-5 w-5 text-blue-600" />
-                    <span className="text-lg font-semibold">{outlet.name}</span>
-                  </div>
-                  {outlet.outlet_code && (
-                    <div className="text-sm text-gray-500 font-mono">
-                      {outlet.outlet_code}
-                    </div>
-                  )}
-                </div>
-                {canManageOutlets() && (
-                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditOutlet(outlet)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    {canDeleteOutlets() && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteOutlet(outlet)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+      {/* Outlets Display */}
+      {viewMode === 'tiles' ? (
+        /* Tiles View - Grouped */
+        <div className="space-y-8">
+          {Object.entries(getGroupedOutlets()).map(([groupName, groupOutlets]) => (
+            <div key={groupName} className="space-y-4">
+              {/* Group Header */}
+              <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleGroupVisibility(groupName)}
+                    className="p-1 h-8 w-8"
+                  >
+                    {hiddenGroups.includes(groupName) ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
                     )}
-                  </div>
-                )}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  {outlet.address && (
-                    <p className="text-sm text-gray-600 flex items-start space-x-2">
-                      <MapPin className="h-4 w-4 mt-0.5 text-gray-400" />
-                      <span>
-                        {outlet.address}
-                        {outlet.province && <>, {outlet.province}</>}
-                      </span>
-                    </p>
-                  )}
-                  
-                  {outlet.phone && (
-                    <p className="text-sm text-gray-600">
-                      📞 {outlet.phone}
-                    </p>
-                  )}
-                  
-                  {outlet.email && (
-                    <p className="text-sm text-gray-600">
-                      ✉️ {outlet.email}
-                    </p>
-                  )}
-                  
-                  {outlet.manager_name && (
-                    <p className="text-sm text-gray-600">
-                      👤 Manager: {outlet.manager_name}
-                    </p>
-                  )}
-                </div>
-                
-                {(outlet.latitude && outlet.longitude) && (
-                  <p className="text-xs text-gray-500 border-t pt-2">
-                    Coordinates: {outlet.latitude}, {outlet.longitude}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                  <div className="flex items-center space-x-1 text-sm text-gray-600">
-                    <Users className="h-4 w-4" />
-                    <span>{outletStats[outlet.id]?.teamCount || 0} Teams</span>
-                  </div>
-                  <div className="flex items-center space-x-1 text-sm text-gray-600">
-                    <User className="h-4 w-4" />
-                    <span>{outletStats[outlet.id]?.userCount || 0} Users</span>
-                  </div>
+                  </Button>
+                  <h2 className="text-xl font-semibold text-gray-800">{groupName}</h2>
+                  <span className="text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                    {groupOutlets.length} outlet{groupOutlets.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
-            </CardContent>
 
-            <CardFooter>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleAssignUsers(outlet)}
-                disabled={!canManageOutlets()}
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Manage Assignments
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+              {/* Group Outlets */}
+              {!hiddenGroups.includes(groupName) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {groupOutlets.map((outlet) => (
+                    <Card key={outlet.id} className="group hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="h-5 w-5 text-blue-600" />
+                              <span className="text-lg font-semibold">{outlet.name}</span>
+                            </div>
+                            {outlet.outlet_code && (
+                              <div className="text-sm text-gray-500 font-mono">
+                                {outlet.outlet_code}
+                              </div>
+                            )}
+                            {outlet.group_name && (
+                              <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full inline-block">
+                                {outlet.group_name}
+                              </div>
+                            )}
+                          </div>
+                          {canManageOutlets() && (
+                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditOutlet(outlet)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {canDeleteOutlets() && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteOutlet(outlet)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
 
-        {outlets.length === 0 && (
-          <div className="col-span-full">
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            {outlet.address && (
+                              <p className="text-sm text-gray-600 flex items-start space-x-2">
+                                <MapPin className="h-4 w-4 mt-0.5 text-gray-400" />
+                                <span>
+                                  {outlet.address}
+                                  {outlet.province && <>, {outlet.province}</>}
+                                </span>
+                              </p>
+                            )}
+                            
+                            {outlet.phone && (
+                              <p className="text-sm text-gray-600">
+                                📞 {outlet.phone}
+                              </p>
+                            )}
+                            
+                            {outlet.email && (
+                              <p className="text-sm text-gray-600">
+                                ✉️ {outlet.email}
+                              </p>
+                            )}
+                            
+                            {outlet.manager_name && (
+                              <p className="text-sm text-gray-600">
+                                👤 Manager: {outlet.manager_name}
+                              </p>
+                            )}
+                          </div>
+                          
+                          {(outlet.latitude && outlet.longitude) && (
+                            <p className="text-xs text-gray-500 border-t pt-2">
+                              Coordinates: {outlet.latitude}, {outlet.longitude}
+                            </p>
+                          )}
+
+                          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                            <div className="flex items-center space-x-1 text-sm text-gray-600">
+                              <Users className="h-4 w-4" />
+                              <span>{outletStats[outlet.id]?.teamCount || 0} Teams</span>
+                            </div>
+                            <div className="flex items-center space-x-1 text-sm text-gray-600">
+                              <User className="h-4 w-4" />
+                              <span>{outletStats[outlet.id]?.userCount || 0} Users</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+
+                      <CardFooter>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => handleAssignUsers(outlet)}
+                          disabled={!canManageOutlets()}
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Manage Assignments
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {outlets.length === 0 && (
             <Card className="border-dashed border-2 border-gray-300">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <MapPin className="h-12 w-12 text-gray-400 mb-4" />
@@ -438,9 +530,151 @@ export default function OutletsPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        /* Table View - Grouped */
+        <div className="space-y-6">
+          {Object.entries(getGroupedOutlets()).map(([groupName, groupOutlets]) => (
+            <Card key={groupName} className="overflow-hidden">
+              <CardHeader className="bg-gray-50 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleGroupVisibility(groupName)}
+                      className="p-1 h-8 w-8"
+                    >
+                      {hiddenGroups.includes(groupName) ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <CardTitle className="text-lg">{groupName}</CardTitle>
+                    <span className="text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                      {groupOutlets.length} outlet{groupOutlets.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+              </CardHeader>
+
+              {!hiddenGroups.includes(groupName) && (
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="text-left p-4 font-medium text-gray-900">Name</th>
+                          <th className="text-left p-4 font-medium text-gray-900">Address</th>
+                          <th className="text-left p-4 font-medium text-gray-900">Manager</th>
+                          <th className="text-center p-4 font-medium text-gray-900">Teams</th>
+                          <th className="text-center p-4 font-medium text-gray-900">Users</th>
+                          {canManageOutlets() && (
+                            <th className="text-center p-4 font-medium text-gray-900">Actions</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupOutlets.map((outlet) => (
+                          <tr key={outlet.id} className="border-b hover:bg-gray-50">
+                            <td className="p-4">
+                              <div className="flex items-center space-x-2">
+                                <MapPin className="h-4 w-4 text-blue-600" />
+                                <div>
+                                  <div className="font-medium">{outlet.name}</div>
+                                  {outlet.outlet_code && (
+                                    <div className="text-sm text-gray-500 font-mono">{outlet.outlet_code}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4 text-gray-600">
+                              <div>
+                                {outlet.address || '-'}
+                                {outlet.province && <div className="text-sm text-gray-500">{outlet.province}</div>}
+                              </div>
+                            </td>
+                            <td className="p-4 text-gray-600">
+                              {outlet.manager_name || '-'}
+                              {outlet.manager_phone && (
+                                <div className="text-sm text-gray-500">{outlet.manager_phone}</div>
+                              )}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="inline-flex items-center space-x-1">
+                                <Users className="h-4 w-4 text-gray-500" />
+                                <span>{outletStats[outlet.id]?.teamCount || 0}</span>
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="inline-flex items-center space-x-1">
+                                <User className="h-4 w-4 text-gray-500" />
+                                <span>{outletStats[outlet.id]?.userCount || 0}</span>
+                              </span>
+                            </td>
+                            {canManageOutlets() && (
+                              <td className="p-4">
+                                <div className="flex items-center justify-center space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAssignUsers(outlet)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditOutlet(outlet)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  {canDeleteOutlets() && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteOutlet(outlet)}
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          ))}
+
+          {outlets.length === 0 && (
+            <Card className="border-dashed border-2 border-gray-300">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <MapPin className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No outlets yet</h3>
+                <p className="text-gray-600 text-center mb-4">
+                  Get started by creating your first outlet location
+                </p>
+                {canManageOutlets() && (
+                  <Button onClick={handleCreateOutlet}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Create First Outlet
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Create Modal */}
       {showCreateForm && (
@@ -497,6 +731,7 @@ interface OutletFormModalProps {
 function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFormModalProps) {
   const [formData, setFormData] = useState({
     name: outlet?.name || '',
+    group_name: outlet?.group_name || '',
     address: outlet?.address || '',
     province: outlet?.province || '',
     phone: outlet?.phone || '',
@@ -528,6 +763,7 @@ function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFo
 
       const outletData = {
         name: formData.name.trim(),
+        group_name: formData.group_name.trim() || null,
         address: formData.address.trim() || null,
         province: formData.province.trim() || null,
         phone: formData.phone.trim() || null,
@@ -595,6 +831,20 @@ function OutletFormModal({ isOpen, onClose, onSuccess, title, outlet }: OutletFo
                 required
                 className="mt-1"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="group_name">Group / Category</Label>
+              <Input
+                id="group_name"
+                value={formData.group_name}
+                onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
+                placeholder="e.g., Main Branches, Sub Offices, Retail Stores"
+                className="mt-1"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Optional: Group outlets by type, region, or category for better organization
+              </p>
             </div>
 
             <div>
@@ -1028,6 +1278,7 @@ interface ImportCSVModalProps {
 
 interface CSVOutletData {
   name: string
+  group_name?: string
   address?: string
   province?: string
   phone?: string
@@ -1045,7 +1296,42 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
   const [previewData, setPreviewData] = useState<CSVOutletData[]>([])
   const [showPreview, setShowPreview] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [assignToGroup, setAssignToGroup] = useState<string>('')
+  const [existingGroups, setExistingGroups] = useState<string[]>([])
   const supabase = createClient()
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchExistingGroups()
+    }
+  }, [isOpen])
+
+  const fetchExistingGroups = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: outlets } = await supabase
+        .from('outlets')
+        .select('group_name')
+        .eq('organization_id', profile.organization_id)
+
+      if (outlets) {
+        const groups = [...new Set(outlets.map(o => o.group_name).filter(Boolean))]
+        setExistingGroups(groups.sort())
+      }
+    } catch (error) {
+      console.error('Error fetching existing groups:', error)
+    }
+  }
 
   const downloadTemplate = () => {
     const link = document.createElement('a')
@@ -1087,6 +1373,10 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
         switch (header.toLowerCase()) {
           case 'name':
             outlet.name = value
+            break
+          case 'group_name':
+          case 'group':
+            outlet.group_name = value || null
             break
           case 'address':
             outlet.address = value || null
@@ -1202,6 +1492,7 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
 
       const outletsToInsert = previewData.map(outlet => ({
         ...outlet,
+        group_name: (assignToGroup && assignToGroup !== '__no_group__') ? assignToGroup : outlet.group_name || null,
         organization_id: profile.organization_id
       }))
 
@@ -1265,10 +1556,47 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
                 <h3 className="font-medium text-blue-900 mb-2">CSV Format Requirements:</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• <strong>Required:</strong> name</li>
-                  <li>• <strong>Optional:</strong> address, province, phone, email</li>
+                  <li>• <strong>Optional:</strong> group_name (or group), address, province, phone, email</li>
                   <li>• <strong>Optional:</strong> manager_name, manager_phone, manager_email</li>
                   <li>• <strong>Optional:</strong> latitude, longitude</li>
                 </ul>
+              </div>
+
+              {/* Group Assignment Option */}
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <h3 className="font-medium text-gray-900 mb-3">Group Assignment</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Optionally assign all imported outlets to a specific group. This will override any group_name values in the CSV.
+                </p>
+                <div className="flex items-center space-x-3">
+                  <Label htmlFor="assignGroup" className="text-sm font-medium min-w-0">
+                    Assign to Group:
+                  </Label>
+                  <div className="flex-1 max-w-xs">
+                    <Select value={assignToGroup} onValueChange={setAssignToGroup}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select group (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__no_group__">No group assignment</SelectItem>
+                        {existingGroups.map(group => (
+                          <SelectItem key={group} value={group}>
+                            {group}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    or
+                  </div>
+                  <Input
+                    placeholder="Create new group"
+                    value={assignToGroup && assignToGroup !== '__no_group__' && !existingGroups.includes(assignToGroup) ? assignToGroup : ''}
+                    onChange={(e) => setAssignToGroup(e.target.value)}
+                    className="max-w-40"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-between">
@@ -1327,6 +1655,7 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
                         <th className="text-left p-3 border-b">Name</th>
+                        <th className="text-left p-3 border-b">Group</th>
                         <th className="text-left p-3 border-b">Address</th>
                         <th className="text-left p-3 border-b">Province</th>
                         <th className="text-left p-3 border-b">Phone</th>
@@ -1334,15 +1663,27 @@ function ImportCSVModal({ isOpen, onClose, onSuccess }: ImportCSVModalProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {previewData.map((outlet, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-3 font-medium">{outlet.name}</td>
-                          <td className="p-3 text-gray-600">{outlet.address || '-'}</td>
-                          <td className="p-3 text-gray-600">{outlet.province || '-'}</td>
-                          <td className="p-3 text-gray-600">{outlet.phone || '-'}</td>
-                          <td className="p-3 text-gray-600">{outlet.manager_name || '-'}</td>
-                        </tr>
-                      ))}
+                      {previewData.map((outlet, index) => {
+                        const finalGroup = (assignToGroup && assignToGroup !== '__no_group__') ? assignToGroup : outlet.group_name || 'Ungrouped'
+                        return (
+                          <tr key={index} className="border-b">
+                            <td className="p-3 font-medium">{outlet.name}</td>
+                            <td className="p-3">
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                finalGroup === 'Ungrouped' 
+                                  ? 'bg-gray-100 text-gray-600' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {finalGroup}
+                              </span>
+                            </td>
+                            <td className="p-3 text-gray-600">{outlet.address || '-'}</td>
+                            <td className="p-3 text-gray-600">{outlet.province || '-'}</td>
+                            <td className="p-3 text-gray-600">{outlet.phone || '-'}</td>
+                            <td className="p-3 text-gray-600">{outlet.manager_name || '-'}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
