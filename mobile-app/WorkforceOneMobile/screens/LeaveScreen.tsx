@@ -10,7 +10,9 @@ import {
   TextInput,
   Alert,
   Modal,
+  Platform,
 } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -34,6 +36,8 @@ export default function LeaveScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [showNewRequestModal, setShowNewRequestModal] = useState(false)
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false)
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false)
   const [newRequest, setNewRequest] = useState({
     start_date: '',
     end_date: '',
@@ -60,7 +64,7 @@ export default function LeaveScreen() {
       const { data, error } = await supabase
         .from('leave_requests')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('employee_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -98,7 +102,7 @@ export default function LeaveScreen() {
       await offlineStorage.addToOutbox({
         type: 'leave_request',
         data: {
-          userId: user!.id,
+          employeeId: user!.id,
           organizationId: profile!.organization_id,
           type: newRequest.leave_type,
           startDate: newRequest.start_date,
@@ -130,6 +134,8 @@ export default function LeaveScreen() {
         leave_type: 'vacation',
         reason: ''
       })
+      setShowStartDatePicker(false)
+      setShowEndDatePicker(false)
       fetchLeaveRequests()
     } catch (error) {
       console.error('Error submitting leave request:', error)
@@ -168,6 +174,30 @@ export default function LeaveScreen() {
     const end = new Date(endDate)
     const diffTime = Math.abs(end.getTime() - start.getTime())
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+  }
+
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowStartDatePicker(false)
+    }
+    if (selectedDate) {
+      const dateString = selectedDate.toISOString().split('T')[0]
+      setNewRequest({ ...newRequest, start_date: dateString })
+    }
+  }
+
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowEndDatePicker(false)
+    }
+    if (selectedDate) {
+      const dateString = selectedDate.toISOString().split('T')[0]
+      setNewRequest({ ...newRequest, end_date: dateString })
+    }
+  }
+
+  const getDateFromString = (dateString: string) => {
+    return dateString ? new Date(dateString) : new Date()
   }
 
   if (loading) {
@@ -254,13 +284,21 @@ export default function LeaveScreen() {
         visible={showNewRequestModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowNewRequestModal(false)}
+        onRequestClose={() => {
+          setShowNewRequestModal(false)
+          setShowStartDatePicker(false)
+          setShowEndDatePicker(false)
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Leave Request</Text>
-              <TouchableOpacity onPress={() => setShowNewRequestModal(false)}>
+              <TouchableOpacity onPress={() => {
+                setShowNewRequestModal(false)
+                setShowStartDatePicker(false)
+                setShowEndDatePicker(false)
+              }}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
@@ -290,23 +328,53 @@ export default function LeaveScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Start Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={newRequest.start_date}
-                  onChangeText={(text) => setNewRequest({ ...newRequest, start_date: text })}
-                  placeholder="2024-01-15"
-                />
+                <Text style={styles.inputLabel}>Start Date</Text>
+                <TouchableOpacity
+                  style={styles.datePickerButton}
+                  onPress={() => setShowStartDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#6b7280" />
+                  <Text style={[
+                    styles.datePickerText,
+                    !newRequest.start_date && styles.datePickerPlaceholder
+                  ]}>
+                    {newRequest.start_date ? formatDate(newRequest.start_date) : 'Select start date'}
+                  </Text>
+                </TouchableOpacity>
+                {showStartDatePicker && (
+                  <DateTimePicker
+                    value={getDateFromString(newRequest.start_date)}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onStartDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>End Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={newRequest.end_date}
-                  onChangeText={(text) => setNewRequest({ ...newRequest, end_date: text })}
-                  placeholder="2024-01-20"
-                />
+                <Text style={styles.inputLabel}>End Date</Text>
+                <TouchableOpacity
+                  style={styles.datePickerButton}
+                  onPress={() => setShowEndDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#6b7280" />
+                  <Text style={[
+                    styles.datePickerText,
+                    !newRequest.end_date && styles.datePickerPlaceholder
+                  ]}>
+                    {newRequest.end_date ? formatDate(newRequest.end_date) : 'Select end date'}
+                  </Text>
+                </TouchableOpacity>
+                {showEndDatePicker && (
+                  <DateTimePicker
+                    value={getDateFromString(newRequest.end_date)}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onEndDateChange}
+                    minimumDate={newRequest.start_date ? new Date(newRequest.start_date) : new Date()}
+                  />
+                )}
               </View>
 
               <View style={styles.inputGroup}>
@@ -325,7 +393,11 @@ export default function LeaveScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setShowNewRequestModal(false)}
+                onPress={() => {
+                  setShowNewRequestModal(false)
+                  setShowStartDatePicker(false)
+                  setShowEndDatePicker(false)
+                }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -608,5 +680,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
     fontWeight: '600',
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+    gap: 8,
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: '#374151',
+  },
+  datePickerPlaceholder: {
+    color: '#9ca3af',
   },
 })

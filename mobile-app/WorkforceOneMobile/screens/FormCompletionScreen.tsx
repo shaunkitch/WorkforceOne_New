@@ -15,7 +15,9 @@ import {
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { Picker } from '@react-native-picker/picker'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { offlineStorage } from '../services/OfflineStorage'
 import { syncService } from '../services/SyncService'
 
@@ -60,6 +62,7 @@ interface RouteParams {
 export default function FormCompletionScreen({ route, navigation }: any) {
   const { formId, outletId, visitId, routeStopId }: RouteParams = route.params
   const { user, profile } = useAuth()
+  const insets = useSafeAreaInsets()
   
   const [form, setForm] = useState<Form | null>(null)
   const [outlet, setOutlet] = useState<Outlet | null>(null)
@@ -77,24 +80,101 @@ export default function FormCompletionScreen({ route, navigation }: any) {
     try {
       setLoading(true)
       
-      // Load form from offline storage
-      const formData = await offlineStorage.getForm(formId)
-      if (!formData) {
-        Alert.alert('Error', 'Form not found. Please ensure you have downloaded the latest data.')
-        navigation.goBack()
-        return
+      // Check if this is the default store visit form
+      if (formId === 'default-store-visit') {
+        // Use the hardcoded default form
+        const defaultForm = {
+          id: 'default-store-visit',
+          title: 'Store Visit Form',
+          description: 'Complete this form for your outlet visit',
+          fields: [
+            {
+              id: 'visit_type',
+              type: 'select',
+              label: 'Visit Type',
+              required: true,
+              options: ['Regular Visit', 'Inspection', 'Delivery', 'Collection', 'Customer Service', 'Other']
+            },
+            {
+              id: 'store_condition',
+              type: 'rating',
+              label: 'Store Condition (1-5)',
+              required: true,
+              min: 1,
+              max: 5
+            },
+            {
+              id: 'products_checked',
+              type: 'checkbox',
+              label: 'Products/Inventory Checked',
+              required: false
+            },
+            {
+              id: 'issues_found',
+              type: 'textarea',
+              label: 'Issues Found',
+              placeholder: 'Describe any issues or concerns',
+              required: false
+            },
+            {
+              id: 'visit_notes',
+              type: 'textarea',
+              label: 'Visit Notes',
+              placeholder: 'Enter any notes about your visit',
+              required: false
+            }
+          ]
+        }
+        setForm(defaultForm)
+      } else {
+        // Try to load form from offline storage first
+        let formData = await offlineStorage.getForm(formId)
+        
+        // If not in offline storage, fetch from Supabase
+        if (!formData) {
+          const { data, error } = await supabase
+            .from('forms')
+            .select('*')
+            .eq('id', formId)
+            .single()
+          
+          if (error || !data) {
+            Alert.alert('Error', 'Form not found.')
+            navigation.goBack()
+            return
+          }
+          
+          formData = data
+          // Store it for offline use
+          await offlineStorage.storeForms([formData])
+        }
+        setForm(formData)
       }
-      setForm(formData)
 
-      // Load outlet from offline storage
-      const outlets = await offlineStorage.getOutlets()
-      const outletData = outlets.find(o => o.id === outletId)
-      if (!outletData) {
-        Alert.alert('Error', 'Outlet not found. Please ensure you have downloaded the latest data.')
-        navigation.goBack()
-        return
+      // Load outlet from offline storage if outletId provided
+      if (outletId) {
+        const outlets = await offlineStorage.getOutlets()
+        const outletData = outlets.find(o => o.id === outletId)
+        if (outletData) {
+          setOutlet(outletData)
+        } else {
+          // Create a placeholder outlet
+          setOutlet({
+            id: outletId,
+            name: 'General Form',
+            address: '',
+            group_name: ''
+          })
+        }
+      } else {
+        // No outlet - this is a general form
+        setOutlet({
+          id: 'general',
+          name: 'General Form',
+          address: '',
+          group_name: ''
+        })
       }
-      setOutlet(outletData)
 
       // Load existing form response if visit ID provided
       if (visitId) {
@@ -155,10 +235,10 @@ export default function FormCompletionScreen({ route, navigation }: any) {
           if (isNaN(numValue)) {
             return 'Please enter a valid number'
           }
-          if (field.min !== undefined && numValue < field.min) {
+          if (field.min !== undefined && field.min !== null && numValue < field.min) {
             return `Value must be at least ${field.min}`
           }
-          if (field.max !== undefined && numValue > field.max) {
+          if (field.max !== undefined && field.max !== null && numValue > field.max) {
             return `Value must be at most ${field.max}`
           }
           break
@@ -530,7 +610,11 @@ export default function FormCompletionScreen({ route, navigation }: any) {
       </View>
 
       {/* Form Content */}
-      <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.formContainer} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {form.description && (
           <Text style={styles.formDescription}>{form.description}</Text>
         )}
@@ -547,7 +631,7 @@ export default function FormCompletionScreen({ route, navigation }: any) {
       </ScrollView>
 
       {/* Action Buttons */}
-      <View style={styles.actionsContainer}>
+      <View style={[styles.actionsContainer, { paddingBottom: 16 + insets.bottom }]}>
         <TouchableOpacity
           style={[styles.actionButton, styles.draftButton]}
           onPress={saveDraft}
@@ -663,6 +747,9 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   formDescription: {
     fontSize: 16,

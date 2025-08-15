@@ -139,6 +139,13 @@ const navigationGroups = [
         feature: 'forms',
         description: 'Dynamic form builder and responses'
       },
+      { 
+        name: 'Submissions', 
+        href: '/dashboard/forms/submissions', 
+        icon: FileText, 
+        feature: 'forms',
+        description: 'View and manage form submissions'
+      },
     ]
   },
   {

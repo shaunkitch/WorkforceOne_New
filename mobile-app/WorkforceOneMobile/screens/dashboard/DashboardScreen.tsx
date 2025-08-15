@@ -28,7 +28,7 @@ interface QuickAction {
 }
 
 export default function DashboardScreen({ navigation }: any) {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile } = useAuth()
   const [stats, setStats] = useState<MemberStats>({
     myTasksCount: 0,
     todayAttendance: false,
@@ -41,7 +41,7 @@ export default function DashboardScreen({ navigation }: any) {
   const quickActions: QuickAction[] = [
     { title: 'Clock In/Out', icon: 'time-outline', color: '#10b981', screen: 'Attendance' },
     { title: 'My Tasks', icon: 'checkmark-circle-outline', color: '#f59e0b', screen: 'Tasks' },
-    { title: 'Time Track', icon: 'stopwatch-outline', color: '#3b82f6', screen: 'TimeTracking' },
+    { title: 'Daily Calls', icon: 'map-outline', color: '#3b82f6', screen: 'DailyCalls' },
     { title: 'Request Leave', icon: 'calendar-outline', color: '#8b5cf6', screen: 'Leave' },
   ]
 
@@ -114,13 +114,6 @@ export default function DashboardScreen({ navigation }: any) {
     fetchDashboardData()
   }
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
 
   if (loading) {
     return (
@@ -141,9 +134,6 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.greeting}>Hello, {profile?.full_name?.split(' ')[0] || 'User'}!</Text>
           <Text style={styles.subGreeting}>Welcome back to WorkforceOne</Text>
         </View>
-        <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-          <Ionicons name="log-out-outline" size={24} color="white" />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -274,9 +264,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   greeting: {
     color: 'white',
@@ -287,9 +274,6 @@ const styles = StyleSheet.create({
     color: '#93c5fd',
     fontSize: 16,
     marginTop: 4,
-  },
-  signOutButton: {
-    padding: 8,
   },
   content: {
     flex: 1,

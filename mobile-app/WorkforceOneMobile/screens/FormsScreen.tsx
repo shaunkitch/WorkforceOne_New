@@ -54,9 +54,15 @@ export default function FormsScreen({ navigation }: any) {
         .select('*')
         .eq('user_id', user.id)
         .eq('organization_id', profile.organization_id)
-        .order('assigned_at', { ascending: false })
+        .order('created_at', { ascending: false })
 
-      if (assignmentsError) throw assignmentsError
+      if (assignmentsError) {
+        console.error('Error fetching form assignments:', assignmentsError)
+        // If table doesn't exist or has issues, just show empty state
+        setAssignments([])
+        setLoading(false)
+        return
+      }
 
       if (!assignments || assignments.length === 0) {
         setAssignments([])

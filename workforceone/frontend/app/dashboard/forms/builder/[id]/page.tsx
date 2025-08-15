@@ -114,11 +114,109 @@ export default function FormBuilderPage() {
         .eq('is_active', true)
         .order('name')
 
-      if (error) throw error
-      setFieldTypes(data || [])
+      if (error) {
+        console.log('Form field types table not found, using default types:', error)
+        setFieldTypes(getDefaultFieldTypes())
+        return
+      }
+      
+      // If no field types exist in database, use defaults
+      if (!data || data.length === 0) {
+        console.log('No field types found in database, using defaults')
+        setFieldTypes(getDefaultFieldTypes())
+        return
+      }
+      
+      setFieldTypes(data)
     } catch (error) {
-      console.error('Error fetching field types:', error)
+      console.error('Error fetching field types, using defaults:', error)
+      setFieldTypes(getDefaultFieldTypes())
     }
+  }
+
+  const getDefaultFieldTypes = (): FieldType[] => {
+    return [
+      {
+        id: 'text',
+        name: 'Text Input',
+        description: 'Single line text input',
+        default_settings: {}
+      },
+      {
+        id: 'textarea',
+        name: 'Text Area',
+        description: 'Multi-line text input',
+        default_settings: { rows: 4 }
+      },
+      {
+        id: 'email',
+        name: 'Email',
+        description: 'Email input with validation',
+        default_settings: {}
+      },
+      {
+        id: 'number',
+        name: 'Number',
+        description: 'Numeric input field',
+        default_settings: {}
+      },
+      {
+        id: 'select',
+        name: 'Dropdown',
+        description: 'Single selection dropdown',
+        default_settings: { options: ['Option 1', 'Option 2', 'Option 3'] }
+      },
+      {
+        id: 'radio',
+        name: 'Radio Buttons',
+        description: 'Single choice from multiple options',
+        default_settings: { options: ['Option 1', 'Option 2', 'Option 3'] }
+      },
+      {
+        id: 'checkbox',
+        name: 'Checkboxes',
+        description: 'Multiple choice selection',
+        default_settings: { options: ['Option 1', 'Option 2', 'Option 3'] }
+      },
+      {
+        id: 'date',
+        name: 'Date Picker',
+        description: 'Date selection field',
+        default_settings: {}
+      },
+      {
+        id: 'file',
+        name: 'File Upload',
+        description: 'File upload field',
+        default_settings: {}
+      },
+      {
+        id: 'rating',
+        name: 'Star Rating',
+        description: 'Star rating field',
+        default_settings: { max: 5 }
+      },
+      {
+        id: 'likert',
+        name: 'Likert Scale',
+        description: 'Survey-style rating scale',
+        default_settings: { 
+          scale: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'] 
+        }
+      },
+      {
+        id: 'section',
+        name: 'Section Header',
+        description: 'Visual section divider',
+        default_settings: {}
+      },
+      {
+        id: 'html',
+        name: 'HTML Content',
+        description: 'Custom HTML content block',
+        default_settings: {}
+      }
+    ]
   }
 
   const saveForm = async () => {
@@ -320,6 +418,21 @@ export default function FormBuilderPage() {
             ))}
           </div>
         )
+      case 'likert':
+        const scale = field.settings?.scale || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
+        return (
+          <div className="grid grid-cols-5 gap-1">
+            {scale.map((option, index) => (
+              <button
+                key={index}
+                disabled
+                className="p-2 text-xs border rounded text-center bg-gray-100 text-gray-500"
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )
       case 'section':
         return (
           <div className="border-b pb-2 mb-4">
@@ -329,8 +442,15 @@ export default function FormBuilderPage() {
             )}
           </div>
         )
+      case 'html':
+        return (
+          <div className="border border-dashed border-gray-300 rounded p-4 bg-gray-50">
+            <p className="text-sm text-gray-500">HTML Content Block</p>
+            <p className="text-xs text-gray-400 mt-1">Custom content will render here</p>
+          </div>
+        )
       default:
-        return <div className="text-gray-400">Unsupported field type</div>
+        return <div className="text-gray-400">Unsupported field type: {field.type}</div>
     }
   }
 
@@ -472,6 +592,123 @@ export default function FormBuilderPage() {
               })}
             />
           </div>
+        )}
+
+        {selectedField.type === 'likert' && (
+          <div>
+            <Label>Scale Options</Label>
+            <div className="space-y-2">
+              {(selectedField.settings?.scale || []).map((option: string, index: number) => (
+                <div key={index} className="flex space-x-2">
+                  <Input
+                    value={option}
+                    onChange={(e) => {
+                      const newScale = [...(selectedField.settings?.scale || [])]
+                      newScale[index] = e.target.value
+                      updateField(selectedField.id, { 
+                        settings: { ...selectedField.settings, scale: newScale }
+                      })
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const newScale = (selectedField.settings?.scale || []).filter((_: any, i: number) => i !== index)
+                      updateField(selectedField.id, { 
+                        settings: { ...selectedField.settings, scale: newScale }
+                      })
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const newScale = [...(selectedField.settings?.scale || []), 'New Option']
+                  updateField(selectedField.id, { 
+                    settings: { ...selectedField.settings, scale: newScale }
+                  })
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Scale Option
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {selectedField.type === 'html' && (
+          <div>
+            <Label htmlFor="htmlContent">HTML Content</Label>
+            <Textarea
+              id="htmlContent"
+              value={selectedField.settings?.content || ''}
+              onChange={(e) => updateField(selectedField.id, { 
+                settings: { ...selectedField.settings, content: e.target.value }
+              })}
+              placeholder="Enter HTML content..."
+              rows={6}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              You can use HTML tags for formatting. Be careful with user-generated content.
+            </p>
+          </div>
+        )}
+
+        {selectedField.type === 'file' && (
+          <>
+            <div>
+              <Label htmlFor="fileAccept">Accepted File Types</Label>
+              <Input
+                id="fileAccept"
+                value={selectedField.settings?.accept || ''}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, accept: e.target.value }
+                })}
+                placeholder="e.g., .pdf,.doc,.docx,image/*"
+              />
+            </div>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={selectedField.settings?.multiple || false}
+                onCheckedChange={(checked) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, multiple: checked }
+                })}
+              />
+              <Label className="text-sm">Allow multiple files</Label>
+            </div>
+          </>
+        )}
+
+        {selectedField.type === 'date' && (
+          <>
+            <div>
+              <Label htmlFor="dateMin">Minimum Date</Label>
+              <Input
+                id="dateMin"
+                type="date"
+                value={selectedField.settings?.minDate || ''}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, minDate: e.target.value }
+                })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="dateMax">Maximum Date</Label>
+              <Input
+                id="dateMax"
+                type="date"
+                value={selectedField.settings?.maxDate || ''}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, maxDate: e.target.value }
+                })}
+              />
+            </div>
+          </>
         )}
 
         {selectedField.type === 'section' && (

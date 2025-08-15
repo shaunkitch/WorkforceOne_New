@@ -93,15 +93,19 @@ export default function AttendanceScreen() {
 
     setActionLoading(true)
     try {
-      const now = new Date().toISOString()
+      const now = new Date()
+      const today = now.toISOString().split('T')[0]
+      const nowISO = now.toISOString()
       
       const { data, error } = await supabase
         .from('attendance')
         .insert({
           user_id: user.id,
           organization_id: profile.organization_id,
-          check_in_time: now,
+          date: today,
+          check_in_time: nowISO,
           location: 'Mobile App',
+          status: 'present'
         })
         .select()
         .single()

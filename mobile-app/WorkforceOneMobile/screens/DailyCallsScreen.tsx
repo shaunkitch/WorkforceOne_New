@@ -9,6 +9,7 @@ import {
   Alert,
   Linking,
   Platform,
+  Switch,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
@@ -69,6 +70,7 @@ export default function DailyCallsScreen({ navigation }: any) {
   const [routes, setRoutes] = useState<DailyRoute[]>([])
   const [selectedRoute, setSelectedRoute] = useState<DailyRoute | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [showCompleted, setShowCompleted] = useState(true)
 
   useEffect(() => {
     fetchTodayRoutes()
@@ -128,7 +130,7 @@ export default function DailyCallsScreen({ navigation }: any) {
             }
           }
 
-          // Get outlet details for each stop
+          // Get outlet details and visit status for each stop
           const stopsWithOutlets = await Promise.all(
             (stops || []).map(async (stop) => {
               const { data: outlet, error: outletError } = await supabase
@@ -145,13 +147,33 @@ export default function DailyCallsScreen({ navigation }: any) {
                     id: stop.outlet_id,
                     name: 'Unknown Outlet',
                     address: '',
-                  }
+                  },
+                  visit_completed: false
                 }
+              }
+
+              // Check if outlet visit exists and form is completed
+              const { data: visitData, error: visitError } = await supabase
+                .from('outlet_visits')
+                .select('form_completed, check_out_time')
+                .eq('route_stop_id', stop.id)
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+              // Determine if the visit is fully completed
+              const visitCompleted = visitData?.form_completed === true || visitData?.check_out_time != null
+
+              // Update stop status if visit is completed
+              if (visitCompleted && stop.status !== 'completed') {
+                stop.status = 'completed'
               }
 
               return {
                 ...stop,
-                outlet
+                outlet,
+                visit_completed: visitCompleted
               }
             })
           )
@@ -361,81 +383,84 @@ export default function DailyCallsScreen({ navigation }: any) {
 
       if (updateError) throw updateError
 
-      // Check if outlet requires a form using the enhanced system
-      const { data: outletFormData, error: outletFormError } = await supabase
-        .from('outlet_form_requirements')
+      // Try to find a store visit form or any available form
+      const { data: availableForms, error: formsError } = await supabase
+        .from('forms')
         .select('*')
-        .eq('outlet_id', stop.outlet.id)
-        .single()
+        .eq('organization_id', profile!.organization_id)
+        .in('status', ['active', 'draft'])
+        .order('created_at', { ascending: false })
 
-      if (outletFormError) {
-        console.error('Error fetching outlet form requirements:', outletFormError)
+      let formToUse = null
+      
+      if (availableForms && availableForms.length > 0) {
+        // Use the first available form (preferably one with "store" or "visit" in the title)
+        formToUse = availableForms.find(f => 
+          f.title?.toLowerCase().includes('store') || 
+          f.title?.toLowerCase().includes('visit') ||
+          f.title?.toLowerCase().includes('outlet')
+        ) || availableForms[0]
       }
 
-      const hasRequiredForm = outletFormData?.form_required === true && outletFormData?.effective_form_id != null
-
-      if (hasRequiredForm && outletFormData) {
-        // Get the full form details for the effective form
-        const { data: formDetails, error: formError } = await supabase
-          .from('forms')
-          .select('*')
-          .eq('id', outletFormData.effective_form_id)
-          .single()
-
-        if (formError) {
-          console.error('Error fetching form details:', formError)
-        }
-
-        const formToUse = formDetails || {
-          id: outletFormData.effective_form_id,
-          title: outletFormData.effective_form_title || 'Required Form',
-          description: 'Please complete this form for the outlet visit',
-          fields: []
-        }
-
-        Alert.alert(
-          'Checked In Successfully!',
-          `You've checked in to ${stop.outlet.name}. Please complete the required form: "${formToUse.title}"${outletFormData.group_form_id ? ' (Group Required)' : ''}`,
-          [
+      if (!formToUse) {
+        // Create a default form structure
+        formToUse = {
+          id: 'default-store-visit',
+          title: 'Store Visit Form',
+          description: 'Complete this form for your outlet visit',
+          fields: [
             {
-              text: 'Complete Form Later',
-              style: 'cancel'
+              id: 'visit_notes',
+              type: 'textarea',
+              label: 'Visit Notes',
+              placeholder: 'Enter any notes about your visit',
+              required: false
             },
             {
-              text: 'Complete Form Now',
-              onPress: () => openOutletForm(formToUse, visitData.id, stop, navigation)
+              id: 'products_checked',
+              type: 'checkbox',
+              label: 'Products Checked',
+              required: false
             },
-            // Add development option if configured
-            ...(CONFIG.SHOW_DEV_OPTIONS ? [{
-              text: 'Dev: Simulate',
-              onPress: () => simulateFormCompletion(formToUse.id, visitData.id, stop.id),
-              style: 'destructive' as const
-            }] : [])
-          ]
-        )
-      } else {
-        // Determine the reason no form is required
-        let message = `You've checked in to ${stop.outlet.name}.`
-        
-        if (outletFormData?.form_required === false) {
-          message += ' Form requirement disabled for this outlet.'
-        } else if (outletFormData?.form_required === true) {
-          message += ' No form assigned to this outlet or group.'
-        } else {
-          message += ' No form required for this outlet.'
-        }
-
-        Alert.alert(
-          'Checked In Successfully!',
-          message,
-          [
             {
-              text: 'Mark as Completed',
-              onPress: () => markStopCompleted(stop.id)
+              id: 'issues_found',
+              type: 'text',
+              label: 'Issues Found',
+              placeholder: 'Any issues to report?',
+              required: false
             }
           ]
-        )
+        }
       }
+
+      Alert.alert(
+        'Checked In Successfully!',
+        `You've checked in to ${stop.outlet.name}. Please complete the store visit form.`,
+        [
+          {
+            text: 'Complete Form Later',
+            style: 'cancel',
+            onPress: () => {
+              // Still allow marking as completed without form
+              Alert.alert(
+                'Skip Form?',
+                'Would you like to mark this visit as completed without a form?',
+                [
+                  { text: 'No', style: 'cancel' },
+                  { 
+                    text: 'Yes, Mark Complete', 
+                    onPress: () => markStopCompleted(stop.id)
+                  }
+                ]
+              )
+            }
+          },
+          {
+            text: 'Complete Store Visit Form',
+            onPress: () => openOutletForm(formToUse, visitData.id, stop, navigation)
+          }
+        ]
+      )
 
       // Refresh data
       await fetchTodayRoutes()
@@ -543,15 +568,32 @@ export default function DailyCallsScreen({ navigation }: any) {
 
   const markStopCompleted = async (stopId: string) => {
     try {
+      const now = new Date().toISOString()
+      
+      // Update route stop status
       const { error } = await supabase
         .from('route_stops')
         .update({
           status: 'completed',
-          actual_departure_time: new Date().toISOString()
+          actual_departure_time: now
         })
         .eq('id', stopId)
 
       if (error) throw error
+
+      // Also update any associated outlet visit
+      const { error: visitError } = await supabase
+        .from('outlet_visits')
+        .update({
+          form_completed: true,
+          check_out_time: now
+        })
+        .eq('route_stop_id', stopId)
+        .eq('user_id', user!.id)
+
+      if (visitError) {
+        console.error('Error updating outlet visit:', visitError)
+      }
 
       // Refresh data to show updated status
       await fetchTodayRoutes()
@@ -617,14 +659,34 @@ export default function DailyCallsScreen({ navigation }: any) {
                     </Text>
                     <Text style={styles.statLabel}>Progress</Text>
                   </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>
+                      {selectedRoute.stops.filter(stop => showCompleted || stop.status !== 'completed').length}
+                    </Text>
+                    <Text style={styles.statLabel}>Showing</Text>
+                  </View>
                 </View>
               </View>
             )}
 
             {/* Route Stops List */}
             <View style={styles.stopsContainer}>
-              <Text style={styles.sectionTitle}>Route Stops</Text>
-              {selectedRoute?.stops.map((stop, index) => (
+              <View style={styles.stopsHeader}>
+                <Text style={styles.sectionTitle}>Route Stops</Text>
+                <View style={styles.toggleContainer}>
+                  <Text style={styles.toggleLabel}>Show Completed</Text>
+                  <Switch
+                    value={showCompleted}
+                    onValueChange={setShowCompleted}
+                    trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
+                    thumbColor={showCompleted ? '#3b82f6' : '#6b7280'}
+                    style={styles.toggle}
+                  />
+                </View>
+              </View>
+              {selectedRoute?.stops
+                .filter(stop => showCompleted || stop.status !== 'completed')
+                .map((stop, index) => (
                 <TouchableOpacity
                   key={stop.id}
                   style={[
@@ -634,7 +696,10 @@ export default function DailyCallsScreen({ navigation }: any) {
                   onPress={() => handleStopPress(stop)}
                 >
                   <View style={styles.stopHeader}>
-                    <View style={styles.stopNumber}>
+                    <View style={[
+                      styles.stopNumber,
+                      stop.status === 'completed' && styles.completedStopNumber
+                    ]}>
                       <Text style={styles.stopNumberText}>{stop.stop_order}</Text>
                     </View>
                     <View style={styles.stopInfo}>
@@ -649,7 +714,7 @@ export default function DailyCallsScreen({ navigation }: any) {
                     <View style={styles.stopStatus}>
                       <Ionicons
                         name={getStatusIcon(stop.status) as any}
-                        size={20}
+                        size={24}
                         color={getStatusColor(stop.status)}
                       />
                     </View>
@@ -763,10 +828,12 @@ const styles = StyleSheet.create({
   },
   routeStats: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
   },
   statItem: {
     alignItems: 'center',
+    minWidth: '22%',
   },
   statNumber: {
     fontSize: 24,
@@ -781,11 +848,28 @@ const styles = StyleSheet.create({
   stopsContainer: {
     marginBottom: 20,
   },
+  stopsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 12,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginRight: 8,
+  },
+  toggle: {
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
   },
   stopCard: {
     backgroundColor: 'white',
@@ -816,6 +900,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  completedStopNumber: {
+    backgroundColor: '#10b981',
   },
   stopNumberText: {
     color: 'white',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -74,7 +74,7 @@ interface OutletVisit {
   form_response_id?: string
 }
 
-export default function CompleteFormPage() {
+function CompleteFormPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [form, setForm] = useState<Form | null>(null)
@@ -792,5 +792,20 @@ export default function CompleteFormPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function CompleteFormPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="text-gray-600">Loading form...</p>
+        </div>
+      </div>
+    }>
+      <CompleteFormPageContent />
+    </Suspense>
   )
 }

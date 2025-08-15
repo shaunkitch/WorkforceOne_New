@@ -199,6 +199,18 @@ class SyncService {
         })
 
       if (error) throw error
+
+      // If form is completed and route stop exists, mark it as completed
+      if (data.formCompleted && data.routeStopId) {
+        await supabase
+          .from('route_stops')
+          .update({
+            status: 'completed',
+            actual_departure_time: data.checkOutTime || new Date().toISOString()
+          })
+          .eq('id', data.routeStopId)
+      }
+
       return { success: true }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -212,7 +224,7 @@ class SyncService {
       const { error } = await supabase
         .from('leave_requests')
         .insert({
-          user_id: data.userId,
+          employee_id: data.employeeId || data.userId, // Support both for backward compatibility
           organization_id: data.organizationId,
           type: data.type,
           start_date: data.startDate,
