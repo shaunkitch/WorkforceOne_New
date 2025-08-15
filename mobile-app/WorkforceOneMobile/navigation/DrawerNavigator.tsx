@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -40,6 +41,7 @@ const drawerItems: DrawerItem[] = [
 
 function CustomDrawerContent(props: any) {
   const { profile, signOut } = useAuth()
+  const insets = useSafeAreaInsets()
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -90,8 +92,12 @@ function CustomDrawerContent(props: any) {
   )
 
   return (
-    <View style={styles.drawerContainer}>
-      <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
+    <View style={[styles.drawerContainer, { paddingTop: insets.top }]}>
+      <DrawerContentScrollView 
+        {...props} 
+        contentContainerStyle={[styles.drawerContent, { flexGrow: 1 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* User Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.profileIcon}>
@@ -121,10 +127,13 @@ function CustomDrawerContent(props: any) {
         <View style={styles.navigationSection}>
           {otherItems.map(renderDrawerItem)}
         </View>
+
+        {/* Spacer to push sign out button to bottom */}
+        <View style={{ flex: 1 }} />
       </DrawerContentScrollView>
 
-      {/* Sign Out Button */}
-      <View style={styles.bottomSection}>
+      {/* Sign Out Button - Fixed at bottom with safe area */}
+      <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={20} color="#ef4444" />
           <Text style={styles.signOutText}>Sign Out</Text>
@@ -153,6 +162,7 @@ export default function DrawerNavigator() {
         },
         drawerActiveTintColor: '#3b82f6',
         drawerInactiveTintColor: '#6b7280',
+        drawerType: 'slide',
       }}
     >
       {drawerItems.map((item) => (
@@ -179,6 +189,7 @@ const styles = StyleSheet.create({
   },
   drawerContent: {
     paddingTop: 0,
+    minHeight: '100%',
   },
   profileSection: {
     backgroundColor: '#3b82f6',
@@ -236,7 +247,9 @@ const styles = StyleSheet.create({
   bottomSection: {
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    padding: 16,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
   },
   signOutButton: {
     flexDirection: 'row',

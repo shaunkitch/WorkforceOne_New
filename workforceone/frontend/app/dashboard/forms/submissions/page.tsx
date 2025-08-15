@@ -32,8 +32,7 @@ import { format, parseISO } from 'date-fns'
 interface FormResponse {
   id: string
   form_id: string
-  user_id: string
-  outlet_id?: string
+  respondent_id: string
   responses: any
   status: 'draft' | 'completed' | 'pending'
   submitted_at: string
@@ -48,11 +47,6 @@ interface FormResponse {
     id: string
     full_name: string
     email: string
-  }
-  outlet?: {
-    id: string
-    name: string
-    address: string
   }
 }
 
@@ -177,8 +171,7 @@ export default function SubmissionsPage() {
         .select(`
           *,
           form:forms(id, title, description),
-          user:profiles!form_responses_user_id_fkey(id, full_name, email),
-          outlet:outlets(id, name, address)
+          user:profiles!respondent_id(id, full_name, email)
         `)
         .eq('organization_id', profile.organization_id)
         .order('submitted_at', { ascending: false, nullsFirst: false })
@@ -193,7 +186,7 @@ export default function SubmissionsPage() {
       }
 
       if (filters.user_id !== 'all') {
-        query = query.eq('user_id', filters.user_id)
+        query = query.eq('respondent_id', filters.user_id)
       }
 
       // Date range filter
@@ -220,12 +213,15 @@ export default function SubmissionsPage() {
 
       // For regular users, only show their own submissions
       if (profile.role === 'member') {
-        query = query.eq('user_id', user.user.id)
+        query = query.eq('respondent_id', user.user.id)
       }
 
       const { data, error } = await query.limit(1000)
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase query error:', error)
+        throw error
+      }
 
       let processedData = data || []
 
@@ -235,8 +231,7 @@ export default function SubmissionsPage() {
         processedData = processedData.filter(submission => 
           submission.form?.title.toLowerCase().includes(searchTerm) ||
           submission.user?.full_name.toLowerCase().includes(searchTerm) ||
-          submission.user?.email.toLowerCase().includes(searchTerm) ||
-          submission.outlet?.name.toLowerCase().includes(searchTerm)
+          submission.user?.email.toLowerCase().includes(searchTerm)
         )
       }
 
@@ -276,13 +271,12 @@ export default function SubmissionsPage() {
   }
 
   const exportToCSV = () => {
-    const headers = ['Form Title', 'Submitted By', 'Outlet', 'Status', 'Submitted At', 'Response Data']
+    const headers = ['Form Title', 'Submitted By', 'Status', 'Submitted At', 'Response Data']
     const csvContent = [
       headers.join(','),
       ...submissions.map(submission => [
         `"${submission.form?.title || 'Unknown Form'}"`,
         `"${submission.user?.full_name || 'Unknown User'}"`,
-        `"${submission.outlet?.name || 'N/A'}"`,
         submission.status,
         submission.submitted_at ? format(parseISO(submission.submitted_at), 'yyyy-MM-dd HH:mm:ss') : 'Not submitted',
         `"${JSON.stringify(submission.responses).replace(/"/g, '""')}"`
@@ -452,7 +446,6 @@ export default function SubmissionsPage() {
                   <tr className="border-b bg-gray-50">
                     <th className="text-left p-3 font-medium">Form</th>
                     <th className="text-left p-3 font-medium">Submitted By</th>
-                    <th className="text-left p-3 font-medium">Outlet</th>
                     <th className="text-left p-3 font-medium">Status</th>
                     <th className="text-left p-3 font-medium">Submitted</th>
                     <th className="text-left p-3 font-medium">Actions</th>
@@ -479,16 +472,6 @@ export default function SubmissionsPage() {
                             <div className="text-sm text-gray-500">{submission.user?.email}</div>
                           </div>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        {submission.outlet ? (
-                          <div>
-                            <div className="font-medium">{submission.outlet.name}</div>
-                            <div className="text-sm text-gray-500 truncate max-w-xs">{submission.outlet.address}</div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">N/A</span>
-                        )}
                       </td>
                       <td className="p-3">
                         <div className="flex items-center">

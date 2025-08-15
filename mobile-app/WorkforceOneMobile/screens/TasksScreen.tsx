@@ -9,8 +9,10 @@ import {
   Modal,
   TextInput,
   Alert,
+  Switch,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Picker } from '@react-native-picker/picker'
 import { useAuth } from '../contexts/AuthContext'
@@ -23,6 +25,8 @@ export default function TasksScreen() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [filter, setFilter] = useState<'all' | 'todo' | 'in_progress' | 'completed'>('all')
+  const [showOutstandingOnly, setShowOutstandingOnly] = useState(false)
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'urgent'>('all')
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -33,7 +37,7 @@ export default function TasksScreen() {
 
   useEffect(() => {
     fetchTasks()
-  }, [filter])
+  }, [filter, showOutstandingOnly, priorityFilter])
 
   const fetchTasks = async () => {
     if (!user || !profile?.organization_id) return
@@ -172,20 +176,34 @@ export default function TasksScreen() {
     }
   }
 
-  const filteredTasks = filter === 'all' ? tasks : tasks.filter(task => task.status === filter)
+  const filteredTasks = tasks.filter(task => {
+    // Status filter
+    let statusMatch = filter === 'all' || task.status === filter
+    
+    // Outstanding tasks filter (non-completed tasks)
+    if (showOutstandingOnly) {
+      statusMatch = statusMatch && task.status !== 'completed'
+    }
+    
+    // Priority filter
+    const priorityMatch = priorityFilter === 'all' || task.priority === priorityFilter
+    
+    return statusMatch && priorityMatch
+  })
+  
   const taskCounts = getTaskCounts()
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3b82f6" />
         <Text style={styles.loadingText}>Loading tasks...</Text>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
       {/* Header */}
@@ -228,6 +246,41 @@ export default function TasksScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      </View>
+
+      {/* Additional Filters */}
+      <View style={styles.additionalFilters}>
+        <View style={styles.filterRow}>
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Outstanding Only</Text>
+            <Switch
+              value={showOutstandingOnly}
+              onValueChange={setShowOutstandingOnly}
+              trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
+              thumbColor={showOutstandingOnly ? '#3b82f6' : '#6b7280'}
+            />
+          </View>
+          
+          <View style={styles.priorityFilterContainer}>
+            <Text style={styles.filterLabel}>Priority:</Text>
+            <TouchableOpacity style={styles.priorityButton}>
+              <View style={styles.priorityPicker}>
+                <Picker
+                  selectedValue={priorityFilter}
+                  onValueChange={(value) => setPriorityFilter(value)}
+                  style={styles.picker}
+                  itemStyle={styles.pickerItem}
+                >
+                  <Picker.Item label="All" value="all" />
+                  <Picker.Item label="Low" value="low" />
+                  <Picker.Item label="Medium" value="medium" />
+                  <Picker.Item label="High" value="high" />
+                  <Picker.Item label="Urgent" value="urgent" />
+                </Picker>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Tasks List */}
@@ -372,10 +425,23 @@ export default function TasksScreen() {
                 </Picker>
               </View>
             </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Due Date (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newTask.due_date}
+                onChangeText={(text) => setNewTask({...newTask, due_date: text})}
+                placeholder="YYYY-MM-DD (e.g., 2024-12-31)"
+              />
+              <Text style={styles.inputHint}>
+                Enter date in YYYY-MM-DD format or leave blank
+              </Text>
+            </View>
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -397,7 +463,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',
@@ -604,5 +670,74 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: 8,
+  },
+  additionalFilters: {
+    backgroundColor: 'white',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginRight: 12,
+    fontWeight: '500',
+  },
+  priorityFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginRight: 8,
+    fontWeight: '500',
+  },
+  priorityButton: {
+    flex: 1,
+    maxWidth: 160,
+  },
+  priorityPicker: {
+    borderWidth: 2,
+    borderColor: '#9ca3af',
+    borderRadius: 8,
+    backgroundColor: 'white',
+    height: 50,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pickerItem: {
+    fontSize: 18,
+    height: 50,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 })

@@ -16,7 +16,7 @@ import {
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
   User, UserCheck, Zap, Route, ChevronRight,
-  BarChart3, Cog, UserPlus, FolderOpen
+  BarChart3, Cog, UserPlus, FolderOpen, Phone
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
 
@@ -120,6 +120,13 @@ const navigationGroups = [
         icon: Building, 
         feature: 'outlets',
         description: 'Manage office locations'
+      },
+      { 
+        name: 'Outlet Visits', 
+        href: '/dashboard/outlet-visits', 
+        icon: Phone, 
+        feature: 'outlets',
+        description: 'Track and manage outlet visits'
       },
     ]
   },

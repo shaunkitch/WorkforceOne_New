@@ -9,6 +9,7 @@ import {
   Dimensions,
   TouchableOpacity,
 } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -36,6 +37,7 @@ interface TimeRange {
 
 export default function SummaryScreen() {
   const { user, profile } = useAuth()
+  const insets = useSafeAreaInsets()
   const [stats, setStats] = useState<SummaryStats>({
     totalVisits: 0,
     totalHours: 0,
@@ -275,17 +277,18 @@ export default function SummaryScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3b82f6" />
         <Text style={styles.loadingText}>Loading summary...</Text>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.content}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 20) }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
@@ -417,7 +420,7 @@ export default function SummaryScreen() {
         {/* Bottom spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -594,6 +597,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   bottomSpacing: {
-    height: 20,
+    height: 10,
   },
 })

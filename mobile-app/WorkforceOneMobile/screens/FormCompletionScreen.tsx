@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { Picker } from '@react-native-picker/picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { offlineStorage } from '../services/OfflineStorage'
@@ -23,11 +24,13 @@ import { syncService } from '../services/SyncService'
 
 interface FormField {
   id: string
-  type: 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'select' | 'radio' | 'checkbox' | 'date' | 'time' | 'rating'
+  type: 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'select' | 'radio' | 'checkbox' | 'multiselect' | 'multi-select' | 'checkboxes' | 'date' | 'time' | 'rating' | 'file' | 'likert' | 'section' | 'html'
   label: string
   placeholder?: string
   required: boolean
   options?: string[]
+  scale?: string[]
+  content?: string
   min?: number
   max?: number
   validation?: {
@@ -71,6 +74,8 @@ export default function FormCompletionScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState<string | null>(null)
+  const [showTimePicker, setShowTimePicker] = useState<string | null>(null)
 
   useEffect(() => {
     loadFormData()
@@ -127,27 +132,29 @@ export default function FormCompletionScreen({ route, navigation }: any) {
         }
         setForm(defaultForm)
       } else {
-        // Try to load form from offline storage first
-        let formData = await offlineStorage.getForm(formId)
+        // Always fetch fresh form data from Supabase first
+        const { data, error } = await supabase
+          .from('forms')
+          .select('*')
+          .eq('id', formId)
+          .single()
         
-        // If not in offline storage, fetch from Supabase
-        if (!formData) {
-          const { data, error } = await supabase
-            .from('forms')
-            .select('*')
-            .eq('id', formId)
-            .single()
-          
-          if (error || !data) {
+        let formData
+        if (error || !data) {
+          // If Supabase fails, try offline storage as fallback
+          console.log('Supabase fetch failed, trying offline storage:', error)
+          formData = await offlineStorage.getForm(formId)
+          if (!formData) {
             Alert.alert('Error', 'Form not found.')
             navigation.goBack()
             return
           }
-          
+        } else {
           formData = data
-          // Store it for offline use
+          // Update offline storage with fresh data
           await offlineStorage.storeForms([formData])
         }
+        console.log('Form data loaded:', JSON.stringify(formData, null, 2))
         setForm(formData)
       }
 
@@ -211,8 +218,12 @@ export default function FormCompletionScreen({ route, navigation }: any) {
 
   const validateField = (field: FormField, value: any): string | null => {
     // Check required fields
-    if (field.required && (!value || (typeof value === 'string' && value.trim() === ''))) {
-      return `${field.label} is required`
+    if (field.required) {
+      if (!value || 
+          (typeof value === 'string' && value.trim() === '') ||
+          (Array.isArray(value) && value.length === 0)) {
+        return `${field.label} is required`
+      }
     }
 
     // Type-specific validation
@@ -240,6 +251,22 @@ export default function FormCompletionScreen({ route, navigation }: any) {
           }
           if (field.max !== undefined && field.max !== null && numValue > field.max) {
             return `Value must be at most ${field.max}`
+          }
+          break
+        case 'date':
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+          if (!dateRegex.test(value)) {
+            return 'Please enter date in YYYY-MM-DD format'
+          }
+          const dateObj = new Date(value)
+          if (isNaN(dateObj.getTime())) {
+            return 'Please enter a valid date'
+          }
+          break
+        case 'time':
+          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
+          if (!timeRegex.test(value)) {
+            return 'Please enter time in HH:MM format (e.g., 14:30)'
           }
           break
       }
@@ -513,19 +540,206 @@ export default function FormCompletionScreen({ route, navigation }: any) {
         )
 
       case 'checkbox':
-        return (
-          <View key={field.id} style={styles.fieldContainer}>
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => handleFieldChange(field.id, !value)}
-            >
-              <View style={[styles.checkbox, value && styles.checkboxSelected]}>
-                {value && <Ionicons name="checkmark" size={16} color="white" />}
-              </View>
-              <Text style={styles.checkboxLabel}>
+        // In frontend, 'checkbox' means multiple choice selection
+        if (field.options && field.options.length > 0) {
+          // Multiple choice checkboxes
+          return (
+            <View key={field.id} style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>
                 {field.label} {field.required && <Text style={styles.required}>*</Text>}
               </Text>
+              <View style={[styles.checkboxesContainer, hasError && styles.inputError]}>
+                {field.options.map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.checkboxOption}
+                    onPress={() => {
+                      const currentValues = Array.isArray(value) ? value : []
+                      const newValues = currentValues.includes(option)
+                        ? currentValues.filter(v => v !== option)
+                        : [...currentValues, option]
+                      handleFieldChange(field.id, newValues)
+                    }}
+                  >
+                    <View style={[
+                      styles.checkbox, 
+                      (Array.isArray(value) && value.includes(option)) && styles.checkboxSelected
+                    ]}>
+                      {(Array.isArray(value) && value.includes(option)) && (
+                        <Ionicons name="checkmark" size={16} color="white" />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxOptionText}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasError && (
+                <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+              )}
+            </View>
+          )
+        } else {
+          // Single checkbox (fallback for no options)
+          return (
+            <View key={field.id} style={styles.fieldContainer}>
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => handleFieldChange(field.id, !value)}
+              >
+                <View style={[styles.checkbox, value && styles.checkboxSelected]}>
+                  {value && <Ionicons name="checkmark" size={16} color="white" />}
+                </View>
+                <Text style={styles.checkboxLabel}>
+                  {field.label} {field.required && <Text style={styles.required}>*</Text>}
+                </Text>
+              </TouchableOpacity>
+              {hasError && (
+                <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+              )}
+            </View>
+          )
+        }
+
+      case 'multiselect':
+        // Multiselect field - multiple choice selection
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <View style={[styles.checkboxesContainer, hasError && styles.inputError]}>
+              {field.options?.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.checkboxOption}
+                  onPress={() => {
+                    const currentValues = Array.isArray(value) ? value : []
+                    const newValues = currentValues.includes(option)
+                      ? currentValues.filter(v => v !== option)
+                      : [...currentValues, option]
+                    handleFieldChange(field.id, newValues)
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox, 
+                    (Array.isArray(value) && value.includes(option)) && styles.checkboxSelected
+                  ]}>
+                    {(Array.isArray(value) && value.includes(option)) && (
+                      <Ionicons name="checkmark" size={16} color="white" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxOptionText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {hasError && (
+              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+            )}
+          </View>
+        )
+
+      case 'multi-select':
+      case 'checkboxes':
+        // Alternative names for multiselect - handle same as multiselect
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <View style={[styles.checkboxesContainer, hasError && styles.inputError]}>
+              {field.options?.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.checkboxOption}
+                  onPress={() => {
+                    const currentValues = Array.isArray(value) ? value : []
+                    const newValues = currentValues.includes(option)
+                      ? currentValues.filter(v => v !== option)
+                      : [...currentValues, option]
+                    handleFieldChange(field.id, newValues)
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox, 
+                    (Array.isArray(value) && value.includes(option)) && styles.checkboxSelected
+                  ]}>
+                    {(Array.isArray(value) && value.includes(option)) && (
+                      <Ionicons name="checkmark" size={16} color="white" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxOptionText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {hasError && (
+              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+            )}
+          </View>
+        )
+
+      case 'date':
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <TouchableOpacity
+              style={[styles.dateTimeButton, hasError && styles.inputError]}
+              onPress={() => setShowDatePicker(field.id)}
+            >
+              <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+              <Text style={styles.dateTimeButtonText}>
+                {value ? new Date(value).toLocaleDateString() : 'Select Date'}
+              </Text>
             </TouchableOpacity>
+            {showDatePicker === field.id && Platform.OS === 'ios' && (
+              <DateTimePicker
+                value={value ? new Date(value) : new Date()}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(null)
+                  if (selectedDate) {
+                    const dateString = selectedDate.toISOString().split('T')[0]
+                    handleFieldChange(field.id, dateString)
+                  }
+                }}
+              />
+            )}
+            {showDatePicker === field.id && Platform.OS === 'android' && (
+              <DateTimePicker
+                value={value ? new Date(value) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(null)
+                  if (selectedDate && event.type === 'set') {
+                    const dateString = selectedDate.toISOString().split('T')[0]
+                    handleFieldChange(field.id, dateString)
+                  }
+                }}
+              />
+            )}
+            {hasError && (
+              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+            )}
+          </View>
+        )
+
+
+      case 'file':
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <TouchableOpacity style={[styles.fileUploadButton, hasError && styles.inputError]}>
+              <Ionicons name="cloud-upload-outline" size={24} color="#007AFF" />
+              <Text style={styles.fileUploadText}>
+                {value ? 'File Selected' : 'Tap to Select File'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.fieldHint}>File upload functionality will be available soon</Text>
             {hasError && (
               <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
             )}
@@ -563,8 +777,122 @@ export default function FormCompletionScreen({ route, navigation }: any) {
           </View>
         )
 
+      case 'time':
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <TouchableOpacity
+              style={[styles.dateTimeButton, hasError && styles.inputError]}
+              onPress={() => setShowTimePicker(field.id)}
+            >
+              <Ionicons name="time-outline" size={20} color="#007AFF" />
+              <Text style={styles.dateTimeButtonText}>
+                {value ? value : 'Select Time'}
+              </Text>
+            </TouchableOpacity>
+            {showTimePicker === field.id && Platform.OS === 'ios' && (
+              <DateTimePicker
+                value={value ? new Date(`2000-01-01T${value}:00`) : new Date()}
+                mode="time"
+                display="spinner"
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(null)
+                  if (selectedTime) {
+                    const timeString = selectedTime.toTimeString().substring(0, 5)
+                    handleFieldChange(field.id, timeString)
+                  }
+                }}
+              />
+            )}
+            {showTimePicker === field.id && Platform.OS === 'android' && (
+              <DateTimePicker
+                value={value ? new Date(`2000-01-01T${value}:00`) : new Date()}
+                mode="time"
+                display="default"
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(null)
+                  if (selectedTime && event.type === 'set') {
+                    const timeString = selectedTime.toTimeString().substring(0, 5)
+                    handleFieldChange(field.id, timeString)
+                  }
+                }}
+              />
+            )}
+            {hasError && (
+              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+            )}
+          </View>
+        )
+
+      case 'likert':
+        const likertScale = field.scale || field.options || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <View style={[styles.likertContainer, hasError && styles.inputError]}>
+              {likertScale.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.likertOption,
+                    value === option && styles.likertOptionSelected
+                  ]}
+                  onPress={() => handleFieldChange(field.id, option)}
+                >
+                  <Text style={[
+                    styles.likertOptionText,
+                    value === option && styles.likertOptionTextSelected
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {hasError && (
+              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
+            )}
+          </View>
+        )
+
+      case 'section':
+        return (
+          <View key={field.id} style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{field.label}</Text>
+              <View style={styles.sectionLine} />
+            </View>
+          </View>
+        )
+
+      case 'html':
+        return (
+          <View key={field.id} style={styles.htmlContainer}>
+            <Text style={styles.htmlContent}>
+              {field.content || field.label || 'HTML content will be displayed here'}
+            </Text>
+          </View>
+        )
+
       default:
-        return null
+        // Show unsupported field type message with debugging info
+        console.log('Unsupported field type detected:', field.type, 'Field:', field)
+        return (
+          <View key={field.id} style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              {field.label} {field.required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <View style={styles.unsupportedField}>
+              <Ionicons name="warning-outline" size={24} color="#f59e0b" />
+              <Text style={styles.unsupportedFieldText}>
+                Field type "{field.type}" is not yet supported in the mobile app.
+              </Text>
+            </View>
+          </View>
+        )
     }
   }
 
@@ -593,7 +921,8 @@ export default function FormCompletionScreen({ route, navigation }: any) {
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <StatusBar style="dark" />
       
@@ -614,6 +943,12 @@ export default function FormCompletionScreen({ route, navigation }: any) {
         style={styles.formContainer} 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+        removeClippedSubviews={true}
+        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={false}
       >
         {form.description && (
           <Text style={styles.formDescription}>{form.description}</Text>
@@ -747,9 +1082,11 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     flex: 1,
+    backgroundColor: '#f8f9fa',
   },
   scrollContent: {
     paddingBottom: 20,
+    flexGrow: 1,
   },
   formDescription: {
     fontSize: 16,
@@ -929,5 +1266,129 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  fieldHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  checkboxesContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+  },
+  checkboxOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  checkboxOptionText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+  },
+  fileUploadButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    backgroundColor: 'white',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileUploadText: {
+    fontSize: 16,
+    color: '#007AFF',
+    marginLeft: 8,
+  },
+  unsupportedField: {
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#fef3c7',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  unsupportedFieldText: {
+    fontSize: 14,
+    color: '#d97706',
+    marginLeft: 8,
+    flex: 1,
+  },
+  likertContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 4,
+  },
+  likertOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#f8f9fa',
+  },
+  likertOptionSelected: {
+    backgroundColor: '#007AFF',
+  },
+  likertOptionText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  likertOptionTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  sectionContainer: {
+    marginVertical: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 12,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  htmlContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    marginVertical: 8,
+  },
+  htmlContent: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  dateTimeButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateTimeButtonText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 8,
   },
 })

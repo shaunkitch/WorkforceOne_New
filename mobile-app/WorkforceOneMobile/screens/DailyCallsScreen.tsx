@@ -12,6 +12,7 @@ import {
   Switch,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -66,6 +67,7 @@ interface DailyRoute {
 
 export default function DailyCallsScreen({ navigation }: any) {
   const { user, profile } = useAuth()
+  const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
   const [routes, setRoutes] = useState<DailyRoute[]>([])
   const [selectedRoute, setSelectedRoute] = useState<DailyRoute | null>(null)
@@ -605,15 +607,15 @@ export default function DailyCallsScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3b82f6" />
         <Text style={styles.loadingText}>Loading daily routes...</Text>
-      </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
       {/* Header */}
@@ -629,7 +631,11 @@ export default function DailyCallsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 20) }}
+        showsVerticalScrollIndicator={false}
+      >
         {routes.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="map-outline" size={48} color="#d1d5db" />
@@ -750,7 +756,7 @@ export default function DailyCallsScreen({ navigation }: any) {
           <ActivityIndicator size="large" color="#3b82f6" />
         </View>
       )}
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -772,7 +778,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',
@@ -957,7 +963,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   bottomSpacing: {
-    height: 100,
+    height: 20,
   },
   loadingOverlay: {
     position: 'absolute',
