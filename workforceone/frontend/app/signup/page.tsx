@@ -92,7 +92,7 @@ function SignupForm() {
         setSelectedOrgId(data[0].id)
       }
     } catch (error) {
-      console.error('Error fetching organizations:', error)
+      // Error fetching organizations handled silently
     } finally {
       setLoadingOrgs(false)
     }
@@ -141,7 +141,7 @@ function SignupForm() {
       setLoadingOrgs(false)
 
     } catch (error) {
-      console.error('Error handling invitation:', error)
+      // Error handling invitation
       setError('Failed to process invitation. Please try again.')
     } finally {
       setLoading(false)
@@ -228,7 +228,24 @@ function SignupForm() {
             .insert({
               name: formData.organizationName,
               slug: formData.organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-              settings: {},
+              description: null,
+              website: null,
+              logo_url: null,
+              address: null,
+              city: null,
+              state: null,
+              country: null,
+              postal_code: null,
+              phone: null,
+              email: null,
+              settings: {
+                currency_symbol: '$',
+                currency_code: 'USD',
+                date_format: 'MM/DD/YYYY',
+                time_format: '12',
+                timezone: 'UTC',
+                language: 'en'
+              },
               feature_flags: {
                 dashboard: true,
                 time_tracking: true,
@@ -240,7 +257,11 @@ function SignupForm() {
                 forms: true,
                 leave: true,
                 outlets: true,
-                settings: true
+                settings: true,
+                analytics: true,
+                reports: true,
+                automation: true,
+                integrations: true
               }
             })
             .select()
@@ -260,7 +281,19 @@ function SignupForm() {
               full_name: formData.fullName,
               phone: formData.phone || null,
               organization_id: organizationId,
-              role: signupMode === 'create' ? 'admin' : 'member', // Creator is admin, joiners are members
+              role: signupMode === 'create' ? 'admin' : 'employee', // Creator is admin, joiners are employees
+              status: 'active',
+              department: formData.department || null,
+              job_title: null,
+              hire_date: null,
+              salary: null,
+              hourly_rate: null,
+              employee_id: null,
+              manager_id: null,
+              last_login: null,
+              timezone: 'UTC',
+              settings: {},
+              feature_flags: {},
               is_active: true
             })
 
@@ -279,7 +312,7 @@ function SignupForm() {
       } else {
         setError(error.message || 'An error occurred during signup')
       }
-      console.error('Signup error:', error)
+      // Signup error handled
     } finally {
       setLoading(false)
     }

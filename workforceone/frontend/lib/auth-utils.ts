@@ -47,7 +47,7 @@ export class AuthService {
 
       return { success: true }
     } catch (error) {
-      console.error('SignIn error:', error)
+      // Sign in error handled
       throw error
     }
   }
@@ -101,7 +101,7 @@ export class AuthService {
             .single()
 
           if (orgError) {
-            console.error('Organization creation error:', orgError)
+            // Organization creation error
             // Don't throw here - user account is created successfully
           }
 
@@ -115,19 +115,19 @@ export class AuthService {
               .eq('id', authData.user.id)
 
             if (profileError) {
-              console.error('Profile update error:', profileError)
+              // Profile update error
               // Don't throw here either - user account is created successfully
             }
           }
         } catch (orgError) {
-          console.error('Post-signup organization setup error:', orgError)
+          // Post-signup organization setup error
           // User account is still created successfully
         }
       }
 
       return { success: true, user: authData.user }
     } catch (error) {
-      console.error('SignUp error:', error)
+      // Sign up error handled
       throw error
     }
   }
@@ -140,7 +140,7 @@ export class AuthService {
       if (error) throw error
       return { success: true }
     } catch (error) {
-      console.error('SignOut error:', error)
+      // Sign out error handled
       throw error
     }
   }
@@ -158,7 +158,7 @@ export class AuthService {
       }
       return { success: true }
     } catch (error) {
-      console.error('Password reset error:', error)
+      // Password reset error handled
       throw error
     }
   }

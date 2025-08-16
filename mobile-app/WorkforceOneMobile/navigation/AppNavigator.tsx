@@ -7,6 +7,7 @@ import LoginScreen from '../screens/auth/LoginScreen'
 import SignupScreen from '../screens/auth/SignupScreen'
 import HybridNavigator from './HybridNavigator'
 import FormCompletionScreen from '../screens/FormCompletionScreen'
+import FormResponseViewScreen from '../screens/FormResponseViewScreen'
 
 const Stack = createStackNavigator()
 
@@ -37,6 +38,15 @@ function AppStack() {
           headerTitle: 'Complete Form',
           headerStyle: { backgroundColor: '#3b82f6' },
           headerTintColor: 'white'
+        }}
+      />
+      <Stack.Screen 
+        name="FormResponseView" 
+        component={FormResponseViewScreen}
+        options={{
+          presentation: 'modal',
+          gestureEnabled: true,
+          headerShown: false
         }}
       />
     </Stack.Navigator>

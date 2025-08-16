@@ -179,12 +179,6 @@ export default function FormBuilderPage() {
         default_settings: { options: ['Option 1', 'Option 2', 'Option 3'] }
       },
       {
-        id: 'date',
-        name: 'Date Picker',
-        description: 'Date selection field',
-        default_settings: {}
-      },
-      {
         id: 'file',
         name: 'File Upload',
         description: 'File upload field',
@@ -402,8 +396,6 @@ export default function FormBuilderPage() {
             ))}
           </div>
         )
-      case 'date':
-        return <Input type="date" disabled />
       case 'file':
         return (
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
@@ -684,32 +676,6 @@ export default function FormBuilderPage() {
           </>
         )}
 
-        {selectedField.type === 'date' && (
-          <>
-            <div>
-              <Label htmlFor="dateMin">Minimum Date</Label>
-              <Input
-                id="dateMin"
-                type="date"
-                value={selectedField.settings?.minDate || ''}
-                onChange={(e) => updateField(selectedField.id, { 
-                  settings: { ...selectedField.settings, minDate: e.target.value }
-                })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="dateMax">Maximum Date</Label>
-              <Input
-                id="dateMax"
-                type="date"
-                value={selectedField.settings?.maxDate || ''}
-                onChange={(e) => updateField(selectedField.id, { 
-                  settings: { ...selectedField.settings, maxDate: e.target.value }
-                })}
-              />
-            </div>
-          </>
-        )}
 
         {selectedField.type === 'section' && (
           <>

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { Profile } from '../types/database'
+import { syncService } from '../services/SyncService'
 
 interface AuthContextType {
   session: Session | null
@@ -68,6 +69,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error
       setProfile(data)
+
+      // Download fresh data for offline use when user logs in
+      if (data?.organization_id) {
+        console.log('Downloading fresh data for offline use...')
+        syncService.downloadFreshData(userId, data.organization_id)
+          .then(success => {
+            if (success) {
+              console.log('Fresh data downloaded successfully')
+            } else {
+              console.log('Failed to download fresh data - user may be offline')
+            }
+          })
+          .catch(error => {
+            console.error('Error downloading fresh data:', error)
+          })
+      }
     } catch (error) {
       console.error('Error fetching profile:', error)
     } finally {

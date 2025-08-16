@@ -97,6 +97,28 @@ class OfflineStorageService {
     }
   }
 
+  async clearFailedActions(): Promise<void> {
+    try {
+      const outbox = await this.getOutbox()
+      const nonFailedActions = outbox.filter(action => action.status !== 'failed')
+      await AsyncStorage.setItem(this.OUTBOX_KEY, JSON.stringify(nonFailedActions))
+      console.log('Cleared failed actions from outbox')
+    } catch (error) {
+      console.error('Error clearing failed actions:', error)
+      throw error
+    }
+  }
+
+  async clearAllActions(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.OUTBOX_KEY, JSON.stringify([]))
+      console.log('Cleared all actions from outbox')
+    } catch (error) {
+      console.error('Error clearing all actions:', error)
+      throw error
+    }
+  }
+
   // Form Storage
   async storeForms(forms: any[]): Promise<void> {
     try {

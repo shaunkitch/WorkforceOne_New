@@ -62,6 +62,7 @@ class SyncService {
         try {
           await offlineStorage.updateOutboxAction(action.id, { status: 'syncing' })
           
+          console.log(`Syncing action ${action.id} (${action.type})...`)
           const syncResult = await this.syncAction(action)
           
           if (syncResult.success) {
@@ -69,15 +70,18 @@ class SyncService {
             results.success++
             console.log(`Successfully synced action: ${action.id}`)
           } else {
-            await this.handleSyncFailure(action, syncResult.error)
+            console.error(`Sync failed for action ${action.id}:`, syncResult.error)
+            console.error('Action data:', JSON.stringify(action.data, null, 2))
+            await this.handleSyncFailure(action, syncResult.error || 'Unknown sync error')
             results.failed++
-            results.errors.push(`${action.type}: ${syncResult.error}`)
+            results.errors.push(`${action.type} (${action.id}): ${syncResult.error}`)
           }
         } catch (error) {
           console.error(`Error syncing action ${action.id}:`, error)
+          console.error('Action data:', JSON.stringify(action.data, null, 2))
           await this.handleSyncFailure(action, error instanceof Error ? error.message : 'Unknown error')
           results.failed++
-          results.errors.push(`${action.type}: ${error}`)
+          results.errors.push(`${action.type} (${action.id}): ${error}`)
         }
       }
 
@@ -126,33 +130,127 @@ class SyncService {
     try {
       const { data } = action
 
+      console.log('Syncing form response with data:', {
+        form_id: data.formId,
+        organization_id: data.organizationId,
+        user_id: data.userId,
+        respondent_id: data.userId, // Will send same value to both columns
+        submitted_at: data.timestamp,
+        responses_keys: data.responses ? Object.keys(data.responses) : 'null'
+      })
+
+      // Insert new form response (allowing multiple submissions per user/form)
+      const insertData = {
+        form_id: data.formId,
+        organization_id: data.organizationId,
+        user_id: data.userId,
+        respondent_id: data.userId, // Provide both columns to handle schema variations
+        responses: data.responses,
+        submitted_at: data.timestamp,
+        status: 'submitted', // Set status to submitted for completed forms
+        // Add location data if available
+        location_latitude: data.location?.latitude,
+        location_longitude: data.location?.longitude,
+        location_accuracy: data.location?.accuracy,
+        location_timestamp: data.location?.timestamp
+      }
+
+      console.log('Inserting new form response:', {
+        form_id: data.formId,
+        respondent_id: data.userId,
+        has_location: !!data.location,
+        action: 'INSERT (multiple submissions allowed)'
+      })
+
+      // Use INSERT to create new response (no more unique constraint)
       const { error } = await supabase
         .from('form_responses')
-        .insert({
-          form_id: data.formId,
-          organization_id: data.organizationId,
-          respondent_id: data.userId,
-          responses: data.responses,
-          status: 'completed',
-          submitted_at: data.timestamp
-        })
+        .insert(insertData)
 
-      if (error) throw error
+      if (error) {
+        console.error('Form response insert error:', error)
+        console.error('Failed insert data:', insertData)
+        
+        // Fallback: try with just respondent_id (for compatibility with older schemas)
+        if (error.message.includes('column') || error.message.includes('user_id')) {
+          console.log('Trying alternative insert with respondent_id only...')
+          
+          const fallbackData = {
+            form_id: data.formId,
+            organization_id: data.organizationId,
+            respondent_id: data.userId,
+            responses: data.responses,
+            submitted_at: data.timestamp,
+            status: 'submitted',
+            location_latitude: data.location?.latitude,
+            location_longitude: data.location?.longitude,
+            location_accuracy: data.location?.accuracy,
+            location_timestamp: data.location?.timestamp
+          }
+          
+          const { error: fallbackError } = await supabase
+            .from('form_responses')
+            .insert(fallbackData)
+            
+          if (fallbackError) {
+            console.error('Fallback insert also failed:', fallbackError)
+            throw fallbackError
+          } else {
+            console.log('Fallback insert succeeded with respondent_id only')
+          }
+        } else {
+          throw error
+        }
+      } else {
+        console.log('Form response insert succeeded')
+      }
 
       // Update visit if provided
       if (data.visitId) {
-        await supabase
+        console.log('Updating outlet visit:', data.visitId)
+        const { error: visitError } = await supabase
           .from('outlet_visits')
           .update({
             form_completed: true,
             check_out_time: data.timestamp
           })
           .eq('id', data.visitId)
+        
+        if (visitError) {
+          console.error('Outlet visit update error:', visitError)
+          // Don't fail the entire sync for visit update errors
+        } else {
+          // Get the route_stop_id from the outlet visit and mark it completed
+          const { data: visitData, error: visitQueryError } = await supabase
+            .from('outlet_visits')
+            .select('route_stop_id')
+            .eq('id', data.visitId)
+            .single()
+
+          if (!visitQueryError && visitData?.route_stop_id) {
+            console.log('Marking route stop as completed:', visitData.route_stop_id)
+            const { error: stopUpdateError } = await supabase
+              .from('route_stops')
+              .update({
+                status: 'completed',
+                actual_departure_time: data.timestamp
+              })
+              .eq('id', visitData.route_stop_id)
+
+            if (stopUpdateError) {
+              console.error('Route stop update error:', stopUpdateError)
+            } else {
+              console.log('Route stop marked as completed successfully')
+            }
+          }
+        }
       }
 
       return { success: true }
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      console.error('Form response sync failed - full error:', error)
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
+      return { success: false, error: errorMessage }
     }
   }
 
@@ -184,31 +282,56 @@ class SyncService {
     try {
       const { data } = action
 
-      const { error } = await supabase
-        .from('outlet_visits')
-        .insert({
-          outlet_id: data.outletId,
-          user_id: data.userId,
-          organization_id: data.organizationId,
-          check_in_time: data.checkInTime,
-          check_out_time: data.checkOutTime,
-          form_completed: data.formCompleted || false,
-          route_stop_id: data.routeStopId,
-          notes: data.notes,
-          location: data.location
-        })
+      // If we have a visitId, update the existing visit, otherwise create new
+      if (data.visitId) {
+        console.log('Updating existing outlet visit:', data.visitId)
+        const { error } = await supabase
+          .from('outlet_visits')
+          .update({
+            form_completed: data.formCompleted || false,
+            check_out_time: data.checkOutTime,
+            notes: data.notes,
+            location: data.location
+          })
+          .eq('id', data.visitId)
 
-      if (error) throw error
+        if (error) throw error
+      } else {
+        console.log('Creating new outlet visit')
+        const { error } = await supabase
+          .from('outlet_visits')
+          .insert({
+            outlet_id: data.outletId,
+            user_id: data.userId,
+            organization_id: data.organizationId,
+            check_in_time: data.checkInTime,
+            check_out_time: data.checkOutTime,
+            form_completed: data.formCompleted || false,
+            route_stop_id: data.routeStopId,
+            notes: data.notes,
+            location: data.location
+          })
+
+        if (error) throw error
+      }
 
       // If form is completed and route stop exists, mark it as completed
       if (data.formCompleted && data.routeStopId) {
-        await supabase
+        console.log('Marking route stop as completed:', data.routeStopId)
+        const { error: stopUpdateError } = await supabase
           .from('route_stops')
           .update({
             status: 'completed',
             actual_departure_time: data.checkOutTime || new Date().toISOString()
           })
           .eq('id', data.routeStopId)
+
+        if (stopUpdateError) {
+          console.error('Route stop update error:', stopUpdateError)
+          // Don't fail the entire sync for route stop update errors
+        } else {
+          console.log('Route stop marked as completed successfully')
+        }
       }
 
       return { success: true }
@@ -221,23 +344,39 @@ class SyncService {
     try {
       const { data } = action
 
+      console.log('Syncing leave request with data:', {
+        employee_id: data.employeeId || data.userId,
+        organization_id: data.organizationId,
+        type: data.type,
+        start_date: data.startDate,
+        end_date: data.endDate,
+        reason: data.reason?.substring(0, 50) + '...',
+        status: 'pending',
+        requested_at: data.timestamp
+      })
+
       const { error } = await supabase
         .from('leave_requests')
         .insert({
           employee_id: data.employeeId || data.userId, // Support both for backward compatibility
           organization_id: data.organizationId,
-          type: data.type,
+          leave_type: data.type || data.leave_type, // Support both field names
           start_date: data.startDate,
           end_date: data.endDate,
           reason: data.reason,
-          status: 'pending',
-          requested_at: data.timestamp
+          status: 'pending'
+          // Note: created_at will be auto-populated by the database
         })
 
-      if (error) throw error
+      if (error) {
+        console.error('Leave request insert error:', error)
+        throw error
+      }
       return { success: true }
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Leave request sync failed:', errorMessage)
+      return { success: false, error: errorMessage }
     }
   }
 
@@ -279,6 +418,11 @@ class SyncService {
       return false
     }
 
+    if (this.isSyncing) {
+      console.log('Sync already in progress, skipping data download')
+      return false
+    }
+
     try {
       console.log('Downloading fresh data...')
 
@@ -289,7 +433,11 @@ class SyncService {
         .eq('organization_id', organizationId)
         .in('status', ['active', 'draft'])
 
-      if (formsError) throw formsError
+      if (formsError) {
+        console.error('Error downloading forms:', formsError)
+        throw formsError
+      }
+      console.log(`Downloaded ${forms?.length || 0} forms`)
       await offlineStorage.storeForms(forms || [])
 
       // Download outlets
@@ -297,9 +445,12 @@ class SyncService {
         .from('outlets')
         .select('*')
         .eq('organization_id', organizationId)
-        .eq('is_active', true)
 
-      if (outletsError) throw outletsError
+      if (outletsError) {
+        console.error('Error downloading outlets:', outletsError)
+        throw outletsError
+      }
+      console.log(`Downloaded ${outlets?.length || 0} outlets`)
       await offlineStorage.storeOutlets(outlets || [])
 
       // Download routes
@@ -313,9 +464,13 @@ class SyncService {
           )
         `)
         .eq('organization_id', organizationId)
-        .eq('is_active', true)
+        .in('status', ['active', 'draft'])
 
-      if (routesError) throw routesError
+      if (routesError) {
+        console.error('Error downloading routes:', routesError)
+        throw routesError
+      }
+      console.log(`Downloaded ${routes?.length || 0} routes`)
       await offlineStorage.storeRoutes(routes || [])
 
       console.log('Fresh data downloaded successfully')

@@ -12,6 +12,8 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { syncService } from '../services/SyncService'
+import { offlineStorage } from '../services/OfflineStorage'
 
 interface Form {
   id: string
@@ -26,6 +28,7 @@ export default function FormsScreenSimple({ navigation }: any) {
   const { user, profile } = useAuth()
   const [forms, setForms] = useState<Form[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     fetchForms()
@@ -35,7 +38,14 @@ export default function FormsScreenSimple({ navigation }: any) {
     if (!user || !profile?.organization_id) return
 
     try {
-      // Fetch all active forms for the organization
+      // First try to load from offline storage
+      const offlineForms = await offlineStorage.getForms()
+      if (offlineForms.length > 0) {
+        setForms(offlineForms)
+        setLoading(false)
+      }
+
+      // Then fetch fresh data from server
       const { data, error } = await supabase
         .from('forms')
         .select('*')
@@ -45,24 +55,68 @@ export default function FormsScreenSimple({ navigation }: any) {
 
       if (error) {
         console.error('Error fetching forms:', error)
-        setForms([])
+        // Only set empty if we don't have offline data
+        if (offlineForms.length === 0) {
+          setForms([])
+        }
       } else {
-        setForms(data || [])
+        const freshForms = data || []
+        setForms(freshForms)
+        // Store fresh data offline
+        await offlineStorage.storeForms(freshForms)
       }
     } catch (error) {
       console.error('Error fetching forms:', error)
-      setForms([])
+      // Try to load offline forms as fallback
+      try {
+        const offlineForms = await offlineStorage.getForms()
+        setForms(offlineForms)
+      } catch (offlineError) {
+        setForms([])
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSync = async () => {
+    if (!user || !profile?.organization_id) return
+
+    setSyncing(true)
+    try {
+      // Download fresh data
+      const success = await syncService.downloadFreshData(user.id, profile.organization_id)
+      
+      if (success) {
+        // Reload forms from fresh data
+        await fetchForms()
+        Alert.alert('Sync Complete', 'Forms have been updated with the latest data.')
+      } else {
+        Alert.alert('Sync Failed', 'Unable to sync data. Please check your internet connection.')
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+      Alert.alert('Sync Error', 'Failed to sync data. Please try again.')
+    } finally {
+      setSyncing(false)
     }
   }
 
   const handleFormPress = (form: Form) => {
     Alert.alert(
       form.title,
-      form.description || 'Would you like to complete this form?',
+      form.description || 'What would you like to do with this form?',
       [
         { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'View Responses', 
+          onPress: () => {
+            // Navigate to form response view
+            navigation.navigate('FormResponseView', {
+              formId: form.id
+            })
+          }
+        },
         { 
           text: 'Complete Form', 
           onPress: () => {
@@ -116,6 +170,21 @@ export default function FormsScreenSimple({ navigation }: any) {
           <Text style={styles.headerTitle}>Forms</Text>
           <Text style={styles.headerSubtitle}>Available forms to complete</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
+          onPress={handleSync}
+          disabled={syncing}
+        >
+          <Ionicons 
+            name={syncing ? "sync" : "cloud-download-outline"} 
+            size={20} 
+            color={syncing ? "#8E8E93" : "white"} 
+            style={syncing ? { transform: [{ rotate: '360deg' }] } : {}}
+          />
+          <Text style={[styles.syncButtonText, syncing && styles.syncButtonTextDisabled]}>
+            {syncing ? 'Syncing...' : 'Sync'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Forms List */}
@@ -187,6 +256,9 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     color: 'white',
@@ -197,6 +269,26 @@ const styles = StyleSheet.create({
     color: '#93c5fd',
     fontSize: 16,
     marginTop: 4,
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  syncButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  syncButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  syncButtonTextDisabled: {
+    color: '#8E8E93',
   },
   content: {
     flex: 1,

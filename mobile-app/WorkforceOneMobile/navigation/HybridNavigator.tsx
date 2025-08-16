@@ -15,6 +15,7 @@ import LeaveScreen from '../screens/LeaveScreen'
 import FormsScreenSimple from '../screens/FormsScreenSimple'
 import PayslipsScreen from '../screens/PayslipsScreen'
 import SummaryScreen from '../screens/SummaryScreen'
+import OutboxScreen from '../screens/OutboxScreen'
 
 const Drawer = createDrawerNavigator()
 const Tab = createBottomTabNavigator()
@@ -113,6 +114,19 @@ function CustomDrawerContent(props: any) {
           label="Payslips"
           icon={({ color, size }) => <Ionicons name="document-text-outline" size={size} color={color} />}
           onPress={() => props.navigation.navigate('Payslips')}
+          activeTintColor="#3b82f6"
+          inactiveTintColor="#6b7280"
+        />
+
+        {/* Sync Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>Sync</Text>
+        </View>
+        
+        <DrawerItem
+          label="Outbox & Sync"
+          icon={({ color, size }) => <Ionicons name="cloud-upload-outline" size={size} color={color} />}
+          onPress={() => props.navigation.navigate('Outbox')}
           activeTintColor="#3b82f6"
           inactiveTintColor="#6b7280"
         />
@@ -263,6 +277,11 @@ export default function HybridNavigator() {
         name="Payslips"
         component={PayslipsScreen}
         options={{ title: 'Payslips' }}
+      />
+      <Drawer.Screen
+        name="Outbox"
+        component={OutboxScreen}
+        options={{ title: 'Sync Outbox' }}
       />
     </Drawer.Navigator>
   )

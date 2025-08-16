@@ -16,18 +16,38 @@ export interface Database {
         Row: {
           id: string
           name: string
-          slug: string
+          slug?: string
+          description?: string | null
+          website?: string | null
           logo_url: string | null
-          settings: Json
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          country?: string | null
+          postal_code?: string | null
+          phone?: string | null
+          email?: string | null
+          settings?: Json
+          feature_flags?: Json
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           name: string
-          slug: string
+          slug?: string
+          description?: string | null
+          website?: string | null
           logo_url?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          country?: string | null
+          postal_code?: string | null
+          phone?: string | null
+          email?: string | null
           settings?: Json
+          feature_flags?: Json
           created_at?: string
           updated_at?: string
         }
@@ -35,8 +55,18 @@ export interface Database {
           id?: string
           name?: string
           slug?: string
+          description?: string | null
+          website?: string | null
           logo_url?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          country?: string | null
+          postal_code?: string | null
+          phone?: string | null
+          email?: string | null
           settings?: Json
+          feature_flags?: Json
           created_at?: string
           updated_at?: string
         }
@@ -48,13 +78,21 @@ export interface Database {
           email: string
           full_name: string | null
           avatar_url: string | null
-          role: string
+          role: 'admin' | 'manager' | 'employee'
+          status: 'active' | 'inactive' | 'suspended'
           department: string | null
-          position: string | null
+          job_title: string | null
           phone: string | null
-          timezone: string
-          settings: Json
-          is_active: boolean
+          hire_date: string | null
+          salary: number | null
+          hourly_rate: number | null
+          employee_id: string | null
+          manager_id: string | null
+          last_login: string | null
+          timezone?: string
+          settings?: Json
+          feature_flags?: Json
+          is_active?: boolean
           created_at: string
           updated_at: string
         }
@@ -64,12 +102,20 @@ export interface Database {
           email: string
           full_name?: string | null
           avatar_url?: string | null
-          role?: string
+          role?: 'admin' | 'manager' | 'employee'
+          status?: 'active' | 'inactive' | 'suspended'
           department?: string | null
-          position?: string | null
+          job_title?: string | null
           phone?: string | null
+          hire_date?: string | null
+          salary?: number | null
+          hourly_rate?: number | null
+          employee_id?: string | null
+          manager_id?: string | null
+          last_login?: string | null
           timezone?: string
           settings?: Json
+          feature_flags?: Json
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -80,12 +126,20 @@ export interface Database {
           email?: string
           full_name?: string | null
           avatar_url?: string | null
-          role?: string
+          role?: 'admin' | 'manager' | 'employee'
+          status?: 'active' | 'inactive' | 'suspended'
           department?: string | null
-          position?: string | null
+          job_title?: string | null
           phone?: string | null
+          hire_date?: string | null
+          salary?: number | null
+          hourly_rate?: number | null
+          employee_id?: string | null
+          manager_id?: string | null
+          last_login?: string | null
           timezone?: string
           settings?: Json
+          feature_flags?: Json
           is_active?: boolean
           created_at?: string
           updated_at?: string

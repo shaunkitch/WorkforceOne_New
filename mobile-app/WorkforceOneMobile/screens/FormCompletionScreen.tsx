@@ -16,15 +16,15 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { Picker } from '@react-native-picker/picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import DateTimePicker from '@react-native-community/datetimepicker'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { offlineStorage } from '../services/OfflineStorage'
 import { syncService } from '../services/SyncService'
+import * as Location from 'expo-location'
 
 interface FormField {
   id: string
-  type: 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'select' | 'radio' | 'checkbox' | 'multiselect' | 'multi-select' | 'checkboxes' | 'date' | 'time' | 'rating' | 'file' | 'likert' | 'section' | 'html'
+  type: 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'select' | 'radio' | 'checkbox' | 'multiselect' | 'multi-select' | 'checkboxes' | 'rating' | 'file' | 'likert' | 'section' | 'html'
   label: string
   placeholder?: string
   required: boolean
@@ -74,8 +74,6 @@ export default function FormCompletionScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [showDatePicker, setShowDatePicker] = useState<string | null>(null)
-  const [showTimePicker, setShowTimePicker] = useState<string | null>(null)
 
   useEffect(() => {
     loadFormData()
@@ -253,22 +251,6 @@ export default function FormCompletionScreen({ route, navigation }: any) {
             return `Value must be at most ${field.max}`
           }
           break
-        case 'date':
-          const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-          if (!dateRegex.test(value)) {
-            return 'Please enter date in YYYY-MM-DD format'
-          }
-          const dateObj = new Date(value)
-          if (isNaN(dateObj.getTime())) {
-            return 'Please enter a valid date'
-          }
-          break
-        case 'time':
-          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
-          if (!timeRegex.test(value)) {
-            return 'Please enter time in HH:MM format (e.g., 14:30)'
-          }
-          break
       }
 
       // Custom validation rules
@@ -334,6 +316,41 @@ export default function FormCompletionScreen({ route, navigation }: any) {
     }
   }
 
+  const getCurrentLocation = async () => {
+    try {
+      console.log('Requesting location permissions...')
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      
+      if (status !== 'granted') {
+        console.log('Location permission denied')
+        return null
+      }
+
+      console.log('Getting current location...')
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 5000,
+        maximumAge: 30000
+      })
+
+      console.log('Location obtained:', {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy
+      })
+
+      return {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+        timestamp: new Date(location.timestamp).toISOString()
+      }
+    } catch (error) {
+      console.error('Error getting location:', error)
+      return null
+    }
+  }
+
   const submitForm = async () => {
     if (!validateForm()) {
       Alert.alert('Validation Error', 'Please fix the validation errors before submitting')
@@ -346,6 +363,9 @@ export default function FormCompletionScreen({ route, navigation }: any) {
     try {
       const responseId = visitId || `response_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const timestamp = new Date().toISOString()
+      
+      // Capture GPS location
+      const location = await getCurrentLocation()
 
       // Save completed form response locally
       const formResponse = {
@@ -360,7 +380,7 @@ export default function FormCompletionScreen({ route, navigation }: any) {
 
       await offlineStorage.saveFormResponse(formResponse)
 
-      // Add to outbox for syncing
+      // Add to outbox for syncing (including location data)
       await offlineStorage.addToOutbox({
         type: 'form_response',
         data: {
@@ -375,10 +395,12 @@ export default function FormCompletionScreen({ route, navigation }: any) {
               user_name: profile.full_name,
               outlet_name: outlet.name,
               completed_at: timestamp,
-              offline_submitted: true
+              offline_submitted: true,
+              location_captured: !!location
             }
           },
-          timestamp
+          timestamp,
+          location: location // Include GPS location data
         },
         timestamp,
         userId: user.id,
@@ -404,16 +426,19 @@ export default function FormCompletionScreen({ route, navigation }: any) {
         })
       }
 
-      // Try to sync if online
+      // Try to sync if online and wait for completion
       const syncStatus = syncService.getSyncStatus()
+      let syncSuccess = true
       if (syncStatus.isOnline) {
-        syncService.forcSync()
+        console.log('Attempting to sync form submission...')
+        syncSuccess = await syncService.forcSync()
+        console.log('Form sync completed:', syncSuccess ? 'success' : 'failed')
       }
 
       Alert.alert(
         'Success', 
         syncStatus.isOnline 
-          ? 'Form submitted successfully!' 
+          ? (syncSuccess ? 'Form submitted successfully!' : 'Form saved locally and will sync when possible.')
           : 'Form saved! It will be submitted when you\'re back online.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       )
@@ -677,54 +702,6 @@ export default function FormCompletionScreen({ route, navigation }: any) {
           </View>
         )
 
-      case 'date':
-        return (
-          <View key={field.id} style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>
-              {field.label} {field.required && <Text style={styles.required}>*</Text>}
-            </Text>
-            <TouchableOpacity
-              style={[styles.dateTimeButton, hasError && styles.inputError]}
-              onPress={() => setShowDatePicker(field.id)}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#007AFF" />
-              <Text style={styles.dateTimeButtonText}>
-                {value ? new Date(value).toLocaleDateString() : 'Select Date'}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker === field.id && Platform.OS === 'ios' && (
-              <DateTimePicker
-                value={value ? new Date(value) : new Date()}
-                mode="date"
-                display="spinner"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(null)
-                  if (selectedDate) {
-                    const dateString = selectedDate.toISOString().split('T')[0]
-                    handleFieldChange(field.id, dateString)
-                  }
-                }}
-              />
-            )}
-            {showDatePicker === field.id && Platform.OS === 'android' && (
-              <DateTimePicker
-                value={value ? new Date(value) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(null)
-                  if (selectedDate && event.type === 'set') {
-                    const dateString = selectedDate.toISOString().split('T')[0]
-                    handleFieldChange(field.id, dateString)
-                  }
-                }}
-              />
-            )}
-            {hasError && (
-              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
-            )}
-          </View>
-        )
 
 
       case 'file':
@@ -777,54 +754,6 @@ export default function FormCompletionScreen({ route, navigation }: any) {
           </View>
         )
 
-      case 'time':
-        return (
-          <View key={field.id} style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>
-              {field.label} {field.required && <Text style={styles.required}>*</Text>}
-            </Text>
-            <TouchableOpacity
-              style={[styles.dateTimeButton, hasError && styles.inputError]}
-              onPress={() => setShowTimePicker(field.id)}
-            >
-              <Ionicons name="time-outline" size={20} color="#007AFF" />
-              <Text style={styles.dateTimeButtonText}>
-                {value ? value : 'Select Time'}
-              </Text>
-            </TouchableOpacity>
-            {showTimePicker === field.id && Platform.OS === 'ios' && (
-              <DateTimePicker
-                value={value ? new Date(`2000-01-01T${value}:00`) : new Date()}
-                mode="time"
-                display="spinner"
-                onChange={(event, selectedTime) => {
-                  setShowTimePicker(null)
-                  if (selectedTime) {
-                    const timeString = selectedTime.toTimeString().substring(0, 5)
-                    handleFieldChange(field.id, timeString)
-                  }
-                }}
-              />
-            )}
-            {showTimePicker === field.id && Platform.OS === 'android' && (
-              <DateTimePicker
-                value={value ? new Date(`2000-01-01T${value}:00`) : new Date()}
-                mode="time"
-                display="default"
-                onChange={(event, selectedTime) => {
-                  setShowTimePicker(null)
-                  if (selectedTime && event.type === 'set') {
-                    const timeString = selectedTime.toTimeString().substring(0, 5)
-                    handleFieldChange(field.id, timeString)
-                  }
-                }}
-              />
-            )}
-            {hasError && (
-              <Text style={styles.errorText}>{validationErrors[field.id]}</Text>
-            )}
-          </View>
-        )
 
       case 'likert':
         const likertScale = field.scale || field.options || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']

@@ -73,10 +73,20 @@ export default function DailyCallsScreen({ navigation }: any) {
   const [selectedRoute, setSelectedRoute] = useState<DailyRoute | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [showCompleted, setShowCompleted] = useState(true)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     fetchTodayRoutes()
   }, [])
+
+  // Refresh data when screen comes into focus (after form completion)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchTodayRoutes()
+    })
+
+    return unsubscribe
+  }, [navigation])
 
   const fetchTodayRoutes = async () => {
     if (!user || !profile?.organization_id) return
@@ -204,6 +214,29 @@ export default function DailyCallsScreen({ navigation }: any) {
       Alert.alert('Error', 'Failed to load daily routes')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSync = async () => {
+    if (!user || !profile?.organization_id) return
+
+    setSyncing(true)
+    try {
+      // Download fresh data
+      const success = await syncService.downloadFreshData(user.id, profile.organization_id)
+      
+      if (success) {
+        // Reload routes from fresh data
+        await fetchTodayRoutes()
+        Alert.alert('Sync Complete', 'Route data has been updated with the latest information.')
+      } else {
+        Alert.alert('Sync Failed', 'Unable to sync data. Please check your internet connection.')
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+      Alert.alert('Sync Error', 'Failed to sync data. Please try again.')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -626,8 +659,20 @@ export default function DailyCallsScreen({ navigation }: any) {
             {new Date().toLocaleDateString()} - Your outlet visits
           </Text>
         </View>
-        <TouchableOpacity onPress={fetchTodayRoutes}>
-          <Ionicons name="refresh" size={24} color="white" />
+        <TouchableOpacity
+          style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
+          onPress={handleSync}
+          disabled={syncing}
+        >
+          <Ionicons 
+            name={syncing ? "sync" : "cloud-download-outline"} 
+            size={20} 
+            color={syncing ? "#8E8E93" : "white"} 
+            style={syncing ? { transform: [{ rotate: '360deg' }] } : {}}
+          />
+          <Text style={[styles.syncButtonText, syncing && styles.syncButtonTextDisabled]}>
+            {syncing ? 'Syncing...' : 'Sync'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -794,6 +839,26 @@ const styles = StyleSheet.create({
     color: '#93c5fd',
     fontSize: 16,
     marginTop: 4,
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  syncButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  syncButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  syncButtonTextDisabled: {
+    color: '#8E8E93',
   },
   content: {
     flex: 1,

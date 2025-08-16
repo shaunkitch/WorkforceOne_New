@@ -42,7 +42,7 @@ export function DebugFeatureFlags() {
           currentUser: user.user.id
         })
       } catch (error) {
-        console.error('Debug fetch error:', error)
+        // Debug fetch error handled silently
       }
     }
 
