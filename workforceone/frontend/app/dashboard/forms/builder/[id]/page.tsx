@@ -25,7 +25,22 @@ import {
   ArrowLeft,
   Settings,
   Copy,
-  GripVertical
+  GripVertical,
+  Type,
+  AlignLeft,
+  Mail,
+  Hash,
+  ChevronDown,
+  CheckSquare,
+  Circle,
+  Square,
+  Upload,
+  Edit3,
+  Camera,
+  Star,
+  BarChart2,
+  Layout,
+  Code
 } from 'lucide-react'
 import {
   DndContext,
@@ -52,6 +67,11 @@ interface FormField {
   options?: string[]
   validation?: any
   settings?: any
+  conditional?: {
+    dependsOn?: string
+    showWhen?: string | string[]
+    hideWhen?: string | string[]
+  }
 }
 
 interface Form {
@@ -107,6 +127,11 @@ export default function FormBuilderPage() {
   }
 
   const fetchFieldTypes = async () => {
+    // Always use default field types for now to ensure all types are available
+    // TODO: In production, fetch from database and merge with defaults
+    setFieldTypes(getDefaultFieldTypes())
+    
+    // Optionally try to fetch from database and merge
     try {
       const { data, error } = await supabase
         .from('form_field_types')
@@ -114,24 +139,44 @@ export default function FormBuilderPage() {
         .eq('is_active', true)
         .order('name')
 
-      if (error) {
-        console.log('Form field types table not found, using default types:', error)
-        setFieldTypes(getDefaultFieldTypes())
-        return
+      if (!error && data && data.length > 0) {
+        // Merge database field types with defaults
+        const defaultTypes = getDefaultFieldTypes()
+        const mergedTypes = [...defaultTypes]
+        
+        // Add any custom types from database that aren't in defaults
+        data.forEach(dbType => {
+          if (!defaultTypes.find(dt => dt.id === dbType.id)) {
+            mergedTypes.push(dbType)
+          }
+        })
+        
+        setFieldTypes(mergedTypes)
       }
-      
-      // If no field types exist in database, use defaults
-      if (!data || data.length === 0) {
-        console.log('No field types found in database, using defaults')
-        setFieldTypes(getDefaultFieldTypes())
-        return
-      }
-      
-      setFieldTypes(data)
     } catch (error) {
-      console.error('Error fetching field types, using defaults:', error)
-      setFieldTypes(getDefaultFieldTypes())
+      console.log('Using default field types')
     }
+  }
+
+  const getFieldIcon = (fieldTypeId: string) => {
+    const icons: Record<string, React.ReactNode> = {
+      text: <Type className="h-4 w-4" />,
+      textarea: <AlignLeft className="h-4 w-4" />,
+      email: <Mail className="h-4 w-4" />,
+      number: <Hash className="h-4 w-4" />,
+      select: <ChevronDown className="h-4 w-4" />,
+      multiselect: <CheckSquare className="h-4 w-4" />,
+      radio: <Circle className="h-4 w-4" />,
+      checkbox: <Square className="h-4 w-4" />,
+      file: <Upload className="h-4 w-4" />,
+      signature: <Edit3 className="h-4 w-4" />,
+      camera: <Camera className="h-4 w-4" />,
+      rating: <Star className="h-4 w-4" />,
+      likert: <BarChart2 className="h-4 w-4" />,
+      section: <Layout className="h-4 w-4" />,
+      html: <Code className="h-4 w-4" />
+    }
+    return icons[fieldTypeId] || <Plus className="h-4 w-4" />
   }
 
   const getDefaultFieldTypes = (): FieldType[] => {
@@ -209,6 +254,24 @@ export default function FormBuilderPage() {
         name: 'HTML Content',
         description: 'Custom HTML content block',
         default_settings: {}
+      },
+      {
+        id: 'multiselect',
+        name: 'Multi-Select Dropdown',
+        description: 'Multiple choice dropdown selection',
+        default_settings: { options: ['Option 1', 'Option 2', 'Option 3'] }
+      },
+      {
+        id: 'signature',
+        name: 'Signature Pad',
+        description: 'Digital signature capture',
+        default_settings: { width: 400, height: 200 }
+      },
+      {
+        id: 'camera',
+        name: 'Camera/Photo',
+        description: 'Photo capture or upload',
+        default_settings: { multiple: false, maxSize: 5 }
       }
     ]
   }
@@ -439,6 +502,45 @@ export default function FormBuilderPage() {
           <div className="border border-dashed border-gray-300 rounded p-4 bg-gray-50">
             <p className="text-sm text-gray-500">HTML Content Block</p>
             <p className="text-xs text-gray-400 mt-1">Custom content will render here</p>
+          </div>
+        )
+      case 'multiselect':
+        return (
+          <Select disabled>
+            <SelectTrigger>
+              <SelectValue placeholder="Select multiple options..." />
+            </SelectTrigger>
+            <SelectContent>
+              {field.options?.map((option, index) => (
+                <SelectItem key={index} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
+      case 'signature':
+        return (
+          <div className="border border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                <span className="text-2xl">✍️</span>
+              </div>
+              <p className="text-sm text-gray-500">Signature capture area</p>
+              <p className="text-xs text-gray-400">Users will sign here</p>
+            </div>
+          </div>
+        )
+      case 'camera':
+        return (
+          <div className="border border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                <span className="text-2xl">📷</span>
+              </div>
+              <p className="text-sm text-gray-500">Camera capture or photo upload</p>
+              <p className="text-xs text-gray-400">Take photo or upload image</p>
+            </div>
           </div>
         )
       default:
@@ -673,6 +775,87 @@ export default function FormBuilderPage() {
               />
               <Label className="text-sm">Allow multiple files</Label>
             </div>
+            <div>
+              <Label htmlFor="maxFileSize">Max File Size (MB)</Label>
+              <Input
+                id="maxFileSize"
+                type="number"
+                value={selectedField.settings?.maxSize || 10}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, maxSize: parseInt(e.target.value) || 10 }
+                })}
+              />
+            </div>
+          </>
+        )}
+
+        {selectedField.type === 'signature' && (
+          <>
+            <div>
+              <Label htmlFor="signatureWidth">Width (pixels)</Label>
+              <Input
+                id="signatureWidth"
+                type="number"
+                value={selectedField.settings?.width || 400}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, width: parseInt(e.target.value) || 400 }
+                })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="signatureHeight">Height (pixels)</Label>
+              <Input
+                id="signatureHeight"
+                type="number"
+                value={selectedField.settings?.height || 200}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, height: parseInt(e.target.value) || 200 }
+                })}
+              />
+            </div>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={selectedField.settings?.clearButton || true}
+                onCheckedChange={(checked) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, clearButton: checked }
+                })}
+              />
+              <Label className="text-sm">Show clear button</Label>
+            </div>
+          </>
+        )}
+
+        {selectedField.type === 'camera' && (
+          <>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={selectedField.settings?.multiple || false}
+                onCheckedChange={(checked) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, multiple: checked }
+                })}
+              />
+              <Label className="text-sm">Allow multiple photos</Label>
+            </div>
+            <div>
+              <Label htmlFor="maxImageSize">Max Image Size (MB)</Label>
+              <Input
+                id="maxImageSize"
+                type="number"
+                value={selectedField.settings?.maxSize || 5}
+                onChange={(e) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, maxSize: parseInt(e.target.value) || 5 }
+                })}
+              />
+            </div>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={selectedField.settings?.allowUpload !== false}
+                onCheckedChange={(checked) => updateField(selectedField.id, { 
+                  settings: { ...selectedField.settings, allowUpload: checked }
+                })}
+              />
+              <Label className="text-sm">Allow file upload (in addition to camera)</Label>
+            </div>
           </>
         )}
 
@@ -716,6 +899,72 @@ export default function FormBuilderPage() {
                   Users must fill out this field before submitting the form
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Conditional Logic */}
+        {selectedField.type !== 'section' && selectedField.type !== 'html' && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <Label className="text-sm font-semibold text-purple-800 mb-3 block">
+              Conditional Logic (Show/Hide)
+            </Label>
+            
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="dependsOn" className="text-xs text-purple-700">Depends on Field</Label>
+                <Select
+                  value={selectedField.conditional?.dependsOn || ''}
+                  onValueChange={(value) => updateField(selectedField.id, {
+                    conditional: {
+                      ...selectedField.conditional,
+                      dependsOn: value || undefined
+                    }
+                  })}
+                >
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Select a field..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {form?.fields
+                      .filter(f => f.id !== selectedField.id && ['select', 'radio', 'checkbox'].includes(f.type))
+                      .map(field => (
+                        <SelectItem key={field.id} value={field.id}>
+                          {field.label}
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedField.conditional?.dependsOn && (
+                <div>
+                  <Label htmlFor="showWhen" className="text-xs text-purple-700">Show when value is</Label>
+                  <Input
+                    id="showWhen"
+                    value={Array.isArray(selectedField.conditional?.showWhen) 
+                      ? selectedField.conditional.showWhen.join(', ')
+                      : selectedField.conditional?.showWhen || ''
+                    }
+                    onChange={(e) => {
+                      const values = e.target.value.split(',').map(v => v.trim()).filter(v => v)
+                      updateField(selectedField.id, {
+                        conditional: {
+                          ...selectedField.conditional,
+                          showWhen: values.length === 1 ? values[0] : values
+                        }
+                      })
+                    }}
+                    placeholder="value1, value2, value3..."
+                    className="text-xs"
+                  />
+                  <p className="text-xs text-purple-600 mt-1">
+                    Separate multiple values with commas
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -802,18 +1051,78 @@ export default function FormBuilderPage() {
                 <p className="text-sm text-gray-600">Drag fields to your form</p>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {fieldTypes.map(fieldType => (
-                    <Button
-                      key={fieldType.id}
-                      variant="outline"
-                      className="w-full justify-start hover:shadow-md hover:scale-105 transition-all border-gray-200 hover:border-blue-300 hover:bg-blue-50"
-                      onClick={() => addField(fieldType.id)}
-                    >
-                      <Plus className="h-4 w-4 mr-2 text-blue-600" />
-                      {fieldType.name}
-                    </Button>
-                  ))}
+                <div className="space-y-4">
+                  {/* Basic Fields */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Basic Fields</p>
+                    <div className="space-y-1">
+                      {fieldTypes.filter(ft => ['text', 'textarea', 'email', 'number'].includes(ft.id)).map(fieldType => (
+                        <Button
+                          key={fieldType.id}
+                          variant="outline"
+                          className="w-full justify-start hover:shadow-md hover:scale-105 transition-all border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                          onClick={() => addField(fieldType.id)}
+                        >
+                          <span className="text-blue-600 mr-2">{getFieldIcon(fieldType.id)}</span>
+                          {fieldType.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Selection Fields */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Selection</p>
+                    <div className="space-y-1">
+                      {fieldTypes.filter(ft => ['select', 'multiselect', 'radio', 'checkbox'].includes(ft.id)).map(fieldType => (
+                        <Button
+                          key={fieldType.id}
+                          variant="outline"
+                          className="w-full justify-start hover:shadow-md hover:scale-105 transition-all border-gray-200 hover:border-purple-300 hover:bg-purple-50"
+                          onClick={() => addField(fieldType.id)}
+                        >
+                          <span className="text-purple-600 mr-2">{getFieldIcon(fieldType.id)}</span>
+                          {fieldType.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Advanced Fields */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Advanced</p>
+                    <div className="space-y-1">
+                      {fieldTypes.filter(ft => ['file', 'signature', 'camera', 'rating', 'likert'].includes(ft.id)).map(fieldType => (
+                        <Button
+                          key={fieldType.id}
+                          variant="outline"
+                          className="w-full justify-start hover:shadow-md hover:scale-105 transition-all border-gray-200 hover:border-green-300 hover:bg-green-50"
+                          onClick={() => addField(fieldType.id)}
+                        >
+                          <span className="text-green-600 mr-2">{getFieldIcon(fieldType.id)}</span>
+                          {fieldType.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Layout Fields */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Layout</p>
+                    <div className="space-y-1">
+                      {fieldTypes.filter(ft => ['section', 'html'].includes(ft.id)).map(fieldType => (
+                        <Button
+                          key={fieldType.id}
+                          variant="outline"
+                          className="w-full justify-start hover:shadow-md hover:scale-105 transition-all border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                          onClick={() => addField(fieldType.id)}
+                        >
+                          <span className="text-gray-600 mr-2">{getFieldIcon(fieldType.id)}</span>
+                          {fieldType.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -41,7 +41,7 @@ import { format, parseISO, differenceInDays, startOfYear, endOfYear, isWithinInt
 interface LeaveRequest {
   id: string
   employee_id: string
-  leave_type: 'vacation' | 'sick' | 'personal' | 'maternity' | 'paternity' | 'bereavement' | 'other'
+  leave_type: 'vacation' | 'sick' | 'personal' | 'emergency' | 'bereavement' | 'maternity' | 'paternity' | 'other'
   start_date: string
   end_date: string
   days_requested: number
@@ -73,6 +73,10 @@ interface LeaveBalance {
   sick_days_used: number
   personal_days_allocated: number
   personal_days_used: number
+  emergency_days_allocated?: number
+  emergency_days_used?: number
+  bereavement_days_allocated?: number
+  bereavement_days_used?: number
   created_at: string
   updated_at: string
 }
@@ -105,11 +109,20 @@ export default function LeavePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [viewMode, setViewMode] = useState<'my_requests' | 'team_requests' | 'all_requests'>('my_requests')
+  const [viewMode, setViewMode] = useState<'my_requests' | 'team_requests' | 'all_requests' | 'settings'>('my_requests')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showCommentModal, setShowCommentModal] = useState(false)
   const [pendingAction, setPendingAction] = useState<{requestId: string, status: 'approved' | 'rejected'} | null>(null)
   const [managerComment, setManagerComment] = useState('')
+  const [employees, setEmployees] = useState<any[]>([])
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
+  const [leaveSettings, setLeaveSettings] = useState({
+    vacation_days_allocated: 20,
+    sick_days_allocated: 10,
+    personal_days_allocated: 5,
+    emergency_days_allocated: 3,
+    bereavement_days_allocated: 3
+  })
   
   // Form state
   const [requestForm, setRequestForm] = useState({
@@ -150,9 +163,10 @@ export default function LeavePage() {
     { value: 'vacation', label: 'Vacation', icon: Plane, color: 'bg-blue-100 text-blue-800' },
     { value: 'sick', label: 'Sick Leave', icon: Heart, color: 'bg-red-100 text-red-800' },
     { value: 'personal', label: 'Personal', icon: User, color: 'bg-green-100 text-green-800' },
+    { value: 'emergency', label: 'Emergency', icon: AlertCircle, color: 'bg-orange-100 text-orange-800' },
+    { value: 'bereavement', label: 'Bereavement', icon: Heart, color: 'bg-gray-100 text-gray-800' },
     { value: 'maternity', label: 'Maternity', icon: Heart, color: 'bg-pink-100 text-pink-800' },
     { value: 'paternity', label: 'Paternity', icon: Heart, color: 'bg-purple-100 text-purple-800' },
-    { value: 'bereavement', label: 'Bereavement', icon: Heart, color: 'bg-gray-100 text-gray-800' },
     { value: 'other', label: 'Other', icon: FileText, color: 'bg-yellow-100 text-yellow-800' }
   ]
 
@@ -161,6 +175,23 @@ export default function LeavePage() {
     fetchLeaveRequests()
     fetchLeaveBalance()
   }, [statusFilter, typeFilter, searchTerm, viewMode])
+
+  // Set default view mode based on user role
+  useEffect(() => {
+    if (currentUser?.profile?.role) {
+      const isAdminOrManager = currentUser.profile.role === 'admin' || currentUser.profile.role === 'manager'
+      if (isAdminOrManager && viewMode === 'my_requests') {
+        setViewMode('team_requests')
+      }
+    }
+  }, [currentUser])
+
+  // Fetch employees when in settings mode
+  useEffect(() => {
+    if (viewMode === 'settings' && canApproveRequests()) {
+      fetchEmployees()
+    }
+  }, [viewMode, currentUser])
 
   useEffect(() => {
     calculateStats()
@@ -462,6 +493,88 @@ export default function LeavePage() {
     }
   }
 
+  const fetchEmployees = async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!userProfile?.organization_id) return
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('organization_id', userProfile.organization_id)
+        .order('full_name', { ascending: true })
+
+      if (error) throw error
+      setEmployees(data || [])
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+    }
+  }
+
+  const updateEmployeeLeaveAllocation = async () => {
+    if (!selectedEmployee) return
+
+    try {
+      const currentYear = new Date().getFullYear()
+
+      const { data: existingBalance } = await supabase
+        .from('leave_balances')
+        .select('id')
+        .eq('employee_id', selectedEmployee.id)
+        .eq('year', currentYear)
+        .single()
+
+      if (existingBalance) {
+        // Update existing balance
+        const { error } = await supabase
+          .from('leave_balances')
+          .update({
+            vacation_days_allocated: leaveSettings.vacation_days_allocated,
+            sick_days_allocated: leaveSettings.sick_days_allocated,
+            personal_days_allocated: leaveSettings.personal_days_allocated,
+            emergency_days_allocated: leaveSettings.emergency_days_allocated,
+            bereavement_days_allocated: leaveSettings.bereavement_days_allocated
+          })
+          .eq('id', existingBalance.id)
+
+        if (error) throw error
+      } else {
+        // Create new balance
+        const { error } = await supabase
+          .from('leave_balances')
+          .insert({
+            employee_id: selectedEmployee.id,
+            year: currentYear,
+            vacation_days_allocated: leaveSettings.vacation_days_allocated,
+            vacation_days_used: 0,
+            sick_days_allocated: leaveSettings.sick_days_allocated,
+            sick_days_used: 0,
+            personal_days_allocated: leaveSettings.personal_days_allocated,
+            personal_days_used: 0,
+            emergency_days_allocated: leaveSettings.emergency_days_allocated,
+            emergency_days_used: 0,
+            bereavement_days_allocated: leaveSettings.bereavement_days_allocated,
+            bereavement_days_used: 0
+          })
+
+        if (error) throw error
+      }
+
+      alert('Leave allocation updated successfully!')
+    } catch (error) {
+      console.error('Error updating leave allocation:', error)
+      alert('Failed to update leave allocation. Please try again.')
+    }
+  }
+
   const deleteRequest = async (requestId: string) => {
     if (!confirm('Are you sure you want to delete this leave request?')) return
 
@@ -585,6 +698,15 @@ export default function LeavePage() {
                 onClick={() => setViewMode('all_requests')}
               >
                 All Requests
+              </Button>
+            )}
+            {canApproveRequests() && (
+              <Button
+                variant={viewMode === 'settings' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('settings')}
+              >
+                Settings
               </Button>
             )}
           </div>
@@ -743,7 +865,345 @@ export default function LeavePage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {viewMode === 'settings' && canApproveRequests() ? (
+        // Settings Tab Content
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Building className="h-5 w-5 mr-2" />
+                Leave Allocation Settings
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Manage leave day allocations for employees in your organization.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Employee Selection Section */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-900 mb-4">Employee Selection</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="employee" className="text-sm font-medium text-gray-700">Select Employee</Label>
+                      <Select
+                        value={selectedEmployee?.id || ''}
+                        onValueChange={async (value) => {
+                          const employee = employees.find(e => e.id === value)
+                          setSelectedEmployee(employee)
+                          
+                          // Load current leave allocation for selected employee
+                          if (employee) {
+                            try {
+                              const currentYear = new Date().getFullYear()
+                              const { data: balance } = await supabase
+                                .from('leave_balances')
+                                .select('*')
+                                .eq('employee_id', employee.id)
+                                .eq('year', currentYear)
+                                .single()
+                              
+                              if (balance) {
+                                setLeaveSettings({
+                                  vacation_days_allocated: balance.vacation_days_allocated,
+                                  sick_days_allocated: balance.sick_days_allocated,
+                                  personal_days_allocated: balance.personal_days_allocated,
+                                  emergency_days_allocated: balance.emergency_days_allocated || 3,
+                                  bereavement_days_allocated: balance.bereavement_days_allocated || 3
+                                })
+                              } else {
+                                // Set defaults if no existing balance
+                                setLeaveSettings({
+                                  vacation_days_allocated: 20,
+                                  sick_days_allocated: 10,
+                                  personal_days_allocated: 5,
+                                  emergency_days_allocated: 3,
+                                  bereavement_days_allocated: 3
+                                })
+                              }
+                            } catch (error) {
+                              console.error('Error loading employee balance:', error)
+                              setLeaveSettings({
+                                vacation_days_allocated: 20,
+                                sick_days_allocated: 10,
+                                personal_days_allocated: 5,
+                                emergency_days_allocated: 3,
+                                bereavement_days_allocated: 3
+                              })
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Choose an employee to manage..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.map(employee => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              <div className="flex items-center">
+                                <User className="h-4 w-4 mr-2" />
+                                {employee.full_name} - {employee.role}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedEmployee && (
+                      <div className="bg-white rounded-lg border p-4">
+                        <div className="flex items-start space-x-3">
+                          <div className="bg-blue-100 rounded-full p-2">
+                            <User className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">{selectedEmployee.full_name}</h4>
+                            <p className="text-sm text-gray-600">{selectedEmployee.email}</p>
+                            <Badge variant="outline" className="text-xs mt-2">
+                              {selectedEmployee.role}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Leave Allocation Settings */}
+                {selectedEmployee && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-medium text-gray-900 mb-4">Leave Day Allocations</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="bg-white rounded-lg border p-4">
+                        <div className="flex items-center mb-3">
+                          <Plane className="h-5 w-5 text-blue-600 mr-2" />
+                          <Label htmlFor="vacation" className="font-medium">Vacation Days</Label>
+                        </div>
+                        <Input
+                          id="vacation"
+                          type="number"
+                          min="0"
+                          max="365"
+                          value={leaveSettings.vacation_days_allocated}
+                          onChange={(e) => setLeaveSettings(prev => ({
+                            ...prev,
+                            vacation_days_allocated: parseInt(e.target.value) || 0
+                          }))}
+                          className="text-center font-medium"
+                        />
+                      </div>
+
+                      <div className="bg-white rounded-lg border p-4">
+                        <div className="flex items-center mb-3">
+                          <Heart className="h-5 w-5 text-red-600 mr-2" />
+                          <Label htmlFor="sick" className="font-medium">Sick Days</Label>
+                        </div>
+                        <Input
+                          id="sick"
+                          type="number"
+                          min="0"
+                          max="365"
+                          value={leaveSettings.sick_days_allocated}
+                          onChange={(e) => setLeaveSettings(prev => ({
+                            ...prev,
+                            sick_days_allocated: parseInt(e.target.value) || 0
+                          }))}
+                          className="text-center font-medium"
+                        />
+                      </div>
+
+                      <div className="bg-white rounded-lg border p-4">
+                        <div className="flex items-center mb-3">
+                          <User className="h-5 w-5 text-green-600 mr-2" />
+                          <Label htmlFor="personal" className="font-medium">Personal Days</Label>
+                        </div>
+                        <Input
+                          id="personal"
+                          type="number"
+                          min="0"
+                          max="365"
+                          value={leaveSettings.personal_days_allocated}
+                          onChange={(e) => setLeaveSettings(prev => ({
+                            ...prev,
+                            personal_days_allocated: parseInt(e.target.value) || 0
+                          }))}
+                          className="text-center font-medium"
+                        />
+                      </div>
+
+                      <div className="bg-white rounded-lg border p-4">
+                        <div className="flex items-center mb-3">
+                          <AlertCircle className="h-5 w-5 text-orange-600 mr-2" />
+                          <Label htmlFor="emergency" className="font-medium">Emergency Days</Label>
+                        </div>
+                        <Input
+                          id="emergency"
+                          type="number"
+                          min="0"
+                          max="365"
+                          value={leaveSettings.emergency_days_allocated}
+                          onChange={(e) => setLeaveSettings(prev => ({
+                            ...prev,
+                            emergency_days_allocated: parseInt(e.target.value) || 0
+                          }))}
+                          className="text-center font-medium"
+                        />
+                      </div>
+
+                      <div className="bg-white rounded-lg border p-4">
+                        <div className="flex items-center mb-3">
+                          <Heart className="h-5 w-5 text-gray-600 mr-2" />
+                          <Label htmlFor="bereavement" className="font-medium">Bereavement Days</Label>
+                        </div>
+                        <Input
+                          id="bereavement"
+                          type="number"
+                          min="0"
+                          max="365"
+                          value={leaveSettings.bereavement_days_allocated}
+                          onChange={(e) => setLeaveSettings(prev => ({
+                            ...prev,
+                            bereavement_days_allocated: parseInt(e.target.value) || 0
+                          }))}
+                          className="text-center font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-end">
+                      <Button 
+                        onClick={updateEmployeeLeaveAllocation}
+                        className="px-6"
+                      >
+                        <Building className="h-4 w-4 mr-2" />
+                        Update Leave Allocation
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!selectedEmployee && (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Employee</h3>
+                    <p className="text-gray-600">Choose an employee from the dropdown above to manage their leave allocations.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Settings for All Employees */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Bulk Leave Settings
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Apply standard leave allocation to all employees in your organization.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-medium text-yellow-800">Bulk Update Warning</h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        This will apply the same leave allocation to all employees in your organization. 
+                        Individual settings will be overwritten. Use with caution.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="flex items-center mb-3">
+                      <Plane className="h-5 w-5 text-blue-600 mr-2" />
+                      <Label className="font-medium">Vacation Days</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="20"
+                      className="text-center font-medium"
+                    />
+                  </div>
+
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="flex items-center mb-3">
+                      <Heart className="h-5 w-5 text-red-600 mr-2" />
+                      <Label className="font-medium">Sick Days</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="10"
+                      className="text-center font-medium"
+                    />
+                  </div>
+
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="flex items-center mb-3">
+                      <User className="h-5 w-5 text-green-600 mr-2" />
+                      <Label className="font-medium">Personal Days</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="5"
+                      className="text-center font-medium"
+                    />
+                  </div>
+
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="flex items-center mb-3">
+                      <AlertCircle className="h-5 w-5 text-orange-600 mr-2" />
+                      <Label className="font-medium">Emergency Days</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="3"
+                      className="text-center font-medium"
+                    />
+                  </div>
+
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="flex items-center mb-3">
+                      <Heart className="h-5 w-5 text-gray-600 mr-2" />
+                      <Label className="font-medium">Bereavement Days</Label>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="3"
+                      className="text-center font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-center">
+                  <Button variant="outline" className="px-8">
+                    <Users className="h-4 w-4 mr-2" />
+                    Apply to All Employees
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        // Original Leave Requests Content
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Requests List */}
         <div className="lg:col-span-1 space-y-4">
           {/* Search and Filters */}
@@ -1032,6 +1492,7 @@ export default function LeavePage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Create Request Modal */}
       {showCreateRequest && (

@@ -26,6 +26,10 @@ import {
   Star
 } from 'lucide-react'
 import { format } from 'date-fns'
+import SignaturePad from '@/components/form-fields/SignaturePad'
+import CameraCapture from '@/components/form-fields/CameraCapture'
+import MultiSelect from '@/components/form-fields/MultiSelect'
+import FileUpload from '@/components/form-fields/FileUpload'
 
 interface Form {
   id: string
@@ -44,6 +48,11 @@ interface FormField {
   required: boolean
   options?: string[]
   settings?: any
+  conditional?: {
+    dependsOn?: string
+    showWhen?: string | string[]
+    hideWhen?: string | string[]
+  }
 }
 
 interface FormResponse {
@@ -322,7 +331,46 @@ export default function FormFillPage() {
     }
   }
 
+  const isFieldVisible = (field: FormField): boolean => {
+    if (!field.conditional?.dependsOn) return true
+
+    const dependentFieldValue = responses[field.conditional.dependsOn]
+    
+    if (field.conditional.showWhen) {
+      const showWhenValues = Array.isArray(field.conditional.showWhen) 
+        ? field.conditional.showWhen 
+        : [field.conditional.showWhen]
+      
+      // For checkbox fields, check if any of the selected values match
+      if (Array.isArray(dependentFieldValue)) {
+        return dependentFieldValue.some(val => showWhenValues.includes(val))
+      }
+      
+      return showWhenValues.includes(dependentFieldValue)
+    }
+
+    if (field.conditional.hideWhen) {
+      const hideWhenValues = Array.isArray(field.conditional.hideWhen) 
+        ? field.conditional.hideWhen 
+        : [field.conditional.hideWhen]
+      
+      // For checkbox fields, check if any of the selected values match
+      if (Array.isArray(dependentFieldValue)) {
+        return !dependentFieldValue.some(val => hideWhenValues.includes(val))
+      }
+      
+      return !hideWhenValues.includes(dependentFieldValue)
+    }
+
+    return true
+  }
+
   const renderField = (field: FormField) => {
+    // Check if field should be visible
+    if (!isFieldVisible(field)) {
+      return null
+    }
+
     const value = responses[field.id]
     const error = errors[field.id]
 
@@ -465,31 +513,15 @@ export default function FormFillPage() {
 
       case 'file':
         return fieldWrapper(
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <Input
-              type="file"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  updateResponse(field.id, file.name)
-                }
-              }}
-              accept={field.settings?.accept}
-              multiple={field.settings?.multiple}
-              className="hidden"
-              id={`file_${field.id}`}
-            />
-            <label htmlFor={`file_${field.id}`} className="cursor-pointer">
-              <div className="text-sm text-gray-600">
-                Click to upload or drag and drop
-              </div>
-              {value && (
-                <div className="text-sm text-blue-600 mt-1">
-                  Selected: {value}
-                </div>
-              )}
-            </label>
-          </div>
+          <FileUpload
+            label=""
+            value={value || []}
+            onChange={(val) => updateResponse(field.id, val)}
+            multiple={field.settings?.multiple || false}
+            maxSize={field.settings?.maxSize || 10}
+            accept={field.settings?.accept}
+            error={error}
+          />
         )
 
       case 'rating':
@@ -552,6 +584,44 @@ export default function FormFillPage() {
           <div 
             className="prose prose-sm"
             dangerouslySetInnerHTML={{ __html: field.settings?.content || '' }}
+          />
+        )
+
+      case 'multiselect':
+        return fieldWrapper(
+          <MultiSelect
+            label=""
+            value={value || []}
+            onChange={(val) => updateResponse(field.id, val)}
+            options={field.options || []}
+            placeholder={field.placeholder || 'Select options...'}
+            error={error}
+          />
+        )
+
+      case 'signature':
+        return fieldWrapper(
+          <SignaturePad
+            label=""
+            value={value || ''}
+            onChange={(val) => updateResponse(field.id, val)}
+            width={field.settings?.width || 400}
+            height={field.settings?.height || 200}
+            clearButton={field.settings?.clearButton !== false}
+            error={error}
+          />
+        )
+
+      case 'camera':
+        return fieldWrapper(
+          <CameraCapture
+            label=""
+            value={value || []}
+            onChange={(val) => updateResponse(field.id, val)}
+            multiple={field.settings?.multiple || false}
+            maxSize={field.settings?.maxSize || 5}
+            allowUpload={field.settings?.allowUpload !== false}
+            error={error}
           />
         )
 
