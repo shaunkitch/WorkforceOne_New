@@ -6,6 +6,7 @@ export interface Profile {
   organization_id: string
   role: 'admin' | 'manager' | 'lead' | 'member'
   department?: string
+  work_type?: 'field' | 'remote' | 'hybrid' | 'office'
   is_active: boolean
   created_at: string
   updated_at: string

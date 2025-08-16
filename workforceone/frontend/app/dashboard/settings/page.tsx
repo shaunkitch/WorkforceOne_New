@@ -1163,6 +1163,11 @@ const ALL_FEATURES = [
   // Forms & Processes
   { id: 'forms', name: 'Dynamic Forms', category: 'Forms', description: 'Form builder and response management' },
   
+  // Mobile App Features
+  { id: 'mobile_daily_visits', name: 'Daily Visits (Mobile)', category: 'Mobile App', description: 'Daily customer visits and location tracking in mobile app' },
+  { id: 'mobile_offline_mode', name: 'Offline Mode (Mobile)', category: 'Mobile App', description: 'Allow mobile app to work offline and sync later' },
+  { id: 'mobile_push_notifications', name: 'Push Notifications (Mobile)', category: 'Mobile App', description: 'Send push notifications to mobile devices' },
+  
   // Administration (Admin/Manager only)
   { id: 'automation', name: 'Workflow Automation', category: 'Administration', description: 'Automated workflows and triggers', requiresRole: ['admin', 'manager'] },
   { id: 'integrations', name: 'Third-party Integrations', category: 'Administration', description: 'Slack, Teams, and other integrations', requiresRole: ['admin', 'manager'] },
@@ -2118,7 +2123,7 @@ function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManag
             </div>
             
             {/* Group features by category */}
-            {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Administration'].map(category => {
+            {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Mobile App', 'Administration'].map(category => {
               const categoryFeatures = ALL_FEATURES.filter(f => f.category === category)
               if (categoryFeatures.length === 0) return null
               
@@ -2247,7 +2252,7 @@ function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManag
                       Customize which features this user can access
                     </p>
                     <div className="space-y-4">
-                      {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Administration'].map(category => {
+                      {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Mobile App', 'Administration'].map(category => {
                         const categoryFeatures = ALL_FEATURES.filter(f => {
                           // Filter by role if user doesn't have required permissions
                           if (f.requiresRole && selectedUser?.role) {

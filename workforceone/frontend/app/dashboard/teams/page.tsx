@@ -32,7 +32,12 @@ import {
   Plus,
   Search,
   Filter,
-  UserCheck
+  UserCheck,
+  Copy,
+  RefreshCw,
+  Key,
+  Building,
+  CheckCircle
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 
@@ -92,6 +97,14 @@ interface Invitation {
   }
 }
 
+interface OrganizationSettings {
+  id: string
+  name: string
+  join_code: string
+  created_at: string
+  updated_at: string
+}
+
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
@@ -113,13 +126,16 @@ export default function TeamsPage() {
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null)
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [availableUsers, setAvailableUsers] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<'teams' | 'invitations' | 'integrations'>('teams')
+  const [activeTab, setActiveTab] = useState<'teams' | 'invitations' | 'integrations' | 'organization'>('teams')
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loadingInvitations, setLoadingInvitations] = useState(false)
   const [showCreateInvitation, setShowCreateInvitation] = useState(false)
   const [emailIntegration, setEmailIntegration] = useState<any>(null)
   const [loadingIntegration, setLoadingIntegration] = useState(false)
   const [showEmailSettings, setShowEmailSettings] = useState(false)
+  const [organizationSettings, setOrganizationSettings] = useState<OrganizationSettings | null>(null)
+  const [loadingOrganization, setLoadingOrganization] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
   
   // Form states
   const [teamForm, setTeamForm] = useState({
@@ -199,6 +215,8 @@ export default function TeamsPage() {
       fetchPendingInvitations()
     } else if (activeTab === 'integrations') {
       fetchEmailIntegration()
+    } else if (activeTab === 'organization') {
+      fetchOrganizationSettings()
     }
   }, [activeTab])
 
@@ -598,6 +616,120 @@ export default function TeamsPage() {
     } catch (error) {
       console.error('Error testing email integration:', error)
       alert('Failed to test email integration. Please try again.')
+    }
+  }
+
+  // Organization settings functions
+  const fetchOrganizationSettings = async () => {
+    setLoadingOrganization(true)
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+
+      // Get user's organization
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      const { data: org, error } = await supabase
+        .from('organizations')
+        .select('id, name, join_code, created_at, updated_at')
+        .eq('id', profile.organization_id)
+        .single()
+
+      if (error) throw error
+      
+      // If organization doesn't have a join_code yet, set the org first then generate one
+      if (!org.join_code) {
+        setOrganizationSettings(org)
+        // Generate a join code for this organization
+        await regenerateJoinCodeForOrg(org.id)
+        return
+      }
+      
+      setOrganizationSettings(org)
+    } catch (error) {
+      console.error('Error fetching organization settings:', error)
+    } finally {
+      setLoadingOrganization(false)
+    }
+  }
+
+  const regenerateJoinCodeForOrg = async (orgId: string) => {
+    try {
+      // Generate new unique code
+      const generateJoinCode = () => {
+        return Math.random().toString(36).substring(2, 8).toUpperCase()
+      }
+
+      let newJoinCode = generateJoinCode()
+      
+      // Ensure code is unique
+      let isUnique = false
+      let attempts = 0
+      while (!isUnique && attempts < 10) {
+        const { data: existingCode } = await supabase
+          .from('organizations')
+          .select('id')
+          .eq('join_code', newJoinCode)
+          .maybeSingle()
+        
+        if (!existingCode) {
+          isUnique = true
+        } else {
+          newJoinCode = generateJoinCode()
+          attempts++
+        }
+      }
+
+      // Update organization with new code
+      const { data, error } = await supabase
+        .from('organizations')
+        .update({ 
+          join_code: newJoinCode,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgId)
+        .select('id, name, join_code, created_at, updated_at')
+        .single()
+
+      if (error) throw error
+      
+      setOrganizationSettings(data)
+    } catch (error) {
+      console.error('Error generating join code:', error)
+    }
+  }
+
+  const regenerateJoinCode = async () => {
+    if (!organizationSettings) return
+    
+    setLoadingOrganization(true)
+    try {
+      await regenerateJoinCodeForOrg(organizationSettings.id)
+      alert('Join code regenerated successfully!')
+    } catch (error) {
+      console.error('Error regenerating join code:', error)
+      alert('Failed to regenerate join code. Please try again.')
+    } finally {
+      setLoadingOrganization(false)
+    }
+  }
+
+  const copyJoinCode = async () => {
+    if (!organizationSettings?.join_code) return
+    
+    try {
+      await navigator.clipboard.writeText(organizationSettings.join_code)
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy join code:', error)
+      alert('Failed to copy join code. Please copy it manually.')
     }
   }
 
@@ -1213,6 +1345,19 @@ export default function TeamsPage() {
             >
               <Settings className="h-5 w-5 mr-2 inline" />
               Email Integration
+            </button>
+          )}
+          {canManageTeams() && (
+            <button
+              onClick={() => setActiveTab('organization')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'organization'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Building className="h-5 w-5 mr-2 inline" />
+              Organization
             </button>
           )}
         </nav>
@@ -2381,6 +2526,135 @@ export default function TeamsPage() {
                   Save Configuration
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Organization Settings Tab */}
+      {activeTab === 'organization' && (
+        <div className="space-y-6">
+          {/* Organization Header */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <Building className="h-5 w-5 mr-2" />
+                    Organization Settings
+                  </CardTitle>
+                  <p className="text-gray-600 mt-1">Manage your organization's join code for new members</p>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
+          {/* Join Code Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Key className="h-5 w-5 mr-2" />
+                Join Code
+              </CardTitle>
+              <p className="text-gray-600 text-sm">
+                Share this code with new team members to join your organization
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loadingOrganization ? (
+                <div className="text-center py-8">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-2 text-gray-600">Loading organization settings...</span>
+                  </div>
+                </div>
+              ) : organizationSettings ? (
+                <div className="space-y-6">
+                  {/* Organization Info */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">Organization</h3>
+                    <p className="text-gray-600">{organizationSettings.name}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Created: {format(parseISO(organizationSettings.created_at), 'PPP')}
+                    </p>
+                  </div>
+
+                  {/* Join Code Display */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          Organization Join Code
+                        </h3>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg px-6 py-3">
+                            <span className="text-2xl font-mono font-bold text-blue-600 tracking-wider">
+                              {organizationSettings.join_code}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-center space-x-3">
+                        <Button
+                          onClick={copyJoinCode}
+                          variant="outline"
+                          className="flex items-center"
+                        >
+                          {copySuccess ? (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy Code
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button
+                          onClick={regenerateJoinCode}
+                          variant="outline"
+                          disabled={loadingOrganization}
+                          className="flex items-center"
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-2 ${loadingOrganization ? 'animate-spin' : ''}`} />
+                          Regenerate
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Instructions */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">How to use the join code:</h4>
+                    <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                      <li>Share this 6-character code with new team members</li>
+                      <li>They can use it during signup by selecting "Join with Code"</li>
+                      <li>New members will be automatically added to your organization</li>
+                      <li>You can regenerate the code anytime for security</li>
+                    </ol>
+                  </div>
+
+                  {/* Security Note */}
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-medium text-yellow-900 mb-2">Security Note:</h4>
+                    <p className="text-sm text-yellow-800">
+                      Regenerate the join code if you suspect it has been compromised or shared with unauthorized individuals. 
+                      All previous codes will become invalid when you generate a new one.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No organization found</h3>
+                  <p className="text-gray-500">Unable to load organization settings.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

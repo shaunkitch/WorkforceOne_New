@@ -4,6 +4,7 @@ import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
+import { useFeatureFlags } from '../hooks/useFeatureFlags'
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen'
@@ -41,6 +42,7 @@ const drawerItems: DrawerItem[] = [
 
 function CustomDrawerContent(props: any) {
   const { profile, signOut } = useAuth()
+  const { hasFeature } = useFeatureFlags()
   const insets = useSafeAreaInsets()
 
   const handleSignOut = async () => {
@@ -65,10 +67,36 @@ function CustomDrawerContent(props: any) {
     )
   }
 
-  // Group items by section
-  const mainItems = drawerItems.filter(item => !item.section)
-  const hrItems = drawerItems.filter(item => item.section === 'HR')
-  const otherItems = drawerItems.filter(item => item.section === 'Other')
+  // Filter items based on feature flags
+  const filterItemsByFeatures = (items: DrawerItem[]) => {
+    return items.filter(item => {
+      // Check if Daily Calls should be shown based on feature flags
+      if (item.name === 'DailyCalls') {
+        return hasFeature('maps') // This checks both organization setting and user work type
+      }
+      
+      // Add more feature checks here for other items if needed
+      if (item.name === 'Tasks') {
+        return hasFeature('tasks')
+      }
+      
+      if (item.name === 'Leave') {
+        return hasFeature('leave')
+      }
+      
+      if (item.name === 'Forms') {
+        return hasFeature('forms')
+      }
+      
+      // Default to showing the item if no specific feature check
+      return true
+    })
+  }
+
+  // Group items by section and filter by features
+  const mainItems = filterItemsByFeatures(drawerItems.filter(item => !item.section))
+  const hrItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'HR'))
+  const otherItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Other'))
 
   const renderDrawerItem = (item: DrawerItem) => (
     <DrawerItem
@@ -144,6 +172,27 @@ function CustomDrawerContent(props: any) {
 }
 
 export default function DrawerNavigator() {
+  const { hasFeature } = useFeatureFlags()
+  
+  // Filter drawer items based on feature flags for screen registration
+  const getFilteredDrawerItems = () => {
+    return drawerItems.filter(item => {
+      if (item.name === 'DailyCalls') {
+        return hasFeature('maps')
+      }
+      if (item.name === 'Tasks') {
+        return hasFeature('tasks')
+      }
+      if (item.name === 'Leave') {
+        return hasFeature('leave')
+      }
+      if (item.name === 'Forms') {
+        return hasFeature('forms')
+      }
+      return true
+    })
+  }
+
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
@@ -165,7 +214,7 @@ export default function DrawerNavigator() {
         drawerType: 'slide',
       }}
     >
-      {drawerItems.map((item) => (
+      {getFilteredDrawerItems().map((item) => (
         <Drawer.Screen
           key={item.name}
           name={item.name}

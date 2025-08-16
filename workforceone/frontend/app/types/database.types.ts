@@ -17,16 +17,7 @@ export interface Database {
           id: string
           name: string
           slug?: string
-          description?: string | null
-          website?: string | null
-          logo_url: string | null
-          address?: string | null
-          city?: string | null
-          state?: string | null
-          country?: string | null
-          postal_code?: string | null
-          phone?: string | null
-          email?: string | null
+          join_code?: string
           settings?: Json
           feature_flags?: Json
           created_at: string
@@ -36,16 +27,7 @@ export interface Database {
           id?: string
           name: string
           slug?: string
-          description?: string | null
-          website?: string | null
-          logo_url?: string | null
-          address?: string | null
-          city?: string | null
-          state?: string | null
-          country?: string | null
-          postal_code?: string | null
-          phone?: string | null
-          email?: string | null
+          join_code?: string
           settings?: Json
           feature_flags?: Json
           created_at?: string
@@ -55,16 +37,7 @@ export interface Database {
           id?: string
           name?: string
           slug?: string
-          description?: string | null
-          website?: string | null
-          logo_url?: string | null
-          address?: string | null
-          city?: string | null
-          state?: string | null
-          country?: string | null
-          postal_code?: string | null
-          phone?: string | null
-          email?: string | null
+          join_code?: string
           settings?: Json
           feature_flags?: Json
           created_at?: string

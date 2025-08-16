@@ -11,6 +11,7 @@ import {
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { useFeatureFlags } from '../../hooks/useFeatureFlags'
 import { supabase } from '../../lib/supabase'
 
 interface MemberStats {
@@ -29,6 +30,7 @@ interface QuickAction {
 
 export default function DashboardScreen({ navigation }: any) {
   const { user, profile } = useAuth()
+  const { hasFeature, loading: featureFlagsLoading } = useFeatureFlags()
   const [stats, setStats] = useState<MemberStats>({
     myTasksCount: 0,
     todayAttendance: false,
@@ -39,10 +41,7 @@ export default function DashboardScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false)
 
   const quickActions: QuickAction[] = [
-    { title: 'Clock In/Out', icon: 'time-outline', color: '#10b981', screen: 'Attendance' },
-    { title: 'My Tasks', icon: 'checkmark-circle-outline', color: '#f59e0b', screen: 'Tasks' },
-    { title: 'Daily Calls', icon: 'map-outline', color: '#3b82f6', screen: 'DailyCalls' },
-    { title: 'Request Leave', icon: 'calendar-outline', color: '#8b5cf6', screen: 'Leave' },
+    { title: 'Daily Visits', icon: 'map-outline', color: '#3b82f6', screen: 'DailyCalls' },
   ]
 
   useEffect(() => {
@@ -58,46 +57,69 @@ export default function DashboardScreen({ navigation }: any) {
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
       const weekStart = startOfWeek.toISOString().split('T')[0]
 
-      // Run queries in parallel for better performance
-      const [tasksResult, attendanceResult, timeEntriesResult, leaveResult] = await Promise.all([
-        // Fetch my pending tasks count
-        supabase
-          .from('tasks')
-          .select('id', { count: 'exact' })
-          .eq('assigned_to', user.id)
-          .in('status', ['todo', 'in_progress']),
-
-        // Check if I've clocked in today
+      // Build query array based on enabled features
+      const queries = []
+      
+      // Always fetch attendance (core feature)
+      queries.push(
         supabase
           .from('attendance')
           .select('id')
           .eq('user_id', user.id)
           .gte('created_at', `${today}T00:00:00.000Z`)
           .lt('created_at', `${today}T23:59:59.999Z`)
-          .limit(1),
+          .limit(1)
+      )
 
-        // Get my weekly hours
-        supabase
-          .from('time_entries')
-          .select('duration')
-          .eq('user_id', user.id)
-          .gte('date', weekStart),
+      // Conditionally fetch tasks if feature is enabled
+      if (hasFeature('tasks')) {
+        queries.push(
+          supabase
+            .from('tasks')
+            .select('id', { count: 'exact' })
+            .eq('assigned_to', user.id)
+            .in('status', ['todo', 'in_progress'])
+        )
+      } else {
+        queries.push(Promise.resolve({ data: [], count: 0 }))
+      }
 
-        // Get my pending leave requests
-        supabase
-          .from('leave_requests')
-          .select('id', { count: 'exact' })
-          .eq('user_id', user.id)
-          .eq('status', 'pending')
-      ])
+      // Conditionally fetch time entries if feature is enabled
+      if (hasFeature('time_tracking')) {
+        queries.push(
+          supabase
+            .from('time_entries')
+            .select('duration')
+            .eq('user_id', user.id)
+            .gte('date', weekStart)
+        )
+      } else {
+        queries.push(Promise.resolve({ data: [] }))
+      }
+
+      // Conditionally fetch leave requests if feature is enabled
+      if (hasFeature('leave')) {
+        queries.push(
+          supabase
+            .from('leave_requests')
+            .select('id', { count: 'exact' })
+            .eq('user_id', user.id)
+            .eq('status', 'pending')
+        )
+      } else {
+        queries.push(Promise.resolve({ data: [], count: 0 }))
+      }
+
+      // Run queries in parallel for better performance
+      const [attendanceResult, tasksResult, timeEntriesResult, leaveResult] = await Promise.all(queries)
 
       // Calculate weekly hours
       const weeklyMinutes = timeEntriesResult.data?.reduce((total, entry) => total + (entry.duration || 0), 0) || 0
       const weeklyHours = Math.round((weeklyMinutes / 60) * 10) / 10
 
       setStats({
-        myTasksCount: tasksResult.count || 0,
         todayAttendance: (attendanceResult.data?.length || 0) > 0,
+        myTasksCount: tasksResult.count || 0,
         weeklyHours,
         pendingLeaveRequests: leaveResult.count || 0,
       })
@@ -140,103 +162,116 @@ export default function DashboardScreen({ navigation }: any) {
         style={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#fef3c7' }]}>
-              <Ionicons name="checkmark-circle-outline" size={32} color="#f59e0b" />
-              <Text style={styles.statNumber}>{stats.myTasksCount}</Text>
-              <Text style={styles.statLabel}>My Tasks</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: stats.todayAttendance ? '#dcfce7' : '#fee2e2' }]}>
+        {/* Today's Focus Card */}
+        <View style={styles.focusCard}>
+          <View style={styles.focusHeader}>
+            <Text style={styles.focusTitle}>Today's Focus</Text>
+            <Text style={styles.focusDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={[styles.attendanceCard, { 
+              backgroundColor: stats.todayAttendance ? '#dcfce7' : '#fef3c7',
+              borderColor: stats.todayAttendance ? '#10b981' : '#f59e0b'
+            }]}
+            onPress={() => navigation.navigate('Attendance')}
+          >
+            <View style={styles.attendanceContent}>
               <Ionicons 
-                name={stats.todayAttendance ? "checkmark-circle-outline" : "time-outline"} 
-                size={32} 
-                color={stats.todayAttendance ? "#10b981" : "#ef4444"} 
+                name={stats.todayAttendance ? "checkmark-circle" : "time"} 
+                size={28} 
+                color={stats.todayAttendance ? "#10b981" : "#f59e0b"} 
               />
-              <Text style={styles.statNumber}>{stats.todayAttendance ? "✓" : "✗"}</Text>
-              <Text style={styles.statLabel}>Clocked In Today</Text>
+              <View style={styles.attendanceText}>
+                <Text style={styles.attendanceTitle}>
+                  {stats.todayAttendance ? "You're clocked in!" : "Ready to start?"}
+                </Text>
+                <Text style={styles.attendanceSubtitle}>
+                  {stats.todayAttendance ? "Tap to view details or clock out" : "Tap to clock in and begin your day"}
+                </Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#dbeafe' }]}>
-              <Ionicons name="stopwatch-outline" size={32} color="#3b82f6" />
-              <Text style={styles.statNumber}>{stats.weeklyHours}h</Text>
-              <Text style={styles.statLabel}>This Week</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: '#f3e8ff' }]}>
-              <Ionicons name="calendar-outline" size={32} color="#8b5cf6" />
-              <Text style={styles.statNumber}>{stats.pendingLeaveRequests}</Text>
-              <Text style={styles.statLabel}>Pending Leave</Text>
+          </TouchableOpacity>
+
+          {/* Weekly Progress */}
+          <View style={styles.progressSection}>
+            <Text style={styles.progressTitle}>This Week's Progress</Text>
+            <View style={styles.progressRow}>
+              {hasFeature('time_tracking') && (
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressValue}>{stats.weeklyHours}h</Text>
+                  <Text style={styles.progressLabel}>Hours Logged</Text>
+                </View>
+              )}
+              {hasFeature('tasks') && (
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressValue}>{stats.myTasksCount}</Text>
+                  <Text style={styles.progressLabel}>Tasks Pending</Text>
+                </View>
+              )}
+              {hasFeature('leave') && stats.pendingLeaveRequests > 0 && (
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressValue}>{stats.pendingLeaveRequests}</Text>
+                  <Text style={styles.progressLabel}>Leave Pending</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            {quickActions.map((action, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.quickActionCard, { borderLeftColor: action.color }]}
-                onPress={() => navigation.navigate(action.screen)}
-              >
-                <Ionicons name={action.icon as any} size={24} color={action.color} />
-                <Text style={styles.quickActionText}>{action.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Today's Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Summary</Text>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryItem}>
-              <View style={[styles.summaryIcon, { backgroundColor: stats.todayAttendance ? '#10b981' : '#ef4444' }]}>
-                <Ionicons name={stats.todayAttendance ? "checkmark" : "close"} size={16} color="white" />
+        {/* Daily Visits Quick Action - Only show if maps feature is enabled */}
+        {hasFeature('maps') && (
+          <TouchableOpacity
+            style={styles.visitsCard}
+            onPress={() => navigation.navigate('DailyCalls')}
+          >
+            <View style={styles.visitsContent}>
+              <View style={styles.visitsIcon}>
+                <Ionicons name="map-outline" size={24} color="#3b82f6" />
               </View>
-              <View style={styles.summaryContent}>
-                <Text style={styles.summaryTitle}>
-                  {stats.todayAttendance ? "Attendance marked" : "Not clocked in yet"}
-                </Text>
-                <Text style={styles.summaryDescription}>
-                  {stats.todayAttendance ? "You're all set for today" : "Remember to clock in when you arrive"}
-                </Text>
+              <View style={styles.visitsText}>
+                <Text style={styles.visitsTitle}>Daily Visits</Text>
+                <Text style={styles.visitsSubtitle}>Plan and track your customer visits</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </View>
-            
-            <View style={styles.summaryItem}>
-              <View style={[styles.summaryIcon, { backgroundColor: stats.myTasksCount > 0 ? '#f59e0b' : '#10b981' }]}>
-                <Ionicons name="list" size={16} color="white" />
-              </View>
-              <View style={styles.summaryContent}>
-                <Text style={styles.summaryTitle}>
-                  {stats.myTasksCount === 0 ? "No pending tasks" : `${stats.myTasksCount} tasks pending`}
-                </Text>
-                <Text style={styles.summaryDescription}>
-                  {stats.myTasksCount === 0 ? "Great job! All caught up" : "Check your task list to get started"}
-                </Text>
-              </View>
-            </View>
+          </TouchableOpacity>
+        )}
 
-            {stats.pendingLeaveRequests > 0 && (
-              <View style={styles.summaryItem}>
-                <View style={[styles.summaryIcon, { backgroundColor: '#8b5cf6' }]}>
-                  <Ionicons name="calendar" size={16} color="white" />
-                </View>
-                <View style={styles.summaryContent}>
-                  <Text style={styles.summaryTitle}>
-                    {stats.pendingLeaveRequests} leave request{stats.pendingLeaveRequests > 1 ? 's' : ''} pending
-                  </Text>
-                  <Text style={styles.summaryDescription}>
-                    Waiting for approval from your manager
-                  </Text>
-                </View>
+        {/* Weekly Insights */}
+        <View style={styles.insightsCard}>
+          <Text style={styles.insightsTitle}>Weekly Insights</Text>
+          {hasFeature('tasks') && (
+            stats.myTasksCount > 0 ? (
+              <View style={styles.insightItem}>
+                <Ionicons name="trending-up" size={16} color="#f59e0b" />
+                <Text style={styles.insightText}>
+                  You have {stats.myTasksCount} task{stats.myTasksCount > 1 ? 's' : ''} to complete this week
+                </Text>
               </View>
-            )}
-          </View>
+            ) : (
+              <View style={styles.insightItem}>
+                <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                <Text style={styles.insightText}>Great job! All tasks completed</Text>
+              </View>
+            )
+          )}
+          
+          {hasFeature('time_tracking') && stats.weeklyHours > 0 && (
+            <View style={styles.insightItem}>
+              <Ionicons name="time" size={16} color="#3b82f6" />
+              <Text style={styles.insightText}>
+                {stats.weeklyHours}h logged this week
+              </Text>
+            </View>
+          )}
+          
+          {!hasFeature('tasks') && !hasFeature('time_tracking') && (
+            <View style={styles.insightItem}>
+              <Ionicons name="information-circle" size={16} color="#6b7280" />
+              <Text style={styles.insightText}>Focus on your forms and attendance today</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -279,29 +314,82 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  statsContainer: {
+  focusCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  focusHeader: {
     marginBottom: 16,
   },
-  statCard: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  statNumber: {
-    fontSize: 24,
+  focusTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#111827',
-    marginTop: 8,
   },
-  statLabel: {
+  focusDate: {
     fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  attendanceCard: {
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 20,
+  },
+  attendanceContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  attendanceText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  attendanceTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  attendanceSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  progressSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 16,
+  },
+  progressTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  progressItem: {
+    alignItems: 'center',
+  },
+  progressValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  progressLabel: {
+    fontSize: 12,
     color: '#6b7280',
     marginTop: 4,
   },
@@ -314,18 +402,10 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickActionCard: {
-    width: '48%',
+  visitsCard: {
     backgroundColor: 'white',
-    padding: 12,
     borderRadius: 12,
-    borderLeftWidth: 4,
-    marginBottom: 8,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -335,54 +415,62 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  quickActionText: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  summaryCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  visitsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
-  summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  summaryIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#10b981',
+  visitsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    marginTop: 2,
   },
-  summaryContent: {
+  visitsText: {
     flex: 1,
   },
-  summaryTitle: {
-    fontSize: 15,
+  visitsTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
   },
-  summaryDescription: {
-    fontSize: 13,
+  visitsSubtitle: {
+    fontSize: 14,
     color: '#6b7280',
-    lineHeight: 18,
+    marginTop: 2,
+  },
+  insightsCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  insightsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  insightItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  insightText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginLeft: 8,
+    flex: 1,
   },
 })

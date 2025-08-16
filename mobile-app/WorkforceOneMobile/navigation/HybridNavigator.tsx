@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../contexts/AuthContext'
+import { useFeatureFlags } from '../hooks/useFeatureFlags'
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen'
@@ -23,6 +24,7 @@ const Tab = createBottomTabNavigator()
 // Custom Drawer Content for additional pages
 function CustomDrawerContent(props: any) {
   const { profile, signOut } = useAuth()
+  const { hasFeature } = useFeatureFlags()
   const insets = useSafeAreaInsets()
 
   const handleSignOut = async () => {
@@ -89,26 +91,30 @@ function CustomDrawerContent(props: any) {
           inactiveTintColor="#6b7280"
         />
         
-        <DrawerItem
-          label="Daily Calls"
-          icon={({ color, size }) => <Ionicons name="map-outline" size={size} color={color} />}
-          onPress={() => props.navigation.navigate('DailyCalls')}
-          activeTintColor="#3b82f6"
-          inactiveTintColor="#6b7280"
-        />
+        {hasFeature('maps') && (
+          <DrawerItem
+            label="Daily Calls"
+            icon={({ color, size }) => <Ionicons name="map-outline" size={size} color={color} />}
+            onPress={() => props.navigation.navigate('DailyCalls')}
+            activeTintColor="#3b82f6"
+            inactiveTintColor="#6b7280"
+          />
+        )}
 
         {/* HR Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>HR</Text>
         </View>
         
-        <DrawerItem
-          label="Leave Requests"
-          icon={({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} />}
-          onPress={() => props.navigation.navigate('Leave')}
-          activeTintColor="#3b82f6"
-          inactiveTintColor="#6b7280"
-        />
+        {hasFeature('leave') && (
+          <DrawerItem
+            label="Leave Requests"
+            icon={({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} />}
+            onPress={() => props.navigation.navigate('Leave')}
+            activeTintColor="#3b82f6"
+            inactiveTintColor="#6b7280"
+          />
+        )}
         
         <DrawerItem
           label="Payslips"
@@ -148,6 +154,7 @@ function CustomDrawerContent(props: any) {
 
 // Bottom Tab Navigator for main functions
 function MainTabs() {
+  const { hasFeature } = useFeatureFlags()
   const insets = useSafeAreaInsets()
   
   return (
@@ -209,22 +216,28 @@ function MainTabs() {
         component={AttendanceScreen} 
         options={{ title: 'Clock In' }}
       />
-      <Tab.Screen 
-        name="Tasks" 
-        component={TasksScreen} 
-        options={{ title: 'My Tasks' }}
-      />
-      <Tab.Screen 
-        name="Forms" 
-        component={FormsScreenSimple} 
-        options={{ title: 'Forms' }}
-      />
+      {hasFeature('tasks') && (
+        <Tab.Screen 
+          name="Tasks" 
+          component={TasksScreen} 
+          options={{ title: 'My Tasks' }}
+        />
+      )}
+      {hasFeature('forms') && (
+        <Tab.Screen 
+          name="Forms" 
+          component={FormsScreenSimple} 
+          options={{ title: 'Forms' }}
+        />
+      )}
     </Tab.Navigator>
   )
 }
 
 // Main Drawer Navigator
 export default function HybridNavigator() {
+  const { hasFeature } = useFeatureFlags()
+  
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
@@ -263,16 +276,20 @@ export default function HybridNavigator() {
         component={SummaryScreen}
         options={{ title: 'Summary' }}
       />
-      <Drawer.Screen
-        name="DailyCalls"
-        component={DailyCallsScreen}
-        options={{ title: 'Daily Calls' }}
-      />
-      <Drawer.Screen
-        name="Leave"
-        component={LeaveScreen}
-        options={{ title: 'Leave Requests' }}
-      />
+      {hasFeature('maps') && (
+        <Drawer.Screen
+          name="DailyCalls"
+          component={DailyCallsScreen}
+          options={{ title: 'Daily Calls' }}
+        />
+      )}
+      {hasFeature('leave') && (
+        <Drawer.Screen
+          name="Leave"
+          component={LeaveScreen}
+          options={{ title: 'Leave Requests' }}
+        />
+      )}
       <Drawer.Screen
         name="Payslips"
         component={PayslipsScreen}

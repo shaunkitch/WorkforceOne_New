@@ -11,20 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
 import { Loader2, Mail, Lock, User, Building, Users, Plus } from 'lucide-react'
-
-interface Organization {
-  id: string
-  name: string
-  slug: string
-}
 
 function SignupForm() {
   const [formData, setFormData] = useState({
@@ -32,15 +19,13 @@ function SignupForm() {
     password: '',
     fullName: '',
     organizationName: '',
+    organizationCode: '',
     phone: '',
     department: ''
   })
-  const [signupMode, setSignupMode] = useState<'join' | 'create'>('join')
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
+  const [signupMode, setSignupMode] = useState<'join' | 'create'>('create')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [loadingOrgs, setLoadingOrgs] = useState(true)
   const [invitationData, setInvitationData] = useState<any>(null)
   const [isInvitationMode, setIsInvitationMode] = useState(false)
   const router = useRouter()
@@ -54,16 +39,13 @@ function SignupForm() {
     if (token) {
       handleInvitationToken(token)
     } else {
-      // Load organizations for normal signup
-      fetchOrganizations()
-      
       // Check for URL parameters (for invitation links)
-      const orgParam = searchParams.get('org')
+      const codeParam = searchParams.get('code')
       const emailParam = searchParams.get('email')
       const nameParam = searchParams.get('name')
       
-      if (orgParam) {
-        setSelectedOrgId(orgParam)
+      if (codeParam) {
+        setFormData(prev => ({ ...prev, organizationCode: codeParam }))
         setSignupMode('join')
       }
       
@@ -77,24 +59,22 @@ function SignupForm() {
     }
   }, [searchParams])
 
-  const fetchOrganizations = async () => {
+  // Function to validate organization code and get org details
+  const validateOrganizationCode = async (code: string) => {
     try {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug')
-        .order('name')
+        .select('id, name, join_code')
+        .eq('join_code', code.toUpperCase())
+        .single()
 
-      if (error) throw error
-      setOrganizations(data || [])
-      
-      // If only one organization exists, auto-select it
-      if (data && data.length === 1) {
-        setSelectedOrgId(data[0].id)
+      if (error || !data) {
+        throw new Error('Invalid organization code')
       }
+
+      return data
     } catch (error) {
-      // Error fetching organizations handled silently
-    } finally {
-      setLoadingOrgs(false)
+      throw new Error('Invalid organization code')
     }
   }
 
@@ -136,9 +116,7 @@ function SignupForm() {
         email: invitation.email,
         department: invitation.department || ''
       }))
-      setSelectedOrgId(invitation.organization_id)
       setSignupMode('join')
-      setLoadingOrgs(false)
 
     } catch (error) {
       // Error handling invitation
@@ -185,12 +163,20 @@ function SignupForm() {
       } else {
         // Regular signup flow
         // Validation
-        if (signupMode === 'join' && !selectedOrgId) {
-          throw new Error('Please select an organization to join.')
+        if (signupMode === 'join' && !formData.organizationCode) {
+          throw new Error('Please enter an organization code to join.')
         }
         
         if (signupMode === 'create' && !formData.organizationName) {
           throw new Error('Please enter an organization name.')
+        }
+
+        let organizationId = ''
+
+        // Validate organization code if joining
+        if (signupMode === 'join') {
+          const orgData = await validateOrganizationCode(formData.organizationCode)
+          organizationId = orgData.id
         }
 
         // Sign up the user
@@ -208,8 +194,6 @@ function SignupForm() {
 
         if (authError) throw authError
 
-        let organizationId = selectedOrgId
-
         // Create organization if in create mode
         if (signupMode === 'create') {
           // Check if organization name already exists
@@ -223,21 +207,35 @@ function SignupForm() {
             throw new Error('An organization with this name already exists. Please choose a different name or join the existing organization.')
           }
 
+          // Generate unique 6-character join code
+          const generateJoinCode = () => {
+            return Math.random().toString(36).substring(2, 8).toUpperCase()
+          }
+
+          let joinCode = generateJoinCode()
+          
+          // Ensure join code is unique
+          let isUnique = false
+          while (!isUnique) {
+            const { data: existingCode } = await supabase
+              .from('organizations')
+              .select('id')
+              .eq('join_code', joinCode)
+              .single()
+            
+            if (!existingCode) {
+              isUnique = true
+            } else {
+              joinCode = generateJoinCode()
+            }
+          }
+
           const { data: org, error: orgError } = await supabase
             .from('organizations')
             .insert({
               name: formData.organizationName,
               slug: formData.organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-              description: null,
-              website: null,
-              logo_url: null,
-              address: null,
-              city: null,
-              state: null,
-              country: null,
-              postal_code: null,
-              phone: null,
-              email: null,
+              // join_code will be auto-generated by database trigger if migration was applied
               settings: {
                 currency_symbol: '$',
                 currency_code: 'USD',
@@ -341,7 +339,7 @@ function SignupForm() {
           <p className="mt-2 text-sm text-gray-600">
             {isInvitationMode 
               ? `Join ${invitationData?.organizations?.name || 'organization'}`
-              : signupMode === 'join' ? 'Join an organization' : 'Create your organization'
+              : signupMode === 'create' ? 'Create your organization' : 'Join an organization with code'
             }
           </p>
           {isInvitationMode && (
@@ -359,16 +357,6 @@ function SignupForm() {
           <div className="flex rounded-lg bg-gray-100 p-1">
             <Button
               type="button"
-              variant={signupMode === 'join' ? 'default' : 'ghost'}
-              size="sm"
-              className="flex-1"
-              onClick={() => setSignupMode('join')}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Join Organization
-            </Button>
-            <Button
-              type="button"
               variant={signupMode === 'create' ? 'default' : 'ghost'}
               size="sm"
               className="flex-1"
@@ -376,6 +364,16 @@ function SignupForm() {
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Organization
+            </Button>
+            <Button
+              type="button"
+              variant={signupMode === 'join' ? 'default' : 'ghost'}
+              size="sm"
+              className="flex-1"
+              onClick={() => setSignupMode('join')}
+            >
+              <Building className="h-4 w-4 mr-2" />
+              Join with Code
             </Button>
           </div>
         )}
@@ -456,44 +454,27 @@ function SignupForm() {
               </div>
             </div>
 
-            {/* Organization Selection/Creation - Hidden in invitation mode */}
+            {/* Organization Creation/Joining - Hidden in invitation mode */}
             {!isInvitationMode && (
               signupMode === 'join' ? (
                 <div>
-                  <Label htmlFor="organization">Select Organization</Label>
-                  <div className="mt-1">
-                    {loadingOrgs ? (
-                      <div className="flex items-center justify-center py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="ml-2 text-sm text-gray-500">Loading organizations...</span>
-                      </div>
-                    ) : organizations.length === 0 ? (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-gray-500 mb-2">No organizations available</p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSignupMode('create')}
-                        >
-                          Create First Organization
-                        </Button>
-                      </div>
-                    ) : (
-                      <Select value={selectedOrgId} onValueChange={setSelectedOrgId} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose an organization" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {organizations.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                  <Label htmlFor="organizationCode">Organization Code</Label>
+                  <div className="mt-1 relative">
+                    <Input
+                      id="organizationCode"
+                      type="text"
+                      value={formData.organizationCode}
+                      onChange={(e) => setFormData({ ...formData, organizationCode: e.target.value.toUpperCase() })}
+                      required
+                      className="pl-10 uppercase font-mono tracking-wider"
+                      placeholder="ABC123"
+                      maxLength={6}
+                    />
+                    <Building className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the 6-character code provided by your organization admin
+                  </p>
                 </div>
               ) : (
                 <div>
@@ -510,6 +491,9 @@ function SignupForm() {
                     />
                     <Building className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    You'll receive a unique code to share with your team members
+                  </p>
                 </div>
               )
             )}
