@@ -1,300 +1,644 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { 
-  Users, 
-  Clock, 
-  Calendar, 
-  BarChart3, 
-  Shield, 
-  Zap,
-  CheckCircle,
-  ArrowRight,
-  Star
+  Users, Clock, Calendar, BarChart3, Shield, Zap,
+  CheckCircle, ArrowRight, Star, Menu, X, ChevronRight,
+  MapPin, FileText, Phone, Building2, Route, ClipboardList,
+  Brain, Sparkles, Globe, Smartphone, Cloud, Lock,
+  TrendingUp, Award, Headphones, BookOpen, Play,
+  DollarSign, Target, Layers, GitBranch, Settings,
+  UserCheck, BellRing, Workflow, FormInput, PieChart
 } from 'lucide-react'
 
+const stats = [
+  { label: 'Active Users', value: '50,000+', growth: '+23%' },
+  { label: 'Companies', value: '500+', growth: '+41%' },
+  { label: 'Countries', value: '45', growth: '+12%' },
+  { label: 'Uptime', value: '99.99%', growth: 'SLA' }
+]
+
+const features = [
+  {
+    category: 'Workforce Management',
+    icon: Users,
+    color: 'blue',
+    items: [
+      { name: 'Multi-tenant Organization', desc: 'Manage multiple organizations with complete data isolation' },
+      { name: 'Team Hierarchy', desc: 'Create complex team structures with managers and reporting lines' },
+      { name: 'Role-based Access', desc: 'Granular permissions for admins, managers, and employees' },
+      { name: 'Employee Profiles', desc: 'Comprehensive profiles with skills, documents, and history' }
+    ]
+  },
+  {
+    category: 'Time & Attendance',
+    icon: Clock,
+    color: 'green',
+    items: [
+      { name: 'GPS Check-in/out', desc: 'Location-based attendance with geofencing support' },
+      { name: 'Shift Management', desc: 'Create and manage complex shift patterns and schedules' },
+      { name: 'Leave Management', desc: 'Handle vacation requests, sick leaves, and approvals' },
+      { name: 'Overtime Tracking', desc: 'Automatic overtime calculation with custom rules' }
+    ]
+  },
+  {
+    category: 'Field Operations',
+    icon: MapPin,
+    color: 'purple',
+    items: [
+      { name: 'Route Optimization', desc: 'AI-powered route planning for field teams' },
+      { name: 'Outlet Management', desc: 'Track visits, manage outlets, and monitor performance' },
+      { name: 'Daily Call Reports', desc: 'Structured reporting for field sales and service teams' },
+      { name: 'Live Location Tracking', desc: 'Real-time team member location for better coordination' }
+    ]
+  },
+  {
+    category: 'Forms & Workflows',
+    icon: FileText,
+    color: 'orange',
+    items: [
+      { name: 'Dynamic Form Builder', desc: 'Drag-and-drop form creation with conditional logic' },
+      { name: 'Workflow Automation', desc: 'Automate approvals and multi-step processes' },
+      { name: 'Digital Signatures', desc: 'Legally binding e-signatures for documents' },
+      { name: 'Template Library', desc: 'Pre-built templates for common business forms' }
+    ]
+  },
+  {
+    category: 'Analytics & Insights',
+    icon: Brain,
+    color: 'red',
+    items: [
+      { name: 'Predictive Analytics', desc: 'AI-powered predictions for attendance and performance' },
+      { name: 'Custom Dashboards', desc: 'Build personalized dashboards with drag-and-drop widgets' },
+      { name: 'Real-time Reports', desc: 'Live data updates with export to Excel, PDF, and CSV' },
+      { name: 'Power BI Integration', desc: 'Native integration with Microsoft Power BI' }
+    ]
+  },
+  {
+    category: 'Communication',
+    icon: BellRing,
+    color: 'teal',
+    items: [
+      { name: 'Push Notifications', desc: 'Instant alerts for important events and updates' },
+      { name: 'Team Announcements', desc: 'Broadcast messages to teams or entire organization' },
+      { name: 'Task Comments', desc: 'Collaborate on tasks with threaded discussions' },
+      { name: 'Email Integration', desc: 'Automated email notifications and reminders' }
+    ]
+  }
+]
+
+const testimonials = [
+  {
+    quote: "WorkforceOne transformed how we manage our distributed sales team. The route optimization alone saved us 30% in travel costs.",
+    author: "Sarah Chen",
+    role: "VP of Operations",
+    company: "TechCorp Global",
+    rating: 5
+  },
+  {
+    quote: "The forms and workflow automation features eliminated hours of paperwork. Our HR team is now 50% more productive.",
+    author: "Michael Rodriguez",
+    role: "HR Director",
+    company: "Innovate Solutions",
+    rating: 5
+  },
+  {
+    quote: "Real-time attendance tracking and predictive analytics helped us reduce absenteeism by 40% in just 3 months.",
+    author: "Emily Watson",
+    role: "CEO",
+    company: "NextGen Retail",
+    rating: 5
+  }
+]
+
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [activeFeature, setActiveFeature] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveFeature((prev) => (prev + 1) % features.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <Users className="h-5 w-5 text-white" />
+            <div className="flex items-center space-x-3">
+              {/* Logo - Replace /logo.png with your actual logo path */}
+              <img 
+                src="/logo.png" 
+                alt="WorkforceOne Logo" 
+                className="h-10 w-auto"
+                onError={(e) => {
+                  // Fallback to icon if logo doesn't exist
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+              <div className="hidden w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+                <Users className="h-6 w-6 text-white" />
               </div>
-              <span className="text-2xl font-bold text-gray-900">WorkforceOne</span>
+              <div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                  WorkforceOne
+                </span>
+                <Badge variant="secondary" className="ml-2 text-xs">v2.0</Badge>
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link 
-                href="/login" 
-                className="text-gray-600 hover:text-gray-900 font-medium"
-              >
+            
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/guides" className="text-gray-600 hover:text-gray-900 font-medium">
+                Guides
+              </Link>
+              <Link href="#features" className="text-gray-600 hover:text-gray-900 font-medium">
+                Features
+              </Link>
+              <Link href="/pricing" className="text-gray-600 hover:text-gray-900 font-medium">
+                Pricing
+              </Link>
+              <Link href="/help" className="text-gray-600 hover:text-gray-900 font-medium">
+                Help
+              </Link>
+            </div>
+
+            <div className="hidden md:flex items-center space-x-4">
+              <Link href="/login" className="text-gray-600 hover:text-gray-900 font-medium">
                 Sign In
               </Link>
               <Link href="/signup">
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  Get Started
+                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg">
+                  Start Free Trial
                 </Button>
               </Link>
             </div>
+
+            {/* Mobile menu button */}
+            <button
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white border-t">
+            <div className="px-4 py-2 space-y-1">
+              <Link href="/guides" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                Guides
+              </Link>
+              <Link href="#features" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                Features
+              </Link>
+              <Link href="/pricing" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                Pricing
+              </Link>
+              <Link href="/help" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                Help
+              </Link>
+              <div className="pt-4 pb-3 border-t">
+                <Link href="/login" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                  Sign In
+                </Link>
+                <Link href="/signup" className="block px-3 py-2">
+                  <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600">
+                    Start Free Trial
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
-      <section className="relative py-20 lg:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-20 lg:py-32 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 opacity-50" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              Manage Your{' '}
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Remote Workforce
-              </span>{' '}
-              Seamlessly
+            <div className="flex justify-center mb-6">
+              <Badge variant="outline" className="px-4 py-1">
+                <Sparkles className="h-3 w-3 mr-1" />
+                AI-Powered Workforce Management
+              </Badge>
+            </div>
+            <h1 className="text-5xl lg:text-7xl font-bold mb-6 leading-tight">
+              The Complete Platform for
+              <span className="block bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Modern Workforce Management
+              </span>
             </h1>
-            <p className="text-xl text-gray-600 mt-4 mb-8 max-w-3xl mx-auto">
-              Streamline team management, track productivity, and foster collaboration 
-              with our comprehensive remote workforce management platform.
+            <p className="text-xl lg:text-2xl text-gray-600 mt-4 mb-8 max-w-4xl mx-auto leading-relaxed">
+              From attendance tracking to predictive analytics, manage your entire workforce 
+              with one powerful platform. Built for teams of all sizes, from startups to enterprises.
             </p>
+            
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mb-10">
+              {stats.map((stat, idx) => (
+                <div key={idx} className="bg-white rounded-xl p-4 shadow-sm border">
+                  <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                  <div className="text-sm text-gray-600">{stat.label}</div>
+                  <Badge variant="secondary" className="mt-1 text-xs">
+                    {stat.growth}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8">
-                  Start Free Trial
+                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 shadow-xl">
+                  Start 14-Day Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Button variant="outline" size="lg" className="text-lg px-8">
-                Watch Demo
-              </Button>
+              <Link href="/guides">
+                <Button variant="outline" size="lg" className="text-lg px-8 border-2">
+                  <BookOpen className="mr-2 h-5 w-5" />
+                  View Guides
+                </Button>
+              </Link>
             </div>
+            <p className="text-sm text-gray-500 mt-4">
+              No credit card required • Setup in 5 minutes • Cancel anytime
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-white">
+      {/* Core Features Grid */}
+      <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Everything you need to manage remote teams
+            <Badge variant="outline" className="mb-4">
+              <Layers className="h-3 w-3 mr-1" />
+              Complete Feature Set
+            </Badge>
+            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              Everything You Need in One Platform
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Powerful tools designed for modern distributed workforces
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Comprehensive tools designed for the modern distributed workforce
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="p-6 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-4">
-                <Users className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Team Management</h3>
-              <p className="text-gray-600">
-                Organize teams, assign roles, and manage employee profiles with ease.
-              </p>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-16">
+            {features.map((category, idx) => (
+              <Card 
+                key={idx} 
+                className={`border-2 hover:shadow-xl transition-all cursor-pointer ${
+                  activeFeature === idx ? 'border-blue-500 shadow-xl' : ''
+                }`}
+                onClick={() => setActiveFeature(idx)}
+              >
+                <CardContent className="p-6">
+                  <div className={`w-12 h-12 bg-gradient-to-br from-${category.color}-500 to-${category.color}-600 rounded-xl flex items-center justify-center mb-4`}>
+                    <category.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-4">{category.category}</h3>
+                  <ul className="space-y-3">
+                    {category.items.map((item, itemIdx) => (
+                      <li key={itemIdx} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <div className="font-medium text-gray-900">{item.name}</div>
+                          <div className="text-sm text-gray-600">{item.desc}</div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-            <div className="p-6 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100">
-              <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mb-4">
-                <Clock className="h-6 w-6 text-white" />
+          {/* Platform Highlights */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Smartphone className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Time Tracking</h3>
-              <p className="text-gray-600">
-                Accurate time tracking with automated timesheets and productivity insights.
-              </p>
+              <h3 className="text-lg font-bold mb-2">Mobile First</h3>
+              <p className="text-gray-600">Native iOS and Android apps with offline support</p>
             </div>
-
-            <div className="p-6 rounded-xl bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mb-4">
-                <Calendar className="h-6 w-6 text-white" />
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Cloud className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Attendance Management</h3>
-              <p className="text-gray-600">
-                Monitor attendance, manage leave requests, and track work schedules.
-              </p>
+              <h3 className="text-lg font-bold mb-2">Cloud Native</h3>
+              <p className="text-gray-600">Scalable infrastructure with 99.99% uptime SLA</p>
             </div>
-
-            <div className="p-6 rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
-              <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mb-4">
-                <BarChart3 className="h-6 w-6 text-white" />
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Lock className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Analytics & Reports</h3>
-              <p className="text-gray-600">
-                Comprehensive dashboards and reports to track team performance.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-xl bg-gradient-to-br from-red-50 to-pink-50 border border-red-100">
-              <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center mb-4">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Security & Compliance</h3>
-              <p className="text-gray-600">
-                Enterprise-grade security with role-based access control.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-xl bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100">
-              <div className="w-12 h-12 bg-teal-600 rounded-lg flex items-center justify-center mb-4">
-                <Zap className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Real-time Collaboration</h3>
-              <p className="text-gray-600">
-                Instant updates and real-time collaboration tools for distributed teams.
-              </p>
+              <h3 className="text-lg font-bold mb-2">Enterprise Security</h3>
+              <p className="text-gray-600">SOC 2 compliant with end-to-end encryption</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="py-20 bg-gray-50">
+      {/* How It Works */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-6">
-                Why choose WorkforceOne?
-              </h2>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Increase Productivity</h3>
-                    <p className="text-gray-600">Boost team efficiency with streamlined workflows and automated processes.</p>
+          <div className="text-center mb-16">
+            <Badge variant="outline" className="mb-4">
+              <Workflow className="h-3 w-3 mr-1" />
+              Simple Setup Process
+            </Badge>
+            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              Get Started in Minutes
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Our guided setup makes it easy to get your team up and running quickly
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {[
+              { step: '1', title: 'Sign Up', desc: 'Create your free account in seconds', icon: UserCheck },
+              { step: '2', title: 'Setup Organization', desc: 'Configure your company settings', icon: Building2 },
+              { step: '3', title: 'Invite Team', desc: 'Add team members and assign roles', icon: Users },
+              { step: '4', title: 'Start Managing', desc: 'Begin tracking and managing your workforce', icon: Target }
+            ].map((item, idx) => (
+              <div key={idx} className="relative">
+                <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-lg mb-4">
+                    {item.step}
                   </div>
+                  <item.icon className="h-8 w-8 text-blue-600 mb-3" />
+                  <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                  <p className="text-gray-600 text-sm">{item.desc}</p>
                 </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Reduce Administrative Overhead</h3>
-                    <p className="text-gray-600">Automate time tracking, attendance, and reporting to save hours each week.</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Improve Team Collaboration</h3>
-                    <p className="text-gray-600">Foster better communication and collaboration across distributed teams.</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Scale with Confidence</h3>
-                    <p className="text-gray-600">Built to grow with your organization from startup to enterprise.</p>
-                  </div>
-                </div>
+                {idx < 3 && (
+                  <ChevronRight className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 h-8 w-8 text-gray-300" />
+                )}
               </div>
-            </div>
-            <div className="bg-white p-8 rounded-2xl shadow-xl">
-              <div className="text-center">
-                <div className="text-4xl font-bold text-blue-600 mb-2">500+</div>
-                <div className="text-gray-600 mb-4">Companies Trust WorkforceOne</div>
-                <div className="flex justify-center space-x-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <div className="text-sm text-gray-500">4.9/5 average rating</div>
-              </div>
-            </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge variant="outline" className="mb-4">
+              <Award className="h-3 w-3 mr-1" />
+              Customer Success Stories
+            </Badge>
+            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              Trusted by Industry Leaders
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              See how companies are transforming their workforce management
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, idx) => (
+              <Card key={idx} className="hover:shadow-xl transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex mb-4">
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
+                    ))}
+                  </div>
+                  <p className="text-gray-700 mb-4 italic">"{testimonial.quote}"</p>
+                  <div className="border-t pt-4">
+                    <div className="font-bold text-gray-900">{testimonial.author}</div>
+                    <div className="text-sm text-gray-600">{testimonial.role}</div>
+                    <div className="text-sm text-blue-600">{testimonial.company}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Start Guides */}
+      <section className="py-20 bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <Badge variant="outline" className="mb-4">
+              <BookOpen className="h-3 w-3 mr-1" />
+              Learning Resources
+            </Badge>
+            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              How-To Guides & Resources
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Everything you need to master WorkforceOne
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Link href="/guides/getting-started">
+              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4">
+                    <Play className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">Getting Started</h3>
+                  <p className="text-gray-600 text-sm mb-3">Complete setup guide for new users</p>
+                  <div className="text-blue-600 font-medium text-sm flex items-center">
+                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/guides/team-management">
+              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mb-4">
+                    <Users className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">Team Management</h3>
+                  <p className="text-gray-600 text-sm mb-3">Organize teams and assign roles</p>
+                  <div className="text-blue-600 font-medium text-sm flex items-center">
+                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/guides/attendance">
+              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4">
+                    <Clock className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">Time & Attendance</h3>
+                  <p className="text-gray-600 text-sm mb-3">Track time and manage attendance</p>
+                  <div className="text-blue-600 font-medium text-sm flex items-center">
+                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/guides/forms-workflows">
+              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mb-4">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">Forms & Workflows</h3>
+                  <p className="text-gray-600 text-sm mb-3">Create forms and automate workflows</p>
+                  <div className="text-blue-600 font-medium text-sm flex items-center">
+                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          <div className="text-center mt-8">
+            <Link href="/guides">
+              <Button variant="outline" size="lg">
+                View All Guides
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-indigo-600">
+      <section className="py-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">
-            Ready to transform your remote workforce management?
+          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">
+            Ready to Transform Your Workforce Management?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join thousands of companies already using WorkforceOne to manage their distributed teams.
+            Join 500+ companies already using WorkforceOne to streamline their operations
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link href="/signup">
-              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-50 text-lg px-8">
-                Start Free Trial
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-50 text-lg px-8 shadow-xl">
+                Start Free 14-Day Trial
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/login">
-              <Button variant="outline" size="lg" className="text-white border-white hover:bg-white/10 text-lg px-8">
-                Sign In
-              </Button>
-            </Link>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="text-white border-2 border-white/80 hover:bg-white hover:text-blue-600 hover:border-white transition-all duration-300 text-lg px-8 backdrop-blur-sm bg-white/10"
+            >
+              <Headphones className="mr-2 h-5 w-5" />
+              Talk to Sales
+            </Button>
           </div>
-          <p className="text-sm text-blue-100 mt-4">
-            No credit card required • 14-day free trial • Cancel anytime
-          </p>
+          <div className="flex flex-wrap justify-center gap-6 text-white/90 text-sm">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              No credit card required
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              14-day free trial
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Cancel anytime
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      <footer className="bg-gray-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                  <Users className="h-5 w-5 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
+            <div className="lg:col-span-2">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center">
+                  <Users className="h-6 w-6 text-white" />
                 </div>
                 <span className="text-2xl font-bold">WorkforceOne</span>
               </div>
-              <p className="text-gray-400 mb-4 max-w-md">
-                The complete remote workforce management solution for modern distributed teams.
+              <p className="text-gray-400 mb-6 max-w-md">
+                The complete workforce management platform trusted by 500+ companies worldwide. 
+                Streamline operations, boost productivity, and scale with confidence.
               </p>
               <div className="flex space-x-4">
-                <a href="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
-                  Start Free Trial
-                </a>
-                <a href="/contact" className="text-gray-400 hover:text-white">
-                  Contact Sales
-                </a>
+                <Badge variant="secondary" className="bg-gray-800">
+                  SOC 2 Certified
+                </Badge>
+                <Badge variant="secondary" className="bg-gray-800">
+                  GDPR Compliant
+                </Badge>
+                <Badge variant="secondary" className="bg-gray-800">
+                  ISO 27001
+                </Badge>
               </div>
             </div>
+            
             <div>
-              <h3 className="font-semibold mb-4">Product</h3>
+              <h3 className="font-semibold mb-4 text-gray-100">Product</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="/features" className="hover:text-white">Features</a></li>
-                <li><a href="/pricing" className="hover:text-white">Pricing</a></li>
-                <li><a href="/security" className="hover:text-white">Security</a></li>
-                <li><a href="/integrations" className="hover:text-white">Integrations</a></li>
-                <li><a href="/mobile" className="hover:text-white">Mobile Apps</a></li>
+                <li><Link href="/features" className="hover:text-white transition">Features</Link></li>
+                <li><Link href="/pricing" className="hover:text-white transition">Pricing</Link></li>
+                <li><Link href="/guides" className="hover:text-white transition">Guides</Link></li>
+                <li><Link href="/integrations" className="hover:text-white transition">Integrations</Link></li>
+                <li><Link href="/mobile" className="hover:text-white transition">Mobile Apps</Link></li>
+                <li><Link href="/changelog" className="hover:text-white transition">Changelog</Link></li>
               </ul>
             </div>
+            
             <div>
-              <h3 className="font-semibold mb-4">Support</h3>
+              <h3 className="font-semibold mb-4 text-gray-100">Resources</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="/help" className="hover:text-white">Help Center</a></li>
-                <li><a href="/contact" className="hover:text-white">Contact Us</a></li>
-                <li><a href="/api-docs" className="hover:text-white">API Documentation</a></li>
-                <li><a href="/status" className="hover:text-white">System Status</a></li>
-                <li><a href="/community" className="hover:text-white">Community</a></li>
+                <li><Link href="/help" className="hover:text-white transition">Help Center</Link></li>
+                <li><Link href="/guides" className="hover:text-white transition">How-To Guides</Link></li>
+                <li><Link href="/api-docs" className="hover:text-white transition">API Docs</Link></li>
+                <li><Link href="/status" className="hover:text-white transition">System Status</Link></li>
+                <li><Link href="/security" className="hover:text-white transition">Security</Link></li>
+                <li><Link href="/community" className="hover:text-white transition">Community</Link></li>
               </ul>
             </div>
+            
             <div>
-              <h3 className="font-semibold mb-4">Company</h3>
+              <h3 className="font-semibold mb-4 text-gray-100">Company</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="/about" className="hover:text-white">About Us</a></li>
-                <li><a href="/blog" className="hover:text-white">Blog</a></li>
-                <li><a href="/careers" className="hover:text-white">Careers</a></li>
-                <li><a href="/press" className="hover:text-white">Press</a></li>
-                <li><a href="/partners" className="hover:text-white">Partners</a></li>
+                <li><Link href="/about" className="hover:text-white transition">About Us</Link></li>
+                <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
+                <li><Link href="/careers" className="hover:text-white transition">Careers</Link></li>
+                <li><Link href="/press" className="hover:text-white transition">Press Kit</Link></li>
+                <li><Link href="/partners" className="hover:text-white transition">Partners</Link></li>
+                <li><Link href="/blog" className="hover:text-white transition">Blog</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8">
+          
+          <div className="border-t border-gray-800 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
-              <div className="flex flex-wrap justify-center md:justify-start space-x-6 text-gray-400 text-sm mb-4 md:mb-0">
-                <a href="/privacy" className="hover:text-white">Privacy Policy</a>
-                <a href="/terms" className="hover:text-white">Terms of Service</a>
-                <a href="/cookies" className="hover:text-white">Cookie Policy</a>
-                <a href="/gdpr" className="hover:text-white">GDPR</a>
-                <a href="/ccpa" className="hover:text-white">CCPA</a>
+              <div className="flex flex-wrap justify-center md:justify-start gap-6 text-gray-400 text-sm mb-4 md:mb-0">
+                <Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link>
+                <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
+                <Link href="/cookies" className="hover:text-white transition">Cookie Policy</Link>
+                <Link href="/dpa" className="hover:text-white transition">DPA</Link>
+                <Link href="/sla" className="hover:text-white transition">SLA</Link>
               </div>
-              <p className="text-center text-gray-400 text-sm">&copy; 2025 WorkforceOne. All rights reserved.</p>
+              <p className="text-center text-gray-400 text-sm">
+                © 2025 WorkforceOne. All rights reserved.
+              </p>
             </div>
           </div>
         </div>

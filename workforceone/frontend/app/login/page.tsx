@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Mail, Lock } from 'lucide-react'
+import { Loader2, Mail, Lock, Users } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -43,7 +43,7 @@ export default function LoginPage() {
       } else {
         setError(error.message || 'An error occurred during login')
       }
-      console.error('Login error:', error)
+      // Login error handled
     } finally {
       setLoading(false)
     }
@@ -53,6 +53,21 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
         <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/logo.png" 
+              alt="WorkforceOne Logo" 
+              className="h-12 w-auto"
+              onError={(e) => {
+                // Fallback to icon if logo doesn't exist
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <div className="hidden w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+              <Users className="h-7 w-7 text-white" />
+            </div>
+          </div>
           <h2 className="text-3xl font-bold text-gray-900">WorkforceOne</h2>
           <p className="mt-2 text-sm text-gray-600">
             Sign in to your account
