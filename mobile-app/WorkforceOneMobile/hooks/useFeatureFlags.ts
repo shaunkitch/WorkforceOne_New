@@ -21,6 +21,11 @@ interface FeatureFlags {
   mobile_daily_visits: boolean
   mobile_offline_mode: boolean
   mobile_push_notifications: boolean
+  mobile_clock_in: boolean
+  mobile_tasks: boolean
+  mobile_forms: boolean
+  mobile_leave: boolean
+  mobile_payslips: boolean
 }
 
 export const useFeatureFlags = () => {
@@ -32,6 +37,17 @@ export const useFeatureFlags = () => {
     fetchFeatureFlags()
   }, [profile?.organization_id])
 
+  // Auto-refresh feature flags every 30 seconds to sync with admin changes
+  useEffect(() => {
+    if (!profile?.organization_id) return
+    
+    const interval = setInterval(() => {
+      fetchFeatureFlags()
+    }, 30000) // 30 seconds
+    
+    return () => clearInterval(interval)
+  }, [profile?.organization_id])
+
   const fetchFeatureFlags = async () => {
     if (!profile?.organization_id) {
       setLoading(false)
@@ -39,6 +55,7 @@ export const useFeatureFlags = () => {
     }
 
     try {
+      console.log('🔄 Syncing feature flags from server...')
       const { data, error } = await supabase
         .from('organizations')
         .select('feature_flags')
@@ -46,6 +63,8 @@ export const useFeatureFlags = () => {
         .single()
 
       if (error) throw error
+      
+      console.log('✅ Feature flags synced successfully')
 
       setFeatureFlags(data.feature_flags || {
         dashboard: true,
@@ -65,7 +84,12 @@ export const useFeatureFlags = () => {
         integrations: true,
         mobile_daily_visits: true,
         mobile_offline_mode: true,
-        mobile_push_notifications: true
+        mobile_push_notifications: true,
+        mobile_clock_in: true,
+        mobile_tasks: true,
+        mobile_forms: true,
+        mobile_leave: true,
+        mobile_payslips: true
       })
     } catch (error) {
       console.error('Error fetching feature flags:', error)
@@ -88,7 +112,12 @@ export const useFeatureFlags = () => {
         integrations: true,
         mobile_daily_visits: true,
         mobile_offline_mode: true,
-        mobile_push_notifications: true
+        mobile_push_notifications: true,
+        mobile_clock_in: true,
+        mobile_tasks: true,
+        mobile_forms: true,
+        mobile_leave: true,
+        mobile_payslips: true
       })
     } finally {
       setLoading(false)
@@ -112,12 +141,37 @@ export const useFeatureFlags = () => {
       }
     }
     
+    // Mobile-specific feature flag overrides
+    if (feature === 'attendance') {
+      return featureFlags?.mobile_clock_in ?? true
+    }
+    
+    if (feature === 'tasks') {
+      return featureFlags?.mobile_tasks ?? true
+    }
+    
+    if (feature === 'forms') {
+      return featureFlags?.mobile_forms ?? true
+    }
+    
+    if (feature === 'leave') {
+      return featureFlags?.mobile_leave ?? true
+    }
+    
     return organizationHasFeature
+  }
+
+  const refreshFeatureFlags = async () => {
+    if (!profile?.organization_id) return
+    
+    setLoading(true)
+    await fetchFeatureFlags()
   }
 
   return {
     featureFlags,
     hasFeature,
-    loading
+    loading,
+    refreshFeatureFlags
   }
 }

@@ -42,7 +42,7 @@ const drawerItems: DrawerItem[] = [
 
 function CustomDrawerContent(props: any) {
   const { profile, signOut } = useAuth()
-  const { hasFeature } = useFeatureFlags()
+  const { hasFeature, featureFlags } = useFeatureFlags()
   const insets = useSafeAreaInsets()
 
   const handleSignOut = async () => {
@@ -86,6 +86,10 @@ function CustomDrawerContent(props: any) {
       
       if (item.name === 'Forms') {
         return hasFeature('forms')
+      }
+      
+      if (item.name === 'Payslips') {
+        return featureFlags?.mobile_payslips ?? true
       }
       
       // Default to showing the item if no specific feature check
@@ -172,7 +176,7 @@ function CustomDrawerContent(props: any) {
 }
 
 export default function DrawerNavigator() {
-  const { hasFeature } = useFeatureFlags()
+  const { hasFeature, featureFlags } = useFeatureFlags()
   
   // Filter drawer items based on feature flags for screen registration
   const getFilteredDrawerItems = () => {
@@ -188,6 +192,9 @@ export default function DrawerNavigator() {
       }
       if (item.name === 'Forms') {
         return hasFeature('forms')
+      }
+      if (item.name === 'Payslips') {
+        return featureFlags?.mobile_payslips ?? true
       }
       return true
     })

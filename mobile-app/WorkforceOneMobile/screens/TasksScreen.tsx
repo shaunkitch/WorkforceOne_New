@@ -14,6 +14,7 @@ import {
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Picker } from '@react-native-picker/picker'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -203,11 +204,16 @@ export default function TasksScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar style="light" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View>
           <Text style={styles.headerTitle}>My Tasks</Text>
           <Text style={styles.headerSubtitle}>Tasks assigned to you</Text>
@@ -218,7 +224,7 @@ export default function TasksScreen() {
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>
@@ -231,18 +237,26 @@ export default function TasksScreen() {
           ].map((item) => (
             <TouchableOpacity
               key={item.key}
-              style={[
-                styles.filterTab,
-                filter === item.key && styles.filterTabActive
-              ]}
               onPress={() => setFilter(item.key as any)}
             >
-              <Text style={[
-                styles.filterTabText,
-                filter === item.key && styles.filterTabTextActive
-              ]}>
-                {item.label}
-              </Text>
+              {filter === item.key ? (
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.filterTab, styles.filterTabActive]}
+                >
+                  <Text style={[styles.filterTabText, styles.filterTabTextActive]}>
+                    {item.label}
+                  </Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.filterTab}>
+                  <Text style={styles.filterTabText}>
+                    {item.label}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -284,16 +298,24 @@ export default function TasksScreen() {
       </View>
 
       {/* Tasks List */}
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {filteredTasks.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle-outline" size={48} color="#d1d5db" />
             <Text style={styles.emptyText}>No tasks found</Text>
-            <TouchableOpacity 
-              style={styles.emptyButton}
-              onPress={() => setShowCreateModal(true)}
-            >
-              <Text style={styles.emptyButtonText}>Create your first task</Text>
+            <TouchableOpacity onPress={() => setShowCreateModal(true)}>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyButton}
+              >
+                <Text style={styles.emptyButtonText}>Create your first task</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
@@ -332,29 +354,41 @@ export default function TasksScreen() {
                   {task.status !== 'completed' && (
                     <>
                       {task.status === 'todo' && (
-                        <TouchableOpacity
-                          style={[styles.actionButton, { backgroundColor: '#3b82f6' }]}
-                          onPress={() => updateTaskStatus(task.id, 'in_progress')}
-                        >
-                          <Text style={styles.actionButtonText}>Start</Text>
+                        <TouchableOpacity onPress={() => updateTaskStatus(task.id, 'in_progress')}>
+                          <LinearGradient
+                            colors={['#667eea', '#764ba2']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.actionButton}
+                          >
+                            <Text style={styles.actionButtonText}>Start</Text>
+                          </LinearGradient>
                         </TouchableOpacity>
                       )}
                       {task.status === 'in_progress' && (
-                        <TouchableOpacity
-                          style={[styles.actionButton, { backgroundColor: '#10b981' }]}
-                          onPress={() => updateTaskStatus(task.id, 'completed')}
-                        >
-                          <Text style={styles.actionButtonText}>Complete</Text>
+                        <TouchableOpacity onPress={() => updateTaskStatus(task.id, 'completed')}>
+                          <LinearGradient
+                            colors={['#10b981', '#059669']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.actionButton}
+                          >
+                            <Text style={styles.actionButtonText}>Complete</Text>
+                          </LinearGradient>
                         </TouchableOpacity>
                       )}
                     </>
                   )}
                   {task.status === 'completed' && (
-                    <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: '#6b7280' }]}
-                      onPress={() => updateTaskStatus(task.id, 'todo')}
-                    >
-                      <Text style={styles.actionButtonText}>Reopen</Text>
+                    <TouchableOpacity onPress={() => updateTaskStatus(task.id, 'todo')}>
+                      <LinearGradient
+                        colors={['#6b7280', '#4b5563']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.actionButton}
+                      >
+                        <Text style={styles.actionButtonText}>Reopen</Text>
+                      </LinearGradient>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -441,7 +475,7 @@ export default function TasksScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -462,8 +496,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 20,
+    paddingTop: 10,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',
@@ -499,7 +532,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   filterTabActive: {
-    backgroundColor: '#3b82f6',
+    // Background handled by LinearGradient
   },
   filterTabText: {
     fontSize: 14,
@@ -511,7 +544,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   emptyState: {
     alignItems: 'center',
@@ -525,7 +561,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   emptyButton: {
-    backgroundColor: '#3b82f6',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -623,7 +658,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 30,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',

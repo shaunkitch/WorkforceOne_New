@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { offlineStorage } from '../services/OfflineStorage'
@@ -211,10 +212,15 @@ export default function LeaveScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <Text style={styles.headerTitle}>Leave Requests</Text>
         <Text style={styles.headerSubtitle}>Manage your time off requests</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.actionBar}>
         <TouchableOpacity
@@ -432,8 +438,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },

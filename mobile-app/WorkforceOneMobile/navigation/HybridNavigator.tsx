@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../contexts/AuthContext'
 import { useFeatureFlags } from '../hooks/useFeatureFlags'
@@ -24,7 +25,7 @@ const Tab = createBottomTabNavigator()
 // Custom Drawer Content for additional pages
 function CustomDrawerContent(props: any) {
   const { profile, signOut } = useAuth()
-  const { hasFeature } = useFeatureFlags()
+  const { hasFeature, featureFlags } = useFeatureFlags()
   const insets = useSafeAreaInsets()
 
   const handleSignOut = async () => {
@@ -116,13 +117,15 @@ function CustomDrawerContent(props: any) {
           />
         )}
         
-        <DrawerItem
-          label="Payslips"
-          icon={({ color, size }) => <Ionicons name="document-text-outline" size={size} color={color} />}
-          onPress={() => props.navigation.navigate('Payslips')}
-          activeTintColor="#3b82f6"
-          inactiveTintColor="#6b7280"
-        />
+        {featureFlags?.mobile_payslips && (
+          <DrawerItem
+            label="Payslips"
+            icon={({ color, size }) => <Ionicons name="document-text-outline" size={size} color={color} />}
+            onPress={() => props.navigation.navigate('Payslips')}
+            activeTintColor="#3b82f6"
+            inactiveTintColor="#6b7280"
+          />
+        )}
 
         {/* Sync Section */}
         <View style={styles.sectionHeader}>
@@ -154,7 +157,7 @@ function CustomDrawerContent(props: any) {
 
 // Bottom Tab Navigator for main functions
 function MainTabs() {
-  const { hasFeature } = useFeatureFlags()
+  const { hasFeature, featureFlags } = useFeatureFlags()
   const insets = useSafeAreaInsets()
   
   return (
@@ -211,11 +214,13 @@ function MainTabs() {
         component={DashboardScreen} 
         options={{ title: 'Home' }}
       />
-      <Tab.Screen 
-        name="Attendance" 
-        component={AttendanceScreen} 
-        options={{ title: 'Clock In' }}
-      />
+      {featureFlags?.mobile_clock_in && (
+        <Tab.Screen 
+          name="Attendance" 
+          component={AttendanceScreen} 
+          options={{ title: 'Clock In' }}
+        />
+      )}
       {hasFeature('tasks') && (
         <Tab.Screen 
           name="Tasks" 
@@ -236,16 +241,21 @@ function MainTabs() {
 
 // Main Drawer Navigator
 export default function HybridNavigator() {
-  const { hasFeature } = useFeatureFlags()
+  const { hasFeature, featureFlags } = useFeatureFlags()
   
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ navigation }) => ({
         headerShown: true,
-        headerStyle: {
-          backgroundColor: '#3b82f6',
-        },
+        headerBackground: () => (
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ flex: 1 }}
+          />
+        ),
         headerTintColor: 'white',
         headerTitleStyle: {
           fontWeight: 'bold',
@@ -290,11 +300,13 @@ export default function HybridNavigator() {
           options={{ title: 'Leave Requests' }}
         />
       )}
-      <Drawer.Screen
-        name="Payslips"
-        component={PayslipsScreen}
-        options={{ title: 'Payslips' }}
-      />
+      {featureFlags?.mobile_payslips && (
+        <Drawer.Screen
+          name="Payslips"
+          component={PayslipsScreen}
+          options={{ title: 'Payslips' }}
+        />
+      )}
       <Drawer.Screen
         name="Outbox"
         component={OutboxScreen}

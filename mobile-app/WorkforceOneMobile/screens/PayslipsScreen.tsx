@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -121,10 +122,15 @@ export default function PayslipsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <Text style={styles.headerTitle}>Payslips</Text>
         <Text style={styles.headerSubtitle}>View your pay history</Text>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.content}
@@ -205,8 +211,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },

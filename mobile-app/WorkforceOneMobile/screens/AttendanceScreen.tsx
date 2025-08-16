@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Attendance } from '../types/database'
@@ -31,9 +32,21 @@ export default function AttendanceScreen() {
     workHours: 0,
     status: 'Not Checked In'
   })
+  const [weeklyStats, setWeeklyStats] = useState({
+    totalHours: 0,
+    totalDays: 0,
+    averageHours: 0
+  })
+  const [monthlyStats, setMonthlyStats] = useState({
+    totalHours: 0,
+    totalDays: 0,
+    averageHours: 0
+  })
 
   useEffect(() => {
     fetchTodayAttendance()
+    fetchWeeklyStats()
+    fetchMonthlyStats()
   }, [])
 
   // Live timer update
@@ -85,6 +98,74 @@ export default function AttendanceScreen() {
       console.error('Error fetching attendance:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchWeeklyStats = async () => {
+    if (!user || !profile?.organization_id) return
+
+    try {
+      // Get start of current week (Monday)
+      const now = new Date()
+      const startOfWeek = new Date(now)
+      const day = startOfWeek.getDay()
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
+      startOfWeek.setDate(diff)
+      startOfWeek.setHours(0, 0, 0, 0)
+
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('work_hours, date')
+        .eq('user_id', user.id)
+        .eq('organization_id', profile.organization_id)
+        .gte('created_at', startOfWeek.toISOString())
+        .not('work_hours', 'is', null)
+
+      if (error) throw error
+
+      const totalHours = data.reduce((sum, record) => sum + (record.work_hours || 0), 0)
+      const totalDays = data.length
+      const averageHours = totalDays > 0 ? totalHours / totalDays : 0
+
+      setWeeklyStats({
+        totalHours: Math.round(totalHours * 10) / 10,
+        totalDays,
+        averageHours: Math.round(averageHours * 10) / 10
+      })
+    } catch (error) {
+      console.error('Error fetching weekly stats:', error)
+    }
+  }
+
+  const fetchMonthlyStats = async () => {
+    if (!user || !profile?.organization_id) return
+
+    try {
+      // Get start of current month
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('work_hours, date')
+        .eq('user_id', user.id)
+        .eq('organization_id', profile.organization_id)
+        .gte('created_at', startOfMonth.toISOString())
+        .not('work_hours', 'is', null)
+
+      if (error) throw error
+
+      const totalHours = data.reduce((sum, record) => sum + (record.work_hours || 0), 0)
+      const totalDays = data.length
+      const averageHours = totalDays > 0 ? totalHours / totalDays : 0
+
+      setMonthlyStats({
+        totalHours: Math.round(totalHours * 10) / 10,
+        totalDays,
+        averageHours: Math.round(averageHours * 10) / 10
+      })
+    } catch (error) {
+      console.error('Error fetching monthly stats:', error)
     }
   }
 
@@ -161,6 +242,10 @@ export default function AttendanceScreen() {
       }))
 
       Alert.alert('Success', `Checked out successfully! You worked ${Math.round(workHours * 100) / 100} hours today.`)
+      
+      // Refresh weekly and monthly stats after checkout
+      fetchWeeklyStats()
+      fetchMonthlyStats()
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to check out')
     } finally {
@@ -269,10 +354,15 @@ export default function AttendanceScreen() {
       <StatusBar style="light" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <Text style={styles.headerTitle}>Attendance</Text>
         <Text style={styles.headerSubtitle}>Track your work hours</Text>
-      </View>
+      </LinearGradient>
 
       <ScrollView style={styles.content}>
         {/* Current Time & Status */}
@@ -318,14 +408,15 @@ export default function AttendanceScreen() {
         <View style={styles.actionButtonsContainer}>
           {/* Main Action Button */}
           <TouchableOpacity
-            style={[
-              styles.mainActionButton,
-              { backgroundColor: isCheckedIn ? "#ef4444" : "#10b981" },
-              actionLoading && styles.buttonDisabled
-            ]}
             onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
             disabled={actionLoading}
           >
+            <LinearGradient
+              colors={isCheckedIn ? ['#ef4444', '#dc2626'] : ['#10b981', '#059669']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.mainActionButton, actionLoading && styles.buttonDisabled]}
+            >
             {actionLoading ? (
               <ActivityIndicator color="white" size="large" />
             ) : (
@@ -340,19 +431,21 @@ export default function AttendanceScreen() {
                 </Text>
               </>
             )}
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* Break Button (only when checked in) */}
           {isCheckedIn && (
             <TouchableOpacity
-              style={[
-                styles.breakButton,
-                { backgroundColor: isOnBreak ? "#10b981" : "#f59e0b" },
-                breakLoading && styles.buttonDisabled
-              ]}
               onPress={isOnBreak ? handleBreakEnd : handleBreakStart}
               disabled={breakLoading}
             >
+              <LinearGradient
+                colors={isOnBreak ? ['#10b981', '#059669'] : ['#f59e0b', '#d97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.breakButton, breakLoading && styles.buttonDisabled]}
+              >
               {breakLoading ? (
                 <ActivityIndicator color="white" />
               ) : (
@@ -367,6 +460,7 @@ export default function AttendanceScreen() {
                   </Text>
                 </>
               )}
+              </LinearGradient>
             </TouchableOpacity>
           )}
         </View>
@@ -395,26 +489,49 @@ export default function AttendanceScreen() {
           </View>
         </View>
 
-        {/* Quick Actions */}
-        {isCheckedIn && (
-          <View style={styles.quickActionsCard}>
-            <Text style={styles.cardTitle}>Quick Actions</Text>
-            <View style={styles.quickActionsGrid}>
-              <TouchableOpacity style={styles.quickActionItem}>
-                <Ionicons name="list-outline" size={24} color="#3b82f6" />
-                <Text style={styles.quickActionLabel}>My Tasks</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionItem}>
-                <Ionicons name="document-outline" size={24} color="#10b981" />
-                <Text style={styles.quickActionLabel}>Forms</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionItem}>
-                <Ionicons name="time-outline" size={24} color="#f59e0b" />
-                <Text style={styles.quickActionLabel}>Time Track</Text>
-              </TouchableOpacity>
+        {/* Week Summary */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>This Week Summary</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Ionicons name="time-outline" size={20} color="#3b82f6" />
+              <Text style={styles.summaryLabel}>Total Hours</Text>
+              <Text style={styles.summaryValue}>{weeklyStats.totalHours}h</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Ionicons name="calendar-outline" size={20} color="#10b981" />
+              <Text style={styles.summaryLabel}>Days Worked</Text>
+              <Text style={styles.summaryValue}>{weeklyStats.totalDays}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Ionicons name="trending-up-outline" size={20} color="#f59e0b" />
+              <Text style={styles.summaryLabel}>Avg/Day</Text>
+              <Text style={styles.summaryValue}>{weeklyStats.averageHours}h</Text>
             </View>
           </View>
-        )}
+        </View>
+
+        {/* Month to Date Summary */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Month to Date Summary</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Ionicons name="time-outline" size={20} color="#8b5cf6" />
+              <Text style={styles.summaryLabel}>Total Hours</Text>
+              <Text style={styles.summaryValue}>{monthlyStats.totalHours}h</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Ionicons name="calendar-outline" size={20} color="#06b6d4" />
+              <Text style={styles.summaryLabel}>Days Worked</Text>
+              <Text style={styles.summaryValue}>{monthlyStats.totalDays}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Ionicons name="bar-chart-outline" size={20} color="#10b981" />
+              <Text style={styles.summaryLabel}>Avg/Day</Text>
+              <Text style={styles.summaryValue}>{monthlyStats.averageHours}h</Text>
+            </View>
+          </View>
+        </View>
 
         {/* Bottom spacing for scroll */}
         <View style={styles.bottomSpacing} />
@@ -440,8 +557,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
@@ -667,67 +783,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
-  },
-  quickStatsCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  quickStatsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  quickStatItem: {
-    alignItems: 'center',
-  },
-  quickStatNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-  quickStatLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  quickActionsCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  quickActionItem: {
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#f9fafb',
-    minWidth: 80,
-  },
-  quickActionLabel: {
-    fontSize: 12,
-    color: '#374151',
-    marginTop: 4,
-    textAlign: 'center',
   },
   bottomSpacing: {
     height: 100, // Extra space at bottom to ensure full scroll

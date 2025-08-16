@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -143,7 +144,12 @@ export default function TeamsScreen({ navigation }: any) {
       <StatusBar style="light" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -154,7 +160,7 @@ export default function TeamsScreen({ navigation }: any) {
           <Text style={styles.headerTitle}>Teams</Text>
           <Text style={styles.headerSubtitle}>Team management</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       <View style={styles.content}>
         {teams.length === 0 ? (
@@ -306,8 +312,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',

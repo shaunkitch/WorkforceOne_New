@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { syncService } from '../services/SyncService'
@@ -165,7 +166,12 @@ export default function FormsScreenSimple({ navigation }: any) {
       <StatusBar style="light" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View>
           <Text style={styles.headerTitle}>Forms</Text>
           <Text style={styles.headerSubtitle}>Available forms to complete</Text>
@@ -185,7 +191,7 @@ export default function FormsScreenSimple({ navigation }: any) {
             {syncing ? 'Syncing...' : 'Sync'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* Forms List */}
       <ScrollView style={styles.content}>
@@ -252,8 +258,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',

@@ -1164,7 +1164,12 @@ const ALL_FEATURES = [
   { id: 'forms', name: 'Dynamic Forms', category: 'Forms', description: 'Form builder and response management' },
   
   // Mobile App Features
+  { id: 'mobile_clock_in', name: 'Clock In/Out (Mobile)', category: 'Mobile App', description: 'Time tracking and attendance in mobile app' },
   { id: 'mobile_daily_visits', name: 'Daily Visits (Mobile)', category: 'Mobile App', description: 'Daily customer visits and location tracking in mobile app' },
+  { id: 'mobile_tasks', name: 'Tasks (Mobile)', category: 'Mobile App', description: 'Task management and tracking in mobile app' },
+  { id: 'mobile_forms', name: 'Forms (Mobile)', category: 'Mobile App', description: 'Form completion and submission in mobile app' },
+  { id: 'mobile_leave', name: 'Leave Requests (Mobile)', category: 'Mobile App', description: 'Leave request submission and management in mobile app' },
+  { id: 'mobile_payslips', name: 'Payslips (Mobile)', category: 'Mobile App', description: 'View and download payslips in mobile app' },
   { id: 'mobile_offline_mode', name: 'Offline Mode (Mobile)', category: 'Mobile App', description: 'Allow mobile app to work offline and sync later' },
   { id: 'mobile_push_notifications', name: 'Push Notifications (Mobile)', category: 'Mobile App', description: 'Send push notifications to mobile devices' },
   

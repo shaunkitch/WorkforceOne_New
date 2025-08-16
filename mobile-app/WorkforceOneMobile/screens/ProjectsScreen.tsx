@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 30,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',

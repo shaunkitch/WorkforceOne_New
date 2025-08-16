@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../../contexts/AuthContext'
 import { useFeatureFlags } from '../../hooks/useFeatureFlags'
 import { supabase } from '../../lib/supabase'
@@ -30,7 +31,7 @@ interface QuickAction {
 
 export default function DashboardScreen({ navigation }: any) {
   const { user, profile } = useAuth()
-  const { hasFeature, loading: featureFlagsLoading } = useFeatureFlags()
+  const { hasFeature, loading: featureFlagsLoading, refreshFeatureFlags } = useFeatureFlags()
   const [stats, setStats] = useState<MemberStats>({
     myTasksCount: 0,
     todayAttendance: false,
@@ -127,13 +128,17 @@ export default function DashboardScreen({ navigation }: any) {
       console.error('Error fetching dashboard data:', error)
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true)
-    fetchDashboardData()
+    // Refresh both dashboard data and feature flags
+    await Promise.all([
+      fetchDashboardData(),
+      refreshFeatureFlags()
+    ])
+    setRefreshing(false)
   }
 
 
@@ -151,12 +156,27 @@ export default function DashboardScreen({ navigation }: any) {
       <StatusBar style="light" />
       
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {profile?.full_name?.split(' ')[0] || 'User'}!</Text>
-          <Text style={styles.subGreeting}>Welcome back to WorkforceOne</Text>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Hello, {profile?.full_name?.split(' ')[0] || 'User'}!</Text>
+            <Text style={styles.subGreeting}>Welcome back to WorkforceOne</Text>
+          </View>
+          {featureFlagsLoading && (
+            <TouchableOpacity 
+              style={styles.syncButton}
+              onPress={refreshFeatureFlags}
+            >
+              <Ionicons name="sync" size={20} color="white" />
+            </TouchableOpacity>
+          )}
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.content}
@@ -169,18 +189,19 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.focusDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
           </View>
           
-          <TouchableOpacity 
-            style={[styles.attendanceCard, { 
-              backgroundColor: stats.todayAttendance ? '#dcfce7' : '#fef3c7',
-              borderColor: stats.todayAttendance ? '#10b981' : '#f59e0b'
-            }]}
-            onPress={() => navigation.navigate('Attendance')}
-          >
+          {hasFeature('attendance') && (
+            <TouchableOpacity onPress={() => navigation.navigate('Attendance')}>
+              <LinearGradient
+                colors={stats.todayAttendance ? ['#10b981', '#059669'] : ['#f59e0b', '#d97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.attendanceCard}
+              >
             <View style={styles.attendanceContent}>
               <Ionicons 
                 name={stats.todayAttendance ? "checkmark-circle" : "time"} 
                 size={28} 
-                color={stats.todayAttendance ? "#10b981" : "#f59e0b"} 
+                color="white" 
               />
               <View style={styles.attendanceText}>
                 <Text style={styles.attendanceTitle}>
@@ -190,8 +211,11 @@ export default function DashboardScreen({ navigation }: any) {
                   {stats.todayAttendance ? "Tap to view details or clock out" : "Tap to clock in and begin your day"}
                 </Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="white" />
             </View>
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           {/* Weekly Progress */}
           <View style={styles.progressSection}>
@@ -236,7 +260,7 @@ export default function DashboardScreen({ navigation }: any) {
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </View>
           </TouchableOpacity>
-        )}
+          )}
 
         {/* Weekly Insights */}
         <View style={styles.insightsCard}>
@@ -295,10 +319,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#3b82f6',
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  syncButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   greeting: {
     color: 'white',
@@ -316,17 +349,17 @@ const styles = StyleSheet.create({
   },
   focusCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     marginBottom: 24,
-    shadowColor: '#000',
+    shadowColor: '#667eea',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 8,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
   },
   focusHeader: {
     marginBottom: 16,
@@ -342,10 +375,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   attendanceCard: {
-    borderRadius: 12,
-    borderWidth: 2,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
+    shadowColor: '#667eea',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 10,
   },
   attendanceContent: {
     flexDirection: 'row',
@@ -358,11 +398,11 @@ const styles = StyleSheet.create({
   attendanceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: 'white',
   },
   attendanceSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 2,
   },
   progressSection: {
