@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,7 +29,8 @@ import {
   BarChart3,
   Send,
   Copy,
-  Settings
+  Settings,
+  Scan
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 
@@ -88,6 +90,7 @@ export default function FormsPage() {
   })
 
   const supabase = createClient()
+  const router = useRouter()
 
   const categories = [
     'feedback',
@@ -385,10 +388,19 @@ export default function FormsPage() {
             My Forms
           </Button>
           {canCreateForms() && (
-            <Button onClick={() => setShowCreateForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Form
-            </Button>
+            <>
+              <Button onClick={() => setShowCreateForm(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Form
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/dashboard/forms/scan')}
+              >
+                <Scan className="h-4 w-4 mr-2" />
+                Scan Form
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -472,10 +484,19 @@ export default function FormsPage() {
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No forms found</h3>
                 <p className="text-gray-500 mb-4">Get started by creating your first form.</p>
                 {canCreateForms() && (
-                  <Button onClick={() => setShowCreateForm(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Form
-                  </Button>
+                  <div className="flex gap-2 justify-center">
+                    <Button onClick={() => setShowCreateForm(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Form
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => router.push('/dashboard/forms/scan')}
+                    >
+                      <Scan className="h-4 w-4 mr-2" />
+                      Scan Form
+                    </Button>
+                  </div>
                 )}
               </div>
             ) : (

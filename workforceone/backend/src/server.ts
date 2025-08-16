@@ -9,6 +9,7 @@ import dotenv from 'dotenv'
 // Import routes
 import invitationRoutes from './routes/simple-invitations'
 import emailIntegrationRoutes from './routes/email-integrations'
+import formScanRoutes from './routes/formScan'
 
 // Load environment variables
 dotenv.config()
@@ -55,6 +56,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/invitations', invitationRoutes)
 app.use('/api/email-integrations', emailIntegrationRoutes)
+app.use('/api/forms', formScanRoutes)
 
 // 404 handler
 app.use((req, res) => {
