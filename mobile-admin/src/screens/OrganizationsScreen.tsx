@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabaseAdmin } from '../lib/supabase'
 import { formatDate, formatCurrency, getHealthStatus, calculateHealthScore, debounce } from '../lib/utils'
@@ -63,7 +64,7 @@ export default function OrganizationsScreen() {
           profiles (
             id,
             created_at,
-            last_sign_in_at
+            last_login
           )
         `)
         .order('created_at', { ascending: false })
@@ -76,7 +77,7 @@ export default function OrganizationsScreen() {
         
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         const activeUsers = profiles.filter(p => 
-          p.last_sign_in_at && new Date(p.last_sign_in_at) > thirtyDaysAgo
+          p.last_login && new Date(p.last_login) > thirtyDaysAgo
         ).length
 
         const orgData = {
@@ -255,7 +256,7 @@ export default function OrganizationsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Organizations</Text>
@@ -352,7 +353,7 @@ export default function OrganizationsScreen() {
           </View>
         )}
       </Modal>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -363,7 +364,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: Config.app.theme.surface,
     borderBottomWidth: 1,
@@ -520,7 +521,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: Config.app.theme.surface,
     borderBottomWidth: 1,

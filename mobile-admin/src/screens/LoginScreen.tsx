@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
@@ -43,14 +44,15 @@ export default function LoginScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={[Config.app.theme.primary, Config.app.theme.secondary]}
-      style={styles.container}
-    >
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <LinearGradient
+        colors={[Config.app.theme.primary, Config.app.theme.secondary]}
+        style={styles.container}
       >
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
         <View style={styles.content}>
           {/* Logo/Icon */}
           <View style={styles.logoContainer}>
@@ -127,12 +129,17 @@ export default function LoginScreen() {
           </View>
           <Text style={styles.authorizedText}>Authorized personnel only</Text>
         </View>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: Config.app.theme.primary,
+  },
   container: {
     flex: 1,
   },

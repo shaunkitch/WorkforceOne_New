@@ -78,13 +78,13 @@ export default function OrganizationsPage() {
         
         // Calculate active users (signed in within last 30 days)
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        const activeUsers = profiles.filter(p => 
+        const activeUsers = profiles.filter((p: any) => 
           p.last_sign_in_at && new Date(p.last_sign_in_at) > thirtyDaysAgo
         ).length
 
         // Get last activity
         const lastActivity = profiles
-          .map(p => p.last_sign_in_at)
+          .map((p: any) => p.last_sign_in_at)
           .filter(Boolean)
           .sort()
           .pop()

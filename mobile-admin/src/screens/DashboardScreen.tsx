@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -126,7 +127,7 @@ export default function DashboardScreen() {
   const healthStatus = stats ? getHealthStatus(stats.healthScore) : null
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -263,7 +264,7 @@ export default function DashboardScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: Config.app.theme.surface,
     borderBottomWidth: 1,

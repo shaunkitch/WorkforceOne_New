@@ -21,8 +21,8 @@ export interface GlobalAdminAuth {
 }
 
 export const GLOBAL_ADMIN_EMAILS = [
-  'shaun@workforceone.com', // Replace with your actual email
-  'admin@workforceone.com'
+  'admin@workforceone.co.za',
+  'shaun@workforceone.com'
 ]
 
 export function isGlobalAdmin(email: string): boolean {
@@ -31,5 +31,5 @@ export function isGlobalAdmin(email: string): boolean {
 
 export function validateAdminSession(token: string): boolean {
   // Simple token validation - in production, use JWT or similar
-  return token === process.env.GLOBAL_ADMIN_SECRET
+  return token.startsWith(process.env.GLOBAL_ADMIN_MASTER_PASSWORD + '_')
 }

@@ -24,7 +24,7 @@ export function isGlobalAdmin(email: string): boolean {
 }
 
 export function validateAdminSession(token: string): boolean {
-  return token === Config.admin.secret
+  return token.startsWith(Config.admin.masterPassword + '_')
 }
 
 // Auth helper functions
@@ -32,13 +32,13 @@ export const auth = {
   async signIn(email: string, password: string): Promise<{ success: boolean; error?: string; token?: string }> {
     try {
       const isValidAdmin = isGlobalAdmin(email)
-      const isValidPassword = password === Config.admin.secret
+      const isValidPassword = password === Config.admin.masterPassword
       
       if (!isValidAdmin || !isValidPassword) {
         return { success: false, error: 'Invalid credentials' }
       }
       
-      const token = Config.admin.secret + '_' + Date.now()
+      const token = Config.admin.masterPassword + '_' + Date.now()
       return {
         success: true,
         token,
@@ -53,6 +53,6 @@ export const auth = {
   },
 
   validateToken(token: string): boolean {
-    return validateAdminSession(token.split('_')[0])
+    return validateAdminSession(token)
   }
 }

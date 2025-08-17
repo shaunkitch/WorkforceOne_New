@@ -68,7 +68,7 @@ export default function UsersPage() {
         return {
           ...profile,
           organization_name: profile.organizations?.name || 'Unknown',
-          is_active: !authUser?.banned_until,
+          is_active: !(authUser as any)?.banned_until,
           auth_user: authUser,
           email_confirmed_at: authUser?.email_confirmed_at,
           last_sign_in_at: authUser?.last_sign_in_at
@@ -124,8 +124,9 @@ export default function UsersPage() {
 
   const handleResendConfirmation = async (userId: string) => {
     try {
-      await supabaseAdmin.auth.admin.resendConfirmation(userId)
-      alert('Confirmation email sent successfully')
+      // Note: resendConfirmation is not available in current Supabase admin API
+      // This would need to be implemented with a custom email service
+      alert('Resend confirmation feature not implemented')
     } catch (error) {
       console.error('Error resending confirmation:', error)
       alert('Failed to send confirmation email')

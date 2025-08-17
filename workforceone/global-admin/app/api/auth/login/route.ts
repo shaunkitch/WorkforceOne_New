@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     
     // Validate credentials
     const isValidAdmin = isGlobalAdmin(email)
-    const isValidPassword = password === process.env.GLOBAL_ADMIN_SECRET
+    const isValidPassword = password === process.env.GLOBAL_ADMIN_MASTER_PASSWORD
     
     if (!isValidAdmin || !isValidPassword) {
       return NextResponse.json(
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create session token (in production, use proper JWT)
-    const token = process.env.GLOBAL_ADMIN_SECRET + '_' + Date.now()
+    const token = process.env.GLOBAL_ADMIN_MASTER_PASSWORD + '_' + Date.now()
     
     return NextResponse.json({
       success: true,

@@ -24,6 +24,7 @@ interface OrganizationDetail {
   updated_at: string
   stripe_customer_id?: string
   subscription?: any
+  subscription_features?: any[]
   profiles?: any[]
   features?: any[]
   invoices?: any[]
@@ -158,7 +159,7 @@ export default function OrganizationDetailPage() {
     )
   }
 
-  const subscription = organization.subscriptions?.[0]
+  const subscription = organization.subscription
   const profiles = organization.profiles || []
   const features = organization.subscription_features?.map(sf => sf.features) || []
   const invoices = organization.invoices || []

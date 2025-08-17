@@ -101,7 +101,7 @@ BEGIN
       -- User activity
       (SELECT COUNT(*) 
        FROM profiles 
-       WHERE last_sign_in_at >= CURRENT_TIMESTAMP - INTERVAL '30 days') as active_users_30d,
+       WHERE last_login >= CURRENT_TIMESTAMP - INTERVAL '30 days') as active_users_30d,
        
       -- Growth metrics
       (SELECT COUNT(*) 
@@ -157,7 +157,7 @@ BEGIN
   -- Get basic org metrics
   SELECT 
     COUNT(*) as total_users,
-    COUNT(CASE WHEN last_sign_in_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 END) as active_users_7d
+    COUNT(CASE WHEN last_login >= CURRENT_TIMESTAMP - INTERVAL '7 days' THEN 1 END) as active_users_7d
   INTO user_count, active_users
   FROM profiles 
   WHERE organization_id = org_id;
@@ -221,7 +221,7 @@ BEGIN
       COALESCE(s.metadata->>'extension_used', 'false')::boolean as extension_used,
       calculate_org_health_score(o.id) as health_score,
       (SELECT COUNT(*) FROM profiles WHERE organization_id = o.id) as actual_user_count,
-      (SELECT COUNT(*) FROM profiles WHERE organization_id = o.id AND last_sign_in_at >= CURRENT_TIMESTAMP - INTERVAL '30 days') as active_user_count
+      (SELECT COUNT(*) FROM profiles WHERE organization_id = o.id AND last_login >= CURRENT_TIMESTAMP - INTERVAL '30 days') as active_user_count
     FROM organizations o
     LEFT JOIN subscriptions s ON s.organization_id = o.id
     WHERE o.id = org_id

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { LineChart, BarChart, PieChart } from 'react-native-chart-kit'
 import { supabaseAdmin } from '../lib/supabase'
@@ -117,7 +118,7 @@ export default function AnalyticsScreen() {
       .reduce((sum, s) => sum + (s.monthly_total || 0), 0)
 
     const activeUsers = users.filter(u => 
-      u.last_sign_in_at && new Date(u.last_sign_in_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      u.last_login && new Date(u.last_login) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     ).length
 
     const averageRevenuePerUser = activeUsers > 0 ? monthlyRecurringRevenue / activeUsers : 0
@@ -230,7 +231,7 @@ export default function AnalyticsScreen() {
   ]
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Analytics</Text>
@@ -415,7 +416,7 @@ export default function AnalyticsScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -430,7 +431,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: Config.app.theme.surface,
     borderBottomWidth: 1,

@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabaseAdmin } from '../lib/supabase'
 import { formatDate, formatDateTime, debounce } from '../lib/utils'
@@ -25,7 +26,7 @@ interface User {
   organization_id: string
   organization_name: string
   created_at: string
-  last_sign_in_at?: string
+  last_login?: string
   email_confirmed_at?: string
   is_active: boolean
 }
@@ -74,7 +75,7 @@ export default function UsersScreen() {
           organization_name: profile.organizations?.name || 'Unknown',
           is_active: !authUser?.banned_until,
           email_confirmed_at: authUser?.email_confirmed_at,
-          last_sign_in_at: authUser?.last_sign_in_at
+          last_login: authUser?.last_sign_in_at
         }
       })
 
@@ -205,7 +206,7 @@ export default function UsersScreen() {
             <View style={styles.userStat}>
               <Text style={styles.statLabel}>Last Sign In</Text>
               <Text style={styles.statValue}>
-                {item.last_sign_in_at ? formatDate(item.last_sign_in_at) : 'Never'}
+                {item.last_login ? formatDate(item.last_login) : 'Never'}
               </Text>
             </View>
             <View style={styles.userStat}>
@@ -226,7 +227,7 @@ export default function UsersScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Users Management</Text>
@@ -359,7 +360,7 @@ export default function UsersScreen() {
                 <View style={styles.modalDetail}>
                   <Text style={styles.modalDetailLabel}>Last Sign In</Text>
                   <Text style={styles.modalDetailValue}>
-                    {selectedUser.last_sign_in_at ? formatDateTime(selectedUser.last_sign_in_at) : 'Never'}
+                    {selectedUser.last_login ? formatDateTime(selectedUser.last_login) : 'Never'}
                   </Text>
                 </View>
                 <View style={styles.modalDetail}>
@@ -400,7 +401,7 @@ export default function UsersScreen() {
           </View>
         )}
       </Modal>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: Config.app.theme.surface,
     borderBottomWidth: 1,
@@ -597,7 +598,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: Config.app.theme.surface,
     borderBottomWidth: 1,
