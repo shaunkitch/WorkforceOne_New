@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useFeatureFlags } from '@/components/feature-flags-provider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,7 +42,8 @@ import {
   Moon,
   Sun,
   Volume2,
-  Users
+  Users,
+  CreditCard
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -93,6 +95,7 @@ interface UserProfile {
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -446,6 +449,7 @@ export default function SettingsPage() {
   ]
 
   if (profile?.role === 'admin') {
+    tabs.push({ id: 'subscription', label: 'Subscription', icon: CreditCard })
     tabs.push({ id: 'regional', label: 'Regional Settings', icon: Globe })
     tabs.push({ id: 'accounting', label: 'Accounting', icon: Users })
     tabs.push({ id: 'branding', label: 'Branding', icon: Camera })
@@ -1117,6 +1121,47 @@ export default function SettingsPage() {
               onUpdate={updateOrganizationSettings}
               saving={savingSettings}
             />
+          )}
+
+          {activeTab === 'subscription' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CreditCard className="h-5 w-5 mr-2" />
+                  Subscription Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="text-center py-8">
+                  <div className="mb-4">
+                    <CreditCard className="h-16 w-16 text-blue-600 mx-auto" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Manage Your Subscription</h3>
+                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    View and manage your subscription plan, features, billing, and payment methods.
+                  </p>
+                  <Button 
+                    onClick={() => router.push('/dashboard/subscription')}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Open Subscription Management
+                  </Button>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">Subscription Features</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Manage your subscription plan and features</li>
+                    <li>• Add or remove premium features</li>
+                    <li>• Adjust team size and pricing</li>
+                    <li>• View billing history and invoices</li>
+                    <li>• Update payment methods</li>
+                    <li>• Switch between monthly and yearly billing</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {activeTab === 'features' && organization && (
