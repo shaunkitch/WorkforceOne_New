@@ -45,13 +45,20 @@ export default function DashboardPage() {
       ] = await Promise.all([
         supabaseAdmin.from('organizations').select('*'),
         supabaseAdmin.from('profiles').select('*'),
-        supabaseAdmin.from('subscriptions').select('*'),
-        supabaseAdmin.from('invoices').select('total_amount, status, created_at')
+        supabaseAdmin.from('subscriptions').select('*').catch(() => ({ data: [], error: null })),
+        supabaseAdmin.from('invoices').select('total_amount, status, created_at').catch(() => ({ data: [], error: null }))
       ])
 
-      if (orgsResponse.error) throw orgsResponse.error
-      if (usersResponse.error) throw usersResponse.error
-      if (subscriptionsResponse.error) throw subscriptionsResponse.error
+      // Log errors but don't throw - allow dashboard to show with available data
+      if (orgsResponse.error) {
+        console.error('Error fetching organizations:', orgsResponse.error)
+      }
+      if (usersResponse.error) {
+        console.error('Error fetching profiles:', usersResponse.error)
+      }
+      if (subscriptionsResponse.error) {
+        console.error('Error fetching subscriptions:', subscriptionsResponse.error)
+      }
 
       const organizations = orgsResponse.data || []
       const users = usersResponse.data || []
@@ -128,9 +135,11 @@ export default function DashboardPage() {
         recentActivity,
         criticalAlerts
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching dashboard stats:', err)
-      setError('Failed to load dashboard statistics')
+      console.error('Error details:', err?.message || 'Unknown error')
+      console.error('Error code:', err?.code)
+      setError(`Failed to load dashboard statistics: ${err?.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
