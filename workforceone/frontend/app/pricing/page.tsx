@@ -11,7 +11,8 @@ import {
   ArrowLeft, Check, X, Star, Users, Building2, Crown,
   Zap, Shield, HeadphonesIcon, Clock, Calendar, FileText,
   BarChart3, MapPin, Smartphone, Globe, ChevronRight,
-  Info, Sparkles, Target, TrendingUp, Layers, Settings
+  Info, Sparkles, Target, TrendingUp, Layers, Settings,
+  Calculator
 } from 'lucide-react'
 import { 
   getUserLocationAndCurrency, 
@@ -183,9 +184,17 @@ export default function PricingPage() {
               <div className="h-8 w-px bg-gray-300" />
               <h1 className="text-xl font-bold">Pricing Plans</h1>
             </div>
-            <Link href="/signup">
-              <Button>Start Free Trial</Button>
-            </Link>
+            <div className="flex space-x-3">
+              <Link href="/pricing/modular">
+                <Button variant="outline">
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Custom Pricing
+                </Button>
+              </Link>
+              <Link href="/signup">
+                <Button>Start Free Trial</Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -200,9 +209,24 @@ export default function PricingPage() {
           <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
             Choose the Perfect Plan for Your Team
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-6">
             Start with a 14-day free trial. No credit card required. Scale as you grow.
           </p>
+          
+          <div className="bg-gradient-to-r from-purple-100 to-blue-100 border border-purple-200 rounded-lg p-4 max-w-2xl mx-auto mb-8">
+            <div className="flex items-center justify-center space-x-3">
+              <Calculator className="h-5 w-5 text-purple-600" />
+              <span className="text-purple-800 font-medium">
+                New: Build your perfect plan with modular pricing
+              </span>
+              <Link href="/pricing/modular">
+                <Button size="sm" variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50">
+                  Try Custom Pricing
+                  <ChevronRight className="h-3 w-3 ml-1" />
+                </Button>
+              </Link>
+            </div>
+          </div>
 
           {/* Location & Currency Info */}
           {!isLoading && locationInfo && (
