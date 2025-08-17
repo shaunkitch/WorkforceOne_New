@@ -1,10 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
+
+// Validate that we have real keys (not placeholders)
+const hasValidConfig = 
+  supabaseUrl !== 'https://placeholder.supabase.co' && 
+  supabaseAnonKey !== 'placeholder-anon-key' &&
+  supabaseServiceKey !== 'placeholder-service-key'
 
 // Client for browser use
-export const supabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Admin client with service role for server-side operations
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -13,6 +20,9 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     persistSession: false
   }
 })
+
+// Export config validation
+export const isSupabaseConfigured = () => hasValidConfig
 
 // Global admin authentication
 export interface GlobalAdminAuth {

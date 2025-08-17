@@ -32,9 +32,18 @@ body {
 }
 
 .admin-card {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  border: 1px solid rgb(229 231 235);
+  transition: box-shadow 0.15s ease-in-out;
+}
+
+.admin-card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 .admin-stat {
-  @apply bg-gradient-to-br from-admin-50 to-admin-100 border border-admin-200;
+  background: linear-gradient(to bottom right, #dbeafe, #bfdbfe);
+  border: 1px solid #93c5fd;
 }
