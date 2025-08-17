@@ -1235,6 +1235,29 @@ function BrandingManagement({ organization, saving }: BrandingManagementProps) {
   const [uploadingSaving, setUploadingSaving] = useState(false)
   const [companyName, setCompanyName] = useState(organization?.name || '')
   const [nameChanged, setNameChanged] = useState(false)
+  
+  // Color scheme state
+  const [colorSchemes, setColorSchemes] = useState<any[]>([])
+  const [currentBranding, setCurrentBranding] = useState<any>(null)
+  const [loadingBranding, setLoadingBranding] = useState(true)
+  const [updatingColors, setUpdatingColors] = useState(false)
+  const [showCustomColors, setShowCustomColors] = useState(false)
+  const [customColors, setCustomColors] = useState({
+    primary_color: '#3b82f6',
+    secondary_color: '#1e40af',
+    accent_color: '#06b6d4',
+    background_light: '#ffffff',
+    background_dark: '#f8fafc',
+    surface_color: '#ffffff',
+    text_primary: '#111827',
+    text_secondary: '#6b7280',
+    text_muted: '#9ca3af',
+    success_color: '#10b981',
+    warning_color: '#f59e0b',
+    error_color: '#ef4444',
+    info_color: '#3b82f6'
+  })
+  
   const supabase = createClient()
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -16,13 +16,16 @@ import { supabase } from '../lib/supabase'
 interface FormAssignment {
   id: string
   form_id: string
-  user_id: string
+  assigned_to_user_id: string
   assigned_by: string
   assigned_at: string
   due_date?: string
-  status: 'assigned' | 'completed' | 'overdue'
-  completed_at?: string
-  response_id?: string
+  is_mandatory: boolean
+  reminder_enabled: boolean
+  reminder_days_before: number
+  assigned_to_team_id?: string
+  assigned_to_role?: string
+  assigned_to_department?: string
   form: {
     id: string
     title: string
@@ -38,7 +41,7 @@ export default function FormsScreen({ navigation }: any) {
   const { user, profile } = useAuth()
   const [assignments, setAssignments] = useState<FormAssignment[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'assigned' | 'completed'>('all')
+  const [filter, setFilter] = useState<'all' | 'mandatory' | 'optional'>('all')
 
   useEffect(() => {
     fetchFormAssignments()
@@ -48,12 +51,16 @@ export default function FormsScreen({ navigation }: any) {
     if (!user || !profile?.organization_id) return
 
     try {
-      // First get form assignments without joins
+      // Get individual form assignments for this user only
+      // The trigger function now expands team/role/department assignments into individual user assignments
       const { data: assignments, error: assignmentsError } = await supabase
         .from('form_assignments')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('assigned_to_user_id', user.id) // Only get assignments specifically for this user
         .eq('organization_id', profile.organization_id)
+        .is('assigned_to_team_id', null) // Exclude team assignments (they get expanded)
+        .is('assigned_to_role', null) // Exclude role assignments (they get expanded)
+        .is('assigned_to_department', null) // Exclude department assignments (they get expanded)
         .order('created_at', { ascending: false })
 
       if (assignmentsError) {
@@ -126,7 +133,9 @@ export default function FormsScreen({ navigation }: any) {
       // Apply filter if needed
       const filteredAssignments = filter === 'all' 
         ? enrichedAssignments 
-        : enrichedAssignments.filter(assignment => assignment.status === filter)
+        : filter === 'mandatory'
+        ? enrichedAssignments.filter(assignment => assignment.is_mandatory)
+        : enrichedAssignments.filter(assignment => !assignment.is_mandatory)
 
       setAssignments(filteredAssignments)
     } catch (error) {
@@ -138,34 +147,15 @@ export default function FormsScreen({ navigation }: any) {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return '#10b981'
-      case 'overdue': return '#ef4444'
-      case 'assigned': return '#3b82f6'
-      default: return '#6b7280'
-    }
+  const getPriorityColor = (is_mandatory: boolean) => {
+    return is_mandatory ? '#ef4444' : '#3b82f6'
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return 'checkmark-circle'
-      case 'overdue': return 'alert-circle'
-      case 'assigned': return 'document-text'
-      default: return 'document'
-    }
+  const getPriorityIcon = (is_mandatory: boolean) => {
+    return is_mandatory ? 'alert-circle' : 'document-text'
   }
 
   const handleFormPress = async (assignment: FormAssignment) => {
-    if (assignment.status === 'completed') {
-      Alert.alert(
-        'Form Completed',
-        'You have already completed this form.',
-        [{ text: 'OK' }]
-      )
-      return
-    }
-
     Alert.alert(
       'Open Form',
       `Open "${assignment.form.title}" to complete?`,
@@ -174,57 +164,27 @@ export default function FormsScreen({ navigation }: any) {
         {
           text: 'Open',
           onPress: () => {
-            // For now, just mark as completed
             // In a real app, this would open a form filling interface
-            markFormCompleted(assignment.id)
+            Alert.alert('Form', 'Form interface would open here')
           }
         }
       ]
     )
   }
 
-  const markFormCompleted = async (assignmentId: string) => {
-    try {
-      const { error } = await supabase
-        .from('form_assignments')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', assignmentId)
-
-      if (error) throw error
-
-      // Update local state
-      setAssignments(prev => 
-        prev.map(assignment => 
-          assignment.id === assignmentId 
-            ? { 
-                ...assignment, 
-                status: 'completed' as const, 
-                completed_at: new Date().toISOString() 
-              }
-            : assignment
-        )
-      )
-
-      Alert.alert('Success', 'Form marked as completed!')
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update form status')
-    }
-  }
-
   const getAssignmentCounts = () => {
     return {
       all: assignments.length,
-      assigned: assignments.filter(a => a.status === 'assigned').length,
-      completed: assignments.filter(a => a.status === 'completed').length,
+      mandatory: assignments.filter(a => a.is_mandatory).length,
+      optional: assignments.filter(a => !a.is_mandatory).length,
     }
   }
 
   const filteredAssignments = filter === 'all' 
     ? assignments 
-    : assignments.filter(assignment => assignment.status === filter)
+    : filter === 'mandatory'
+    ? assignments.filter(assignment => assignment.is_mandatory)
+    : assignments.filter(assignment => !assignment.is_mandatory)
   
   const counts = getAssignmentCounts()
 
@@ -254,8 +214,8 @@ export default function FormsScreen({ navigation }: any) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[
             { key: 'all', label: `All (${counts.all})` },
-            { key: 'assigned', label: `Pending (${counts.assigned})` },
-            { key: 'completed', label: `Completed (${counts.completed})` },
+            { key: 'mandatory', label: `Mandatory (${counts.mandatory})` },
+            { key: 'optional', label: `Optional (${counts.optional})` },
           ].map((item) => (
             <TouchableOpacity
               key={item.key}
@@ -283,10 +243,10 @@ export default function FormsScreen({ navigation }: any) {
             <Ionicons name="document-outline" size={48} color="#d1d5db" />
             <Text style={styles.emptyText}>No forms found</Text>
             <Text style={styles.emptySubtext}>
-              {filter === 'assigned' 
-                ? "No pending forms to complete" 
-                : filter === 'completed'
-                ? "No completed forms yet"
+              {filter === 'mandatory' 
+                ? "No mandatory forms assigned" 
+                : filter === 'optional'
+                ? "No optional forms assigned"
                 : "No forms have been assigned to you yet"}
             </Text>
           </View>
@@ -302,15 +262,15 @@ export default function FormsScreen({ navigation }: any) {
                   <View style={styles.formMeta}>
                     <View style={[
                       styles.statusBadge, 
-                      { backgroundColor: getStatusColor(assignment.status) }
+                      { backgroundColor: getPriorityColor(assignment.is_mandatory) }
                     ]}>
                       <Ionicons 
-                        name={getStatusIcon(assignment.status) as any} 
+                        name={getPriorityIcon(assignment.is_mandatory) as any} 
                         size={12} 
                         color="white" 
                       />
                       <Text style={styles.statusText}>
-                        {assignment.status.replace('_', ' ').toUpperCase()}
+                        {assignment.is_mandatory ? 'MANDATORY' : 'OPTIONAL'}
                       </Text>
                     </View>
                   </View>

@@ -6,7 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString('en-US', {
+  const userLocale = typeof window !== 'undefined' 
+    ? navigator.language || 'en-US' 
+    : 'en-US'
+    
+  return new Date(date).toLocaleDateString(userLocale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -14,7 +18,11 @@ export function formatDate(date: string | Date): string {
 }
 
 export function formatDateTime(date: string | Date): string {
-  return new Date(date).toLocaleString('en-US', {
+  const userLocale = typeof window !== 'undefined' 
+    ? navigator.language || 'en-US' 
+    : 'en-US'
+    
+  return new Date(date).toLocaleString(userLocale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -23,11 +31,27 @@ export function formatDateTime(date: string | Date): string {
   })
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
+export function formatCurrency(amount: number, currency?: string): string {
+  // Detect user's locale and preferred currency
+  const userLocale = typeof window !== 'undefined' 
+    ? navigator.language || 'en-US' 
+    : 'en-US'
+  
+  // Default to USD if no currency specified, but allow override
+  const defaultCurrency = currency || 'USD'
+  
+  try {
+    return new Intl.NumberFormat(userLocale, {
+      style: 'currency',
+      currency: defaultCurrency,
+    }).format(amount)
+  } catch (error) {
+    // Fallback to en-US if user's locale causes issues
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: defaultCurrency,
+    }).format(amount)
+  }
 }
 
 export function getHealthStatus(score: number): {

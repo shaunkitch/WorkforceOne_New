@@ -53,12 +53,13 @@ export default function DashboardLayout({
     { name: 'Users', href: '/dashboard/users', icon: Users },
     { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
     { name: 'Health Monitor', href: '/dashboard/health', icon: TrendingUp },
+    { name: 'AI Incidents', href: '/dashboard/incidents', icon: AlertTriangle },
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     { name: 'System', href: '/dashboard/system', icon: Database },
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -70,9 +71,9 @@ export default function DashboardLayout({
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 flex flex-col ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:static lg:inset-0`}>
+      }`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-admin-600 rounded-lg flex items-center justify-center">
@@ -91,7 +92,7 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        <nav className="mt-6 px-3">
+        <nav className="flex-1 mt-6 px-3 overflow-y-auto">
           <div className="space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon
@@ -133,7 +134,7 @@ export default function DashboardLayout({
           </div>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-gray-200 mt-auto">
           <button
             onClick={handleLogout}
             className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors"
@@ -145,9 +146,9 @@ export default function DashboardLayout({
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="bg-white shadow-sm border-b border-gray-200 z-10">
           <div className="flex items-center justify-between h-16 px-6">
             <div className="flex items-center">
               <button
@@ -189,7 +190,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </div>

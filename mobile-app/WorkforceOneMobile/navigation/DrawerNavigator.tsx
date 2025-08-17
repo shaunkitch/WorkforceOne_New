@@ -14,6 +14,8 @@ import TasksScreen from '../screens/TasksScreen'
 import LeaveScreen from '../screens/LeaveScreen'
 import FormsScreen from '../screens/FormsScreen'
 import PayslipsScreen from '../screens/PayslipsScreen'
+import NotificationCenterScreen from '../screens/NotificationCenterScreen'
+import MessagesScreen from '../screens/MessagesScreen'
 
 const Drawer = createDrawerNavigator()
 
@@ -31,6 +33,10 @@ const drawerItems: DrawerItem[] = [
   { name: 'Attendance', label: 'Clock In/Out', icon: 'time-outline', component: AttendanceScreen },
   { name: 'Tasks', label: 'My Tasks', icon: 'checkmark-circle-outline', component: TasksScreen },
   { name: 'DailyCalls', label: 'Daily Calls', icon: 'map-outline', component: DailyCallsScreen },
+  
+  // Communication Section
+  { name: 'Notifications', label: 'Notifications', icon: 'notifications-outline', component: NotificationCenterScreen, section: 'Communication' },
+  { name: 'Messages', label: 'Messages', icon: 'mail-outline', component: MessagesScreen, section: 'Communication' },
   
   // HR Section
   { name: 'Leave', label: 'Leave Requests', icon: 'calendar-outline', component: LeaveScreen, section: 'HR' },
@@ -99,6 +105,7 @@ function CustomDrawerContent(props: any) {
 
   // Group items by section and filter by features
   const mainItems = filterItemsByFeatures(drawerItems.filter(item => !item.section))
+  const communicationItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Communication'))
   const hrItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'HR'))
   const otherItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Other'))
 
@@ -148,14 +155,20 @@ function CustomDrawerContent(props: any) {
           {mainItems.map(renderDrawerItem)}
         </View>
 
+        {/* Communication Section */}
+        {communicationItems.length > 0 && renderSectionHeader('Communication')}
+        <View style={styles.navigationSection}>
+          {communicationItems.map(renderDrawerItem)}
+        </View>
+
         {/* HR Section */}
-        {renderSectionHeader('HR')}
+        {hrItems.length > 0 && renderSectionHeader('HR')}
         <View style={styles.navigationSection}>
           {hrItems.map(renderDrawerItem)}
         </View>
 
         {/* Other Section */}
-        {renderSectionHeader('Other')}
+        {otherItems.length > 0 && renderSectionHeader('Other')}
         <View style={styles.navigationSection}>
           {otherItems.map(renderDrawerItem)}
         </View>

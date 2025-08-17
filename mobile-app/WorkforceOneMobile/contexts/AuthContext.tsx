@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { Profile } from '../types/database'
 import { syncService } from '../services/SyncService'
+import { NotificationService } from '../lib/notifications/NotificationService'
 
 interface AuthContextType {
   session: Session | null
@@ -73,6 +74,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Download fresh data for offline use when user logs in
       if (data?.organization_id) {
         console.log('Downloading fresh data for offline use...')
+        
+        // Initialize notification service
+        NotificationService.initialize(userId, data.organization_id)
+          .then(() => {
+            console.log('Notification service initialized')
+          })
+          .catch(error => {
+            console.error('Error initializing notification service:', error)
+          })
+        
         syncService.downloadFreshData(userId, data.organization_id)
           .then(success => {
             if (success) {

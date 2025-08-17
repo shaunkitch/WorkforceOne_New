@@ -10,16 +10,34 @@ const hasValidConfig =
   supabaseAnonKey !== 'placeholder-anon-key' &&
   supabaseServiceKey !== 'placeholder-service-key'
 
+// Singleton instances to prevent multiple client warnings
+let _supabase: any = null
+let _supabaseAdmin: any = null
+
 // Client for browser use
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = (() => {
+  if (!_supabase) {
+    _supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false
+      }
+    })
+  }
+  return _supabase
+})()
 
 // Admin client with service role for server-side operations
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+export const supabaseAdmin = (() => {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
   }
-})
+  return _supabaseAdmin
+})()
 
 // Export config validation
 export const isSupabaseConfigured = () => hasValidConfig
