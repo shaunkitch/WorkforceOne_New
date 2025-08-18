@@ -1,7 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+// Get environment variables - fallback to env if NEXT_PUBLIC_ not available
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'placeholder-anon-key'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
 
 // Validate that we have real keys (not placeholders)
@@ -11,33 +12,40 @@ const hasValidConfig =
   supabaseServiceKey !== 'placeholder-service-key'
 
 // Singleton instances to prevent multiple client warnings
-let _supabase: any = null
-let _supabaseAdmin: any = null
+let _supabase: SupabaseClient | null = null
+let _supabaseAdmin: SupabaseClient | null = null
 
-// Client for browser use
-export const supabase = (() => {
+// Lazy initialization function for regular client
+function getSupabaseClient(): SupabaseClient {
   if (!_supabase) {
     _supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        persistSession: false
+        persistSession: false,
+        detectSessionInUrl: false,
+        autoRefreshToken: false
       }
     })
   }
   return _supabase
-})()
+}
 
-// Admin client with service role for server-side operations
-export const supabaseAdmin = (() => {
+// Lazy initialization function for admin client
+function getSupabaseAdminClient(): SupabaseClient {
   if (!_supabaseAdmin) {
     _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
+        persistSession: false,
+        detectSessionInUrl: false
       }
     })
   }
   return _supabaseAdmin
-})()
+}
+
+// Export clients as functions to ensure proper initialization
+export const supabase = getSupabaseClient()
+export const supabaseAdmin = getSupabaseAdminClient()
 
 // Export config validation
 export const isSupabaseConfigured = () => hasValidConfig

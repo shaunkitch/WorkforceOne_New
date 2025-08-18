@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   CreditCard, Users, Calendar, Package, Zap, Settings,
   Check, X, AlertCircle, ChevronRight, Plus, Minus,
-  Building2, Clock, TrendingUp, Shield, Sparkles
+  Building2, Clock, TrendingUp, Shield, Sparkles, Crown, ArrowUp
 } from 'lucide-react'
 import { useSubscription, featureAccess, FEATURES } from '@/lib/feature-access'
 import { formatPrice, CURRENCIES, getUserLocationAndCurrency, CurrencyInfo } from '@/lib/currency-utils'
@@ -32,6 +32,75 @@ interface Feature {
   is_popular: boolean
 }
 
+interface PricingTier {
+  id: string
+  name: string
+  price: number
+  yearlyPrice: number
+  icon: React.ComponentType<any>
+  color: string
+  bgColor: string
+  description: string
+  features: string[]
+}
+
+const PRICING_TIERS: PricingTier[] = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 5,
+    yearlyPrice: 4,
+    icon: Building2,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    description: 'Perfect for small teams getting started',
+    features: [
+      'Team Management (up to 30)',
+      'Basic Attendance Tracking',
+      'Task Management',
+      'Mobile App Access',
+      'Email Support',
+      'Basic Forms & Reports'
+    ]
+  },
+  {
+    id: 'professional',
+    name: 'Professional',
+    price: 9,
+    yearlyPrice: 7,
+    icon: Zap,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    description: 'For growing businesses with advanced needs',
+    features: [
+      'Team Management (up to 100)',
+      'Advanced Attendance & Time Tracking',
+      'GPS & Route Tracking',
+      'Advanced Analytics',
+      'Workflow Automation',
+      'Priority Support'
+    ]
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 21,
+    yearlyPrice: 17,
+    icon: Crown,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    description: 'For large organizations with custom requirements',
+    features: [
+      'Unlimited Team Members',
+      'Enterprise Attendance Suite',
+      'Predictive Analytics',
+      'Full API Access',
+      'Custom Integrations',
+      'Dedicated Account Manager'
+    ]
+  }
+]
+
 export default function SubscriptionPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -47,6 +116,7 @@ export default function SubscriptionPage() {
   const [showAddFeatures, setShowAddFeatures] = useState(false)
   const [userCurrency, setUserCurrency] = useState<CurrencyInfo>(CURRENCIES.USD)
   const [showPayment, setShowPayment] = useState(false)
+  const [upgrading, setUpgrading] = useState(false)
 
   useEffect(() => {
     fetchUserProfile()
@@ -146,6 +216,140 @@ export default function SubscriptionPage() {
 
   const handlePaymentCancel = () => {
     setShowPayment(false)
+  }
+
+  const getCurrentTier = () => {
+    if (!subscription) return null
+    const tierPrice = subscription.user_tier_price || 0
+    return PRICING_TIERS.find(tier => tier.price === tierPrice || tier.yearlyPrice === tierPrice) || null
+  }
+
+  const getAvailableUpgrades = () => {
+    const currentTier = getCurrentTier()
+    if (!currentTier) return PRICING_TIERS
+    
+    const currentIndex = PRICING_TIERS.findIndex(tier => tier.id === currentTier.id)
+    return PRICING_TIERS.slice(currentIndex + 1)
+  }
+
+  const handleUpgradeToTier = async (targetTier: PricingTier) => {
+    setUpgrading(true)
+    try {
+      // First update the tier features
+      const tierFeatures = getTierFeatures(targetTier.id)
+      setSelectedFeatures(tierFeatures)
+      
+      // Update subscription with new tier pricing
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+
+      const { error } = await supabase.rpc('update_subscription', {
+        org_id: userProfile.organization_id,
+        user_count: userCount,
+        billing_period: isYearly ? 'yearly' : 'monthly',
+        feature_keys: tierFeatures
+      })
+
+      if (error) throw error
+
+      // Update the tier pricing in subscription
+      const tierPrice = isYearly ? targetTier.yearlyPrice : targetTier.price
+      const { error: priceError } = await supabase
+        .from('subscriptions')
+        .update({
+          user_tier_price: tierPrice,
+          monthly_total: tierPrice * userCount
+        })
+        .eq('organization_id', userProfile.organization_id)
+
+      if (priceError) throw priceError
+
+      refresh()
+      alert(`Successfully upgraded to ${targetTier.name}!`)
+    } catch (error) {
+      console.error('Error upgrading tier:', error)
+      alert('Failed to upgrade tier')
+    } finally {
+      setUpgrading(false)
+    }
+  }
+
+  const getTierFeatures = (tierId: string): string[] => {
+    // Define feature sets for each tier
+    const tierFeatureSets: Record<string, string[]> = {
+      starter: [
+        'dashboard',
+        'attendance',
+        'leave',
+        'teams',
+        'forms',
+        'mobile_clock_in',
+        'mobile_leave',
+        'mobile_forms'
+      ],
+      professional: [
+        'dashboard',
+        'attendance',
+        'leave',
+        'teams',
+        'forms',
+        'time_tracking',
+        'projects',
+        'tasks',
+        'routes',
+        'maps',
+        'outlets',
+        'analytics',
+        'custom_branding',
+        'color_schemes',
+        'mobile_clock_in',
+        'mobile_leave',
+        'mobile_forms',
+        'mobile_offline_mode',
+        'mobile_push_notifications',
+        'mobile_gps_tracking',
+        'mobile_photo_attachments',
+        'priority_support'
+      ],
+      enterprise: [
+        'dashboard',
+        'attendance',
+        'leave',
+        'teams',
+        'forms',
+        'time_tracking',
+        'projects',
+        'tasks',
+        'routes',
+        'maps',
+        'outlets',
+        'analytics',
+        'automation',
+        'integrations',
+        'payroll',
+        'daily_calls',
+        'messaging',
+        'api_access',
+        'custom_branding',
+        'color_schemes',
+        'mobile_clock_in',
+        'mobile_leave',
+        'mobile_forms',
+        'mobile_offline_mode',
+        'mobile_push_notifications',
+        'mobile_gps_tracking',
+        'mobile_photo_attachments',
+        'mobile_analytics',
+        'mobile_messaging',
+        'mobile_daily_calls',
+        'mobile_payslips',
+        'priority_support',
+        'phone_support',
+        'dedicated_support'
+      ]
+    }
+    
+    return tierFeatureSets[tierId] || []
   }
 
   const getStatusColor = (status: string) => {
@@ -394,6 +598,117 @@ export default function SubscriptionPage() {
                 </Badge>
               )}
             </div>
+          </div>
+
+          {/* Current Tier & Upgrade Options */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Current Plan Tier
+            </label>
+            
+            {/* Current Tier Display */}
+            {getCurrentTier() && (
+              <div className="mb-4 p-4 border rounded-lg bg-blue-50 border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {React.createElement(getCurrentTier()!.icon, { 
+                      className: `h-6 w-6 ${getCurrentTier()!.color}` 
+                    })}
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{getCurrentTier()!.name}</h3>
+                      <p className="text-sm text-gray-600">{getCurrentTier()!.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-gray-900">
+                      {formatPrice(isYearly ? getCurrentTier()!.yearlyPrice : getCurrentTier()!.price, userCurrency)}
+                      <span className="text-sm font-normal text-gray-600">/user/mo</span>
+                    </div>
+                    {isYearly && (
+                      <div className="text-xs text-green-600">
+                        20% yearly savings
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upgrade Options */}
+            {getAvailableUpgrades().length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                  <ArrowUp className="h-4 w-4 mr-2 text-green-600" />
+                  Available Upgrades
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {getAvailableUpgrades().map((tier) => {
+                    const Icon = tier.icon
+                    const currentTier = getCurrentTier()
+                    const currentPrice = isYearly ? (currentTier?.yearlyPrice || 0) : (currentTier?.price || 0)
+                    const newPrice = isYearly ? tier.yearlyPrice : tier.price
+                    const priceDiff = newPrice - currentPrice
+                    
+                    return (
+                      <div
+                        key={tier.id}
+                        className="border rounded-lg p-4 hover:border-blue-500 transition-colors bg-white"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className={`p-2 rounded-lg ${tier.bgColor}`}>
+                              <Icon className={`h-5 w-5 ${tier.color}`} />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{tier.name}</h4>
+                              <p className="text-xs text-gray-600">{tier.description}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                          <div className="text-lg font-bold text-gray-900">
+                            {formatPrice(newPrice, userCurrency)}
+                            <span className="text-sm font-normal text-gray-600">/user/mo</span>
+                          </div>
+                          <div className="text-sm text-green-600 font-medium">
+                            +{formatPrice(priceDiff, userCurrency)}/user/mo increase
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Total: {formatPrice(newPrice * userCount, userCurrency)}/mo
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <h5 className="text-xs font-medium text-gray-700 mb-2">Key Features:</h5>
+                          <ul className="text-xs text-gray-600 space-y-1">
+                            {tier.features.slice(0, 3).map((feature, idx) => (
+                              <li key={idx} className="flex items-center">
+                                <Check className="h-3 w-3 text-green-500 mr-1 flex-shrink-0" />
+                                {feature}
+                              </li>
+                            ))}
+                            {tier.features.length > 3 && (
+                              <li className="text-blue-600">+{tier.features.length - 3} more features</li>
+                            )}
+                          </ul>
+                        </div>
+
+                        <Button
+                          onClick={() => handleUpgradeToTier(tier)}
+                          disabled={upgrading}
+                          className="w-full"
+                          size="sm"
+                        >
+                          {upgrading ? 'Upgrading...' : `Upgrade to ${tier.name}`}
+                          <ArrowUp className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Active Features */}

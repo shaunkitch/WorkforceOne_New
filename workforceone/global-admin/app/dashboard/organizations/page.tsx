@@ -7,9 +7,10 @@ import {
   Building2, Users, Calendar, CreditCard, AlertTriangle, 
   Clock, CheckCircle, XCircle, Plus, Search, Filter,
   Eye, Edit, Trash2, MoreVertical, TrendingUp, TrendingDown,
-  Shield, Mail, Phone, Globe, MapPin
+  Shield, Mail, Phone, Globe, MapPin, Settings
 } from 'lucide-react'
-import { supabaseAdmin } from '@/lib/supabase'
+import SubscriptionModal from '@/components/subscription-modal'
+// Remove direct supabase import - we'll use API routes instead
 import { formatDate, formatCurrency, getHealthStatus, calculateHealthScore } from '@/lib/utils'
 
 interface Organization {
@@ -40,6 +41,15 @@ export default function OrganizationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedOrgs, setSelectedOrgs] = useState<string[]>([])
+  const [subscriptionModal, setSubscriptionModal] = useState<{
+    isOpen: boolean
+    orgId: string
+    orgName: string
+  }>({
+    isOpen: false,
+    orgId: '',
+    orgName: ''
+  })
 
   useEffect(() => {
     fetchOrganizations()
@@ -49,48 +59,35 @@ export default function OrganizationsPage() {
     try {
       setLoading(true)
       
-      // Fetch organizations with related data
-      const { data: orgsData, error: orgsError } = await supabaseAdmin
-        .from('organizations')
-        .select(`
-          *,
-          subscriptions (
-            status,
-            trial_ends_at,
-            monthly_total,
-            user_count,
-            updated_at
-          ),
-          profiles (
-            id,
-            created_at,
-            last_sign_in_at
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (orgsError) throw orgsError
+      // Fetch organizations from API route
+      const response = await fetch('/api/organizations')
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch organizations')
+      }
 
       // Transform and calculate additional metrics
-      const transformedOrgs = orgsData.map(org => {
+      const transformedOrgs = result.data.map((org: any) => {
         const subscription = org.subscriptions?.[0]
         const profiles = org.profiles || []
         
         // Calculate active users (signed in within last 30 days)
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         const activeUsers = profiles.filter((p: any) => 
-          p.last_sign_in_at && new Date(p.last_sign_in_at) > thirtyDaysAgo
+          p.last_login && new Date(p.last_login) > thirtyDaysAgo
         ).length
 
         // Get last activity
         const lastActivity = profiles
-          .map((p: any) => p.last_sign_in_at)
+          .map((p: any) => p.last_login)
           .filter(Boolean)
           .sort()
           .pop()
 
         const orgData = {
           ...org,
+          email: org.email || `admin@${org.slug || org.name.toLowerCase().replace(/\s+/g, '')}.com`, // Generate email if missing
           subscription_status: subscription?.status || 'none',
           trial_ends_at: subscription?.trial_ends_at,
           monthly_total: subscription?.monthly_total || 0,
@@ -109,6 +106,8 @@ export default function OrganizationsPage() {
       setOrganizations(transformedOrgs)
     } catch (error) {
       console.error('Error fetching organizations:', error)
+      // Set empty array on error instead of keeping loading state
+      setOrganizations([])
     } finally {
       setLoading(false)
     }
@@ -125,17 +124,24 @@ export default function OrganizationsPage() {
 
   const handleExtendTrial = async (orgId: string) => {
     try {
-      const { data, error } = await supabaseAdmin.rpc('extend_trial', {
-        org_id: orgId
+      const response = await fetch('/api/organizations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orgId,
+          action: 'extend_trial'
+        })
       })
       
-      if (error) throw error
+      const result = await response.json()
       
-      if (data.success) {
+      if (result.success) {
         alert('Trial extended successfully!')
         fetchOrganizations()
       } else {
-        alert(data.error || 'Failed to extend trial')
+        alert(result.error || 'Failed to extend trial')
       }
     } catch (error) {
       console.error('Error extending trial:', error)
@@ -339,9 +345,22 @@ export default function OrganizationsPage() {
                           <Link
                             href={`/dashboard/organizations/${org.id}`}
                             className="text-admin-600 hover:text-admin-900"
+                            title="View Organization"
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
+                          
+                          <button
+                            onClick={() => setSubscriptionModal({
+                              isOpen: true,
+                              orgId: org.id,
+                              orgName: org.name
+                            })}
+                            className="text-green-600 hover:text-green-900"
+                            title="Manage Subscription"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
                           
                           {org.subscription_status === 'trial' && !trialExpired && (
                             <button
@@ -379,6 +398,15 @@ export default function OrganizationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Subscription Management Modal */}
+      <SubscriptionModal
+        organizationId={subscriptionModal.orgId}
+        organizationName={subscriptionModal.orgName}
+        isOpen={subscriptionModal.isOpen}
+        onClose={() => setSubscriptionModal({ isOpen: false, orgId: '', orgName: '' })}
+        onUpdate={fetchOrganizations}
+      />
     </div>
   )
 }

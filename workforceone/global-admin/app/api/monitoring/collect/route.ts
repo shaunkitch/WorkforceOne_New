@@ -191,8 +191,8 @@ export async function POST(request: NextRequest) {
     // Calculate collection efficiency
     results.data.collection_summary = {
       total_metrics: results.metrics_collected,
-      sources_successful: sources.filter(source => 
-        results.data[source] && !results.errors.some(err => err.includes(source))
+      sources_successful: sources.filter((source: string) => 
+        results.data[source] && !results.errors.some((err: string) => err.includes(source))
       ).length,
       sources_failed: results.errors.length,
       collection_duration_ms: Date.now() - new Date(results.timestamp).getTime(),

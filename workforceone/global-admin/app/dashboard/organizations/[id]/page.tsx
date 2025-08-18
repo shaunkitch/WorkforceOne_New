@@ -10,7 +10,7 @@ import {
   Mail, Phone, Globe, MapPin, Activity, TrendingUp,
   Shield, Database, Settings, Download, RefreshCw
 } from 'lucide-react'
-import { supabaseAdmin } from '@/lib/supabase'
+// Remove direct supabase import - we'll use API routes instead
 import { formatDate, formatDateTime, formatCurrency, getHealthStatus, calculateHealthScore } from '@/lib/utils'
 
 interface OrganizationDetail {
@@ -49,24 +49,15 @@ export default function OrganizationDetailPage() {
     try {
       setLoading(true)
       
-      const { data: orgData, error: orgError } = await supabaseAdmin
-        .from('organizations')
-        .select(`
-          *,
-          subscriptions (*),
-          profiles (*),
-          invoices (*),
-          subscription_features (
-            *,
-            features (*)
-          )
-        `)
-        .eq('id', orgId)
-        .single()
-
-      if (orgError) throw orgError
+      // Use API route instead of direct Supabase query
+      const response = await fetch(`/api/organizations/${orgId}`)
+      const result = await response.json()
       
-      setOrganization(orgData)
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch organization')
+      }
+      
+      setOrganization(result.data)
     } catch (error) {
       console.error('Error fetching organization detail:', error)
     } finally {
@@ -79,17 +70,26 @@ export default function OrganizationDetailPage() {
     
     setActionLoading(true)
     try {
-      const { data, error } = await supabaseAdmin.rpc('extend_trial', {
-        org_id: organization.id
+      // Use subscription API route for trial extension
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orgId: organization.id,
+          action: 'extend_trial',
+          trialDays: 14
+        })
       })
       
-      if (error) throw error
+      const result = await response.json()
       
-      if (data.success) {
+      if (result.success) {
         alert('Trial extended successfully!')
         fetchOrganizationDetail(organization.id)
       } else {
-        alert(data.error || 'Failed to extend trial')
+        alert(result.error || 'Failed to extend trial')
       }
     } catch (error) {
       console.error('Error extending trial:', error)
@@ -104,16 +104,25 @@ export default function OrganizationDetailPage() {
     
     setActionLoading(true)
     try {
-      const { data, error } = await supabaseAdmin.rpc('cancel_subscription', {
-        org_id: organization.id,
-        immediate: false
+      // Use subscription API route for cancellation
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orgId: organization.id,
+          action: 'cancel_subscription'
+        })
       })
       
-      if (error) throw error
+      const result = await response.json()
       
-      if (data.success) {
+      if (result.success) {
         alert('Subscription canceled successfully!')
         fetchOrganizationDetail(organization.id)
+      } else {
+        alert(result.error || 'Failed to cancel subscription')
       }
     } catch (error) {
       console.error('Error canceling subscription:', error)
@@ -159,7 +168,7 @@ export default function OrganizationDetailPage() {
     )
   }
 
-  const subscription = organization.subscription
+  const subscription = organization.subscriptions?.[0] || null
   const profiles = organization.profiles || []
   const features = organization.subscription_features?.map(sf => sf.features) || []
   const invoices = organization.invoices || []

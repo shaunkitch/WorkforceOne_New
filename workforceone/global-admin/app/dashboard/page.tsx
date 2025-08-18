@@ -6,8 +6,9 @@ import {
   Building2, Users, CreditCard, AlertTriangle, TrendingUp, 
   DollarSign, Activity, Globe, Clock, Shield, Zap, Database
 } from 'lucide-react'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabase, supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase'
 import { formatCurrency, formatDateTime, getHealthStatus } from '@/lib/utils'
+import { debugEnvironment } from '@/lib/debug-env'
 
 interface DashboardStats {
   totalOrganizations: number
@@ -35,6 +36,11 @@ export default function DashboardPage() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true)
+      
+      // Debug environment configuration
+      const envDebug = debugEnvironment()
+      console.log('🔧 Environment Check:', envDebug)
+      console.log('✅ Supabase Configured:', isSupabaseConfigured())
       
       // Mock data for development - remove when database is properly set up
       const mockData = {
@@ -66,37 +72,34 @@ export default function DashboardPage() {
         ]
       }
 
-      // Try to fetch from database, fall back to mock data
+      // Fetch data from API route instead of direct database calls
       let organizations, users, subscriptions, invoices
 
       try {
-        const [
-          orgsResponse,
-          usersResponse,
-          subscriptionsResponse,
-          revenueResponse
-        ] = await Promise.all([
-          supabaseAdmin.from('organizations').select('*'),
-          supabaseAdmin.from('profiles').select('*'),
-          supabaseAdmin.from('subscriptions').select('*'),
-          supabaseAdmin.from('invoices').select('total_amount, status, created_at')
-        ])
-
-        // Check if we have database errors, use mock data if so
-        if (orgsResponse.error || usersResponse.error || subscriptionsResponse.error || revenueResponse.error) {
-          console.log('Using mock data due to database errors or missing tables')
+        console.log('🚀 Fetching dashboard data from API...')
+        
+        const response = await fetch('/api/dashboard/stats')
+        const result = await response.json()
+        
+        if (result.success) {
+          console.log('✅ Successfully fetched data from API')
+          if (result.useMockData) {
+            console.log('📋 API returned mock data due to database issues')
+          }
+          
+          organizations = result.data.organizations
+          users = result.data.users
+          subscriptions = result.data.subscriptions
+          invoices = result.data.invoices
+        } else {
+          console.error('❌ API request failed:', result.error)
           organizations = mockData.organizations
           users = mockData.users
           subscriptions = mockData.subscriptions
           invoices = mockData.invoices
-        } else {
-          organizations = orgsResponse.data || mockData.organizations
-          users = usersResponse.data || mockData.users
-          subscriptions = subscriptionsResponse.data || mockData.subscriptions
-          invoices = revenueResponse.data || mockData.invoices
         }
       } catch (error) {
-        console.log('Database connection failed, using mock data:', error)
+        console.error('💥 API request failed, using mock data:', error)
         organizations = mockData.organizations
         users = mockData.users
         subscriptions = mockData.subscriptions

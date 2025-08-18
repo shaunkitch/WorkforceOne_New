@@ -1,8 +1,23 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase'
+import { debugEnvironment } from '@/lib/debug-env'
 
 export async function GET() {
   try {
+    // Debug environment first
+    const envDebug = debugEnvironment()
+    const configured = isSupabaseConfigured()
+    
+    console.log('🔧 API Route Environment Check:', envDebug)
+    console.log('✅ Supabase Configured:', configured)
+    
+    if (!configured) {
+      return NextResponse.json({
+        success: false,
+        error: 'Supabase configuration incomplete',
+        debug: envDebug
+      }, { status: 500 })
+    }
     // Test each table individually
     const tableTests: Record<string, any> = {}
     
@@ -67,7 +82,9 @@ export async function GET() {
       summary: {
         totalTables: Object.keys(tableTests).filter(k => tableTests[k].exists).length,
         missingTables: Object.keys(tableTests).filter(k => !tableTests[k].exists)
-      }
+      },
+      debug: envDebug,
+      configured
     })
   } catch (error: any) {
     return NextResponse.json({
