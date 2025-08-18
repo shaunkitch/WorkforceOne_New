@@ -146,14 +146,10 @@ function CustomDrawerContent(props: any) {
   const securityItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Security'))
   const otherItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Other'))
   
-  // Debug logging for security items
-  console.log('🔐 Security Navigation Debug:', {
-    totalSecurityItemsBeforeFilter: drawerItems.filter(item => item.section === 'Security').length,
-    securityItemsAfterFilter: securityItems.length,
-    securityItems: securityItems.map(item => ({ name: item.name, label: item.label })),
-    userProfile: { role: profile?.role, workType: profile?.work_type },
-    hasSecurityFeature: hasFeature('security')
-  });
+  // Security navigation logging
+  if (__DEV__ && securityItems.length > 0) {
+    console.log('🔐 Security navigation enabled for user');
+  }
 
   const renderDrawerItem = (item: DrawerItem) => (
     <DrawerItem

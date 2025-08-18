@@ -19,6 +19,16 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   Users, 
   Shield, 
@@ -28,7 +38,12 @@ import {
   Navigation,
   Route,
   UserCheck,
-  ClipboardList
+  ClipboardList,
+  UserPlus,
+  Copy,
+  MessageCircle,
+  ExternalLink,
+  Share
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import SecurityMap from '@/components/security/SecurityMap';
@@ -91,6 +106,13 @@ export default function SecurityDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedGuard, setSelectedGuard] = useState<GuardLocation | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<SecurityIncident | null>(null);
+  
+  // Guard invitation states
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviting, setInviting] = useState(false);
 
   // Refs
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
@@ -264,6 +286,122 @@ export default function SecurityDashboard() {
     console.log('Incident clicked:', incident);
   };
 
+  // Guard invitation functions
+  const generateInviteCode = () => {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setInviteCode(code);
+    
+    // Generate registration link with embedded code
+    const baseUrl = window.location.origin;
+    const registrationLink = `${baseUrl}/auth/register?type=security&code=${code}&email=${encodeURIComponent(inviteEmail.trim())}`;
+    setInviteLink(registrationLink);
+    
+    return { code, link: registrationLink };
+  };
+
+  const sendGuardInvitation = async () => {
+    if (!inviteEmail.trim()) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    setInviting(true);
+    try {
+      const { code, link } = generateInviteCode();
+      
+      // Get current user's organization
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id, full_name')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) throw new Error('Profile not found');
+
+      // Success - invitation generated
+      console.log('Guard invitation generated:', { code, link, email: inviteEmail.trim() });
+      
+      // Don't close dialog - let user copy/share the information
+      // setShowInviteDialog(false);
+
+    } catch (error: any) {
+      console.error('Error generating invitation:', error);
+      alert(`Failed to generate invitation: ${error.message}`);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const copyInviteCode = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      alert('Invitation code copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy code:', err);
+      alert('Failed to copy code');
+    }
+  };
+
+  const copyInviteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      alert('Registration link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      alert('Failed to copy link');
+    }
+  };
+
+  const shareViaWhatsApp = () => {
+    const message = encodeURIComponent(`🛡️ Security Guard Invitation
+
+Hello! You've been invited to join our security team.
+
+👤 Email: ${inviteEmail.trim()}
+🔑 Code: ${inviteCode}
+
+📱 Quick Registration:
+${inviteLink}
+
+📲 Mobile App:
+Download "WorkforceOne Mobile" from the App Store and use the code above to register.
+
+Welcome to the team! 🚀`);
+    
+    const whatsappUrl = `https://wa.me/?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const shareGeneric = async () => {
+    const shareData = {
+      title: 'Security Guard Invitation',
+      text: `Security Guard Invitation - Code: ${inviteCode}`,
+      url: inviteLink
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback - copy to clipboard
+        await copyInviteLink();
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+      copyInviteLink();
+    }
+  };
+
+  const resetInviteForm = () => {
+    setInviteEmail('');
+    setInviteCode('');
+    setInviteLink('');
+    setShowInviteDialog(false);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -299,9 +437,13 @@ export default function SecurityDashboard() {
           <span>Manage Routes</span>
         </Button>
         
-        <Button variant="outline" className="h-20 flex flex-col">
-          <UserCheck className="h-5 w-5 mb-2" />
-          <span>Assign Guards</span>
+        <Button 
+          variant="outline" 
+          className="h-20 flex flex-col"
+          onClick={() => setShowInviteDialog(true)}
+        >
+          <UserPlus className="h-5 w-5 mb-2" />
+          <span>Invite Guard</span>
         </Button>
         
         <Button variant="outline" className="h-20 flex flex-col">
@@ -582,6 +724,202 @@ export default function SecurityDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Guard Invitation Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Invite Security Guard
+            </DialogTitle>
+            <DialogDescription>
+              Send an invitation to a new security guard to join your organization.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {!inviteCode ? (
+              // Step 1: Email input
+              <div>
+                <Label htmlFor="email">Guard Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="guard@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="mt-1"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Enter the email address of the security guard you want to invite
+                </p>
+              </div>
+            ) : (
+              // Step 2: Generated invitation with sharing options
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h3 className="font-semibold text-green-800 mb-2">Invitation Generated Successfully!</h3>
+                  <p className="text-sm text-green-700">
+                    Share the invitation code or registration link with <strong>{inviteEmail}</strong>
+                  </p>
+                </div>
+                
+                {/* Invitation Code */}
+                <div>
+                  <Label>Invitation Code</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      value={inviteCode}
+                      readOnly
+                      className="font-mono font-bold text-lg"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyInviteCode}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Registration Link */}
+                <div>
+                  <Label>Direct Registration Link</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      value={inviteLink}
+                      readOnly
+                      className="text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyInviteLink}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This link pre-fills the registration form with the code
+                  </p>
+                </div>
+
+                {/* Sharing Options */}
+                <div>
+                  <Label>Share Invitation</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={shareViaWhatsApp}
+                      className="flex items-center gap-2"
+                    >
+                      <MessageCircle className="h-4 w-4 text-green-600" />
+                      WhatsApp
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={shareGeneric}
+                      className="flex items-center gap-2"
+                    >
+                      <Share className="h-4 w-4" />
+                      Share
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyInviteLink}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Copy Link
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(inviteLink)}`, '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <span className="text-sm">⚡</span>
+                      QR Code
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Choose how to share the invitation with the guard
+                  </p>
+                </div>
+
+                {/* Instructions */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-800 mb-2">Instructions for the Guard:</h4>
+                  <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                    <li>Click the registration link or go to the website</li>
+                    <li>Use email: <strong>{inviteEmail}</strong></li>
+                    <li>Enter invitation code: <strong>{inviteCode}</strong></li>
+                    <li>Set work type to "Security Guard"</li>
+                    <li>Download "WorkforceOne Mobile" app from App Store</li>
+                    <li>Login to access security patrol features</li>
+                  </ol>
+                  <div className="mt-2 pt-2 border-t border-blue-200">
+                    <p className="text-xs text-blue-600">
+                      💡 Tip: Use WhatsApp to share the invitation instantly with the guard
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {!inviteCode ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetInviteForm}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={sendGuardInvitation}
+                  disabled={inviting || !inviteEmail.trim()}
+                >
+                  {inviting ? 'Generating...' : 'Generate Invitation'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetInviteForm}
+                >
+                  Create Another
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setShowInviteDialog(false)}
+                >
+                  Done
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

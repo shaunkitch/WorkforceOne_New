@@ -133,15 +133,12 @@ export const useFeatureFlags = () => {
   const hasFeature = (feature: keyof FeatureFlags): boolean => {
     const organizationHasFeature = featureFlags?.[feature] ?? true
     
-    // Debug logging for security feature
-    if (feature === 'security') {
+    // Security feature access logging
+    if (feature === 'security' && __DEV__) {
       console.log('🔐 Security Feature Check:', {
-        feature,
         organizationHasFeature,
         userWorkType: profile?.work_type,
-        userRole: profile?.role,
-        profileId: profile?.id,
-        featureFlags: featureFlags
+        userRole: profile?.role
       });
     }
     
@@ -191,14 +188,9 @@ export const useFeatureFlags = () => {
       
       const result = organizationHasFeature && mobileSecurityEnabled && hasSecurityAccess;
       
-      console.log('🔐 Security Access Result:', {
-        hasSecurityAccess,
-        result,
-        userWorkType,
-        userRole,
-        organizationHasFeature,
-        mobileSecurityEnabled
-      });
+      if (__DEV__) {
+        console.log('🔐 Security Access:', result ? 'GRANTED' : 'DENIED');
+      }
       
       return result;
     }
