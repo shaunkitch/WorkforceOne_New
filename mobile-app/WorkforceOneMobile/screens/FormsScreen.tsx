@@ -11,6 +11,7 @@ import {
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme, createThemedStyles } from '../contexts/ThemeContext'
 import { supabase } from '../lib/supabase'
 
 interface FormAssignment {
@@ -39,9 +40,13 @@ interface FormAssignment {
 
 export default function FormsScreen({ navigation }: any) {
   const { user, profile } = useAuth()
+  const { colors } = useTheme()
   const [assignments, setAssignments] = useState<FormAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'mandatory' | 'optional'>('all')
+
+  // Create themed styles
+  const themedStyles = createThemedStyles(colors)
 
   useEffect(() => {
     fetchFormAssignments()
@@ -202,7 +207,7 @@ export default function FormsScreen({ navigation }: any) {
       <StatusBar style="light" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View>
           <Text style={styles.headerTitle}>My Forms</Text>
           <Text style={styles.headerSubtitle}>Complete assigned forms</Text>
@@ -221,7 +226,7 @@ export default function FormsScreen({ navigation }: any) {
               key={item.key}
               style={[
                 styles.filterTab,
-                filter === item.key && styles.filterTabActive
+                filter === item.key && { ...styles.filterTabActive, backgroundColor: colors.primary }
               ]}
               onPress={() => setFilter(item.key as any)}
             >

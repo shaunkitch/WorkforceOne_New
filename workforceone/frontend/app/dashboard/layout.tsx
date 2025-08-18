@@ -19,6 +19,7 @@ import {
   BarChart3, Cog, UserPlus, FolderOpen, Phone
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
+import { ThemeProvider } from '@/components/theme-provider'
 
 // Grouped navigation structure
 const navigationGroups = [
@@ -322,7 +323,7 @@ function GroupedSidebarNav({
                       className={`
                         group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
                         ${isActive 
-                          ? 'bg-blue-600 text-white shadow-sm' 
+                          ? 'bg-brand-primary text-white shadow-sm' 
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
                         }
                         ${mobile ? 'text-base py-2.5' : ''}
@@ -340,7 +341,7 @@ function GroupedSidebarNav({
                         {!mobile && (
                           <div className={`text-xs mt-0.5 truncate ${
                             isActive 
-                              ? 'text-blue-100' 
+                              ? 'text-white opacity-80' 
                               : 'text-gray-500 group-hover:text-gray-600'
                           }`}>
                             {item.description}
@@ -379,7 +380,7 @@ function SidebarNav({ navigation, pathname, mobile = false }: {
             className={`
               group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200
               ${isActive 
-                ? 'bg-blue-600 text-white shadow-sm' 
+                ? 'bg-brand-primary text-white shadow-sm' 
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
               }
               ${mobile ? 'text-base py-3' : ''}
@@ -397,7 +398,7 @@ function SidebarNav({ navigation, pathname, mobile = false }: {
               {!mobile && (
                 <div className={`text-xs mt-0.5 truncate ${
                   isActive 
-                    ? 'text-blue-100' 
+                    ? 'text-white opacity-80' 
                     : 'text-gray-600 group-hover:text-gray-700'
                 }`}>
                   {item.description}
@@ -427,11 +428,11 @@ function LogoBrand({ organization, className = "" }: { organization: any, classN
           />
         </div>
       ) : (
-        <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center hover:shadow-lg transition-all">
+        <div className="h-8 w-8 bg-brand-primary rounded-lg flex items-center justify-center hover:shadow-lg transition-all">
           <Users className="h-5 w-5 text-white" />
         </div>
       )}
-      <span className="ml-3 text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+      <span className="ml-3 text-xl font-bold text-brand-primary">
         {organization?.name || 'WorkforceOne'}
       </span>
     </Link>
@@ -452,8 +453,8 @@ function UserProfile({ profile }: { profile: any }) {
     <HeadlessMenu as="div" className="relative">
       <HeadlessMenu.Button className="flex items-center w-full px-3 py-2 text-sm text-left rounded-xl hover:bg-gray-100/50 transition-colors group">
         <div className="flex items-center w-full">
-          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <User className="h-4 w-4 text-blue-600" />
+          <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
+            <User className="h-4 w-4 text-brand-primary" />
           </div>
           <div className="ml-3 flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
@@ -581,9 +582,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [supabase])
 
   return (
-    <div className="flex h-full bg-background">
-      {/* Mobile sidebar */}
-      <Transition.Root show={sidebarOpen} as={Fragment}>
+    <ThemeProvider organizationId={userProfile?.organization_id}>
+      <div className="flex h-full bg-background">
+        {/* Mobile sidebar */}
+        <Transition.Root show={sidebarOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
           <Transition.Child
             as={Fragment}
@@ -716,7 +718,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
       </div>
-
-    </div>
+      </div>
+    </ThemeProvider>
   )
 }

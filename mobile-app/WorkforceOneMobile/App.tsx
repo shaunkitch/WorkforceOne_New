@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import AppNavigator from './navigation/AppNavigator'
 import { notificationService } from './lib/notifications'
 import { offlineService } from './lib/offline'
@@ -32,7 +33,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppNavigator />
+        <ThemeProvider>
+          <AppNavigator />
+        </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   )

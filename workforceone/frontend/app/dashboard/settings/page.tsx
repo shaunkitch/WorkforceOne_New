@@ -46,6 +46,7 @@ import {
   CreditCard
 } from 'lucide-react'
 import { format } from 'date-fns'
+import BrandingDebug from '@/components/branding-debug'
 
 interface UserProfile {
   id: string
@@ -1173,6 +1174,7 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+      <BrandingDebug />
     </div>
   )
 }
@@ -1398,6 +1400,193 @@ function BrandingManagement({ organization, saving }: BrandingManagementProps) {
     setNameChanged(e.target.value.trim() !== organization?.name)
   }
 
+  // Load color schemes and current branding
+  useEffect(() => {
+    if (!organization?.id) return
+
+    const loadBrandingData = async () => {
+      try {
+        // Load predefined color schemes
+        const { data: schemes, error: schemesError } = await supabase
+          .from('branding_color_schemes')
+          .select('*')
+          .order('category', { ascending: true })
+
+        if (schemesError) throw schemesError
+        setColorSchemes(schemes || [])
+
+        // Load current organization branding
+        const { data: branding, error: brandingError } = await supabase
+          .from('organization_branding')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .single()
+
+        if (brandingError && brandingError.code !== 'PGRST116') {
+          throw brandingError
+        }
+
+        setCurrentBranding(branding)
+        if (branding) {
+          setCustomColors({
+            primary_color: branding.primary_color,
+            secondary_color: branding.secondary_color,
+            accent_color: branding.accent_color,
+            background_light: branding.background_light,
+            background_dark: branding.background_dark,
+            surface_color: branding.surface_color,
+            text_primary: branding.text_primary,
+            text_secondary: branding.text_secondary,
+            text_muted: branding.text_muted,
+            success_color: branding.success_color,
+            warning_color: branding.warning_color,
+            error_color: branding.error_color,
+            info_color: branding.info_color
+          })
+        }
+      } catch (error) {
+        console.error('Error loading branding data:', error)
+      } finally {
+        setLoadingBranding(false)
+      }
+    }
+
+    loadBrandingData()
+  }, [organization?.id])
+
+  // Apply predefined color scheme
+  const applyColorScheme = async (schemeId: string) => {
+    if (!organization?.id) return
+
+    setUpdatingColors(true)
+    try {
+      const { data, error } = await supabase.rpc('apply_color_scheme_to_organization', {
+        org_id: organization.id,
+        scheme_id: schemeId,
+        user_id: (await supabase.auth.getUser()).data.user?.id
+      })
+
+      if (error) throw error
+
+      // Reload branding data
+      const { data: branding } = await supabase
+        .from('organization_branding')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .single()
+
+      setCurrentBranding(branding)
+      if (branding) {
+        setCustomColors({
+          primary_color: branding.primary_color,
+          secondary_color: branding.secondary_color,
+          accent_color: branding.accent_color,
+          background_light: branding.background_light,
+          background_dark: branding.background_dark,
+          surface_color: branding.surface_color,
+          text_primary: branding.text_primary,
+          text_secondary: branding.text_secondary,
+          text_muted: branding.text_muted,
+          success_color: branding.success_color,
+          warning_color: branding.warning_color,
+          error_color: branding.error_color,
+          info_color: branding.info_color
+        })
+      }
+
+      // Apply colors to CSS
+      applyColorsToCSS(branding)
+
+      // Show success message
+      const successMsg = document.createElement('div')
+      successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50'
+      successMsg.textContent = 'Color scheme applied successfully!'
+      document.body.appendChild(successMsg)
+      setTimeout(() => document.body.removeChild(successMsg), 3000)
+
+    } catch (error) {
+      console.error('Error applying color scheme:', error)
+      alert('Failed to apply color scheme. Please try again.')
+    } finally {
+      setUpdatingColors(false)
+    }
+  }
+
+  // Update custom colors
+  const updateCustomColors = async () => {
+    if (!organization?.id) return
+
+    setUpdatingColors(true)
+    try {
+      const user = (await supabase.auth.getUser()).data.user
+      if (!user) throw new Error('Not authenticated')
+
+      const { error } = await supabase
+        .from('organization_branding')
+        .upsert({
+          organization_id: organization.id,
+          ...customColors,
+          updated_by: user.id,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+
+      // Reload branding data
+      const { data: branding } = await supabase
+        .from('organization_branding')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .single()
+
+      setCurrentBranding(branding)
+
+      // Apply colors to CSS
+      applyColorsToCSS(branding)
+
+      // Show success message
+      const successMsg = document.createElement('div')
+      successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50'
+      successMsg.textContent = 'Custom colors updated successfully!'
+      document.body.appendChild(successMsg)
+      setTimeout(() => document.body.removeChild(successMsg), 3000)
+
+    } catch (error) {
+      console.error('Error updating custom colors:', error)
+      alert('Failed to update custom colors. Please try again.')
+    } finally {
+      setUpdatingColors(false)
+    }
+  }
+
+  // Apply colors to CSS custom properties
+  const applyColorsToCSS = (branding: any) => {
+    if (!branding) return
+
+    const root = document.documentElement
+    root.style.setProperty('--color-primary', branding.primary_color)
+    root.style.setProperty('--color-secondary', branding.secondary_color)
+    root.style.setProperty('--color-accent', branding.accent_color)
+    root.style.setProperty('--color-background-light', branding.background_light)
+    root.style.setProperty('--color-background-dark', branding.background_dark)
+    root.style.setProperty('--color-surface', branding.surface_color)
+    root.style.setProperty('--color-text-primary', branding.text_primary)
+    root.style.setProperty('--color-text-secondary', branding.text_secondary)
+    root.style.setProperty('--color-text-muted', branding.text_muted)
+    root.style.setProperty('--color-success', branding.success_color)
+    root.style.setProperty('--color-warning', branding.warning_color)
+    root.style.setProperty('--color-error', branding.error_color)
+    root.style.setProperty('--color-info', branding.info_color)
+  }
+
+  // Apply current branding on load
+  useEffect(() => {
+    if (currentBranding) {
+      applyColorsToCSS(currentBranding)
+      console.log('Applied branding colors:', currentBranding)
+    }
+  }, [currentBranding])
+
   return (
     <Card>
       <CardHeader>
@@ -1539,6 +1728,358 @@ function BrandingManagement({ organization, saving }: BrandingManagementProps) {
               <li>• <strong>File Requirements:</strong> PNG, JPG, or SVG • Max 5MB • Recommended 200x200px</li>
             </ul>
           </div>
+        </div>
+
+        {/* Color Scheme Section */}
+        <div>
+          <h3 className="text-lg font-medium mb-4">Color Scheme</h3>
+          <p className="text-gray-600 mb-6">
+            Choose a color scheme to customize the appearance of your WorkforceOne portal and mobile app.
+          </p>
+
+          {loadingBranding ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <>
+              {/* Predefined Color Schemes */}
+              <div className="mb-8">
+                <h4 className="font-medium mb-4">Predefined Themes</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {colorSchemes.map((scheme) => (
+                    <div
+                      key={scheme.id}
+                      className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => applyColorScheme(scheme.id)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="font-medium">{scheme.name}</h5>
+                        {scheme.is_default && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Default</span>
+                        )}
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-3">{scheme.description}</p>
+                      
+                      {/* Color Preview */}
+                      <div className="flex space-x-2 mb-3">
+                        <div
+                          className="w-6 h-6 rounded border"
+                          style={{ backgroundColor: scheme.primary_color }}
+                          title="Primary"
+                        />
+                        <div
+                          className="w-6 h-6 rounded border"
+                          style={{ backgroundColor: scheme.secondary_color }}
+                          title="Secondary"
+                        />
+                        <div
+                          className="w-6 h-6 rounded border"
+                          style={{ backgroundColor: scheme.accent_color }}
+                          title="Accent"
+                        />
+                        <div
+                          className="w-6 h-6 rounded border"
+                          style={{ backgroundColor: scheme.success_color }}
+                          title="Success"
+                        />
+                        <div
+                          className="w-6 h-6 rounded border"
+                          style={{ backgroundColor: scheme.warning_color }}
+                          title="Warning"
+                        />
+                      </div>
+                      
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={updatingColors}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          applyColorScheme(scheme.id)
+                        }}
+                      >
+                        {updatingColors ? 'Applying...' : 'Apply Theme'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Colors Section */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Custom Colors</h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCustomColors(!showCustomColors)}
+                  >
+                    <Palette className="h-4 w-4 mr-2" />
+                    {showCustomColors ? 'Hide' : 'Show'} Custom Colors
+                  </Button>
+                </div>
+
+                {showCustomColors && (
+                  <div className="border rounded-lg p-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Primary Colors */}
+                      <div>
+                        <h5 className="font-medium mb-3">Brand Colors</h5>
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-sm">Primary Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.primary_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, primary_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.primary_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, primary_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#3b82f6"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label className="text-sm">Secondary Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.secondary_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, secondary_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.secondary_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, secondary_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#1e40af"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm">Accent Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.accent_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, accent_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.accent_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, accent_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#06b6d4"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Background Colors */}
+                      <div>
+                        <h5 className="font-medium mb-3">Background Colors</h5>
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-sm">Light Background</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.background_light}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, background_light: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.background_light}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, background_light: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#ffffff"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm">Dark Background</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.background_dark}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, background_dark: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.background_dark}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, background_dark: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#f8fafc"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm">Surface Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.surface_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, surface_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.surface_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, surface_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#ffffff"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Colors */}
+                      <div>
+                        <h5 className="font-medium mb-3">Status Colors</h5>
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-sm">Success Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.success_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, success_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.success_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, success_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#10b981"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm">Warning Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.warning_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, warning_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.warning_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, warning_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#f59e0b"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm">Error Color</Label>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="color"
+                                value={customColors.error_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, error_color: e.target.value }))}
+                                className="w-10 h-10 rounded border cursor-pointer"
+                              />
+                              <Input
+                                value={customColors.error_color}
+                                onChange={(e) => setCustomColors(prev => ({ ...prev, error_color: e.target.value }))}
+                                className="flex-1 text-sm"
+                                placeholder="#ef4444"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t">
+                      <div className="text-sm text-gray-600">
+                        Changes will apply to both the portal and mobile app in real-time.
+                      </div>
+                      <Button
+                        onClick={updateCustomColors}
+                        disabled={updatingColors}
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {updatingColors ? 'Updating...' : 'Save Custom Colors'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Current Colors Preview */}
+              {currentBranding && (
+                <div className="mt-8 bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium mb-3">Current Color Scheme</h4>
+                  <div className="mb-3 text-sm text-gray-600">
+                    CSS Variables applied: --color-primary: {getComputedStyle(document.documentElement).getPropertyValue('--color-primary') || 'not set'}
+                  </div>
+                  <div className="mb-3 p-3 bg-brand-primary text-white rounded">
+                    This element uses bg-brand-primary and should change color when you select a new theme
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-6 h-6 rounded border"
+                        style={{ backgroundColor: currentBranding.primary_color }}
+                      />
+                      <span className="text-sm">Primary</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-6 h-6 rounded border"
+                        style={{ backgroundColor: currentBranding.secondary_color }}
+                      />
+                      <span className="text-sm">Secondary</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-6 h-6 rounded border"
+                        style={{ backgroundColor: currentBranding.accent_color }}
+                      />
+                      <span className="text-sm">Accent</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-6 h-6 rounded border"
+                        style={{ backgroundColor: currentBranding.success_color }}
+                      />
+                      <span className="text-sm">Success</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-6 h-6 rounded border"
+                        style={{ backgroundColor: currentBranding.warning_color }}
+                      />
+                      <span className="text-sm">Warning</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-6 h-6 rounded border"
+                        style={{ backgroundColor: currentBranding.error_color }}
+                      />
+                      <span className="text-sm">Error</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </CardContent>
     </Card>
