@@ -36,11 +36,15 @@ class NotificationService {
           projectId: 'e450cb6a-8add-4ce0-b2a4-f513cce316ee',
         })
         this.expoPushToken = token.data
-        console.log('Expo push token:', this.expoPushToken)
+        console.log('✅ Expo push token obtained:', this.expoPushToken)
         return true
       } catch (error) {
-        console.error('Error getting push token:', error)
-        return false
+        console.warn('⚠️ Push notifications not available in Expo Go (SDK 53+)')
+        console.log('ℹ️ Push notifications require a development build')
+        console.log('ℹ️ In-app notifications and real-time updates still work!')
+        
+        // Still return true so other notification features work
+        return true
       }
     } else {
       console.log('Must use physical device for push notifications')
@@ -124,11 +128,108 @@ class NotificationService {
     })
   }
 
-  async notifyTaskCompleted(taskTitle: string) {
+  async notifyTaskAssigned(taskTitle: string, assignedBy?: string, priority?: string, dueDate?: string) {
+    const priorityText = priority && priority !== 'medium' ? ` (${priority.toUpperCase()})` : ''
+    const dueDateText = dueDate ? ` Due: ${dueDate}` : ''
+    const assignerText = assignedBy ? ` by ${assignedBy}` : ''
+    
     return this.scheduleLocalNotification({
-      title: 'Task Completed',
-      body: `Great job! You completed "${taskTitle}"`,
-      data: { type: 'task_completed', taskTitle },
+      title: `New Task Assignment${priorityText}`,
+      body: `You've been assigned: "${taskTitle}"${assignerText}.${dueDateText}`,
+      data: { 
+        type: 'task_assignment',
+        taskTitle,
+        assignedBy,
+        priority,
+        dueDate
+      },
+    })
+  }
+
+  async notifyTaskReassigned(taskTitle: string, assignedBy?: string) {
+    return this.scheduleLocalNotification({
+      title: 'Task Reassigned',
+      body: `"${taskTitle}" has been reassigned to you${assignedBy ? ` by ${assignedBy}` : ''}`,
+      data: { 
+        type: 'task_reassigned',
+        taskTitle,
+        assignedBy
+      },
+    })
+  }
+
+  async notifyTaskUnassigned(taskTitle: string) {
+    return this.scheduleLocalNotification({
+      title: 'Task Reassigned',
+      body: `"${taskTitle}" has been reassigned to someone else`,
+      data: { 
+        type: 'task_unassigned',
+        taskTitle
+      },
+    })
+  }
+
+  async notifyTaskPriorityChanged(taskTitle: string, newPriority: string, oldPriority: string) {
+    return this.scheduleLocalNotification({
+      title: 'Task Priority Updated',
+      body: `"${taskTitle}" priority changed from ${oldPriority.toUpperCase()} to ${newPriority.toUpperCase()}`,
+      data: { 
+        type: 'task_priority_changed',
+        taskTitle,
+        newPriority,
+        oldPriority
+      },
+    })
+  }
+
+  async notifyTaskDueDateChanged(taskTitle: string, newDueDate: string, oldDueDate?: string) {
+    const changeText = oldDueDate ? `changed to ${newDueDate}` : `set to ${newDueDate}`
+    return this.scheduleLocalNotification({
+      title: 'Task Due Date Updated',
+      body: `"${taskTitle}" due date ${changeText}`,
+      data: { 
+        type: 'task_due_date_changed',
+        taskTitle,
+        newDueDate,
+        oldDueDate
+      },
+    })
+  }
+
+  async notifyTaskDueTomorrow(taskTitle: string, priority?: string) {
+    return this.scheduleLocalNotification({
+      title: '⏰ Task Due Tomorrow',
+      body: `Reminder: "${taskTitle}" is due tomorrow${priority && priority !== 'medium' ? ` (${priority.toUpperCase()})` : ''}`,
+      data: { 
+        type: 'task_due_tomorrow',
+        taskTitle,
+        priority
+      },
+    })
+  }
+
+  async notifyTaskOverdue(taskTitle: string, daysOverdue: number) {
+    return this.scheduleLocalNotification({
+      title: '🚨 Overdue Task',
+      body: `"${taskTitle}" is ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue`,
+      data: { 
+        type: 'task_overdue',
+        taskTitle,
+        daysOverdue
+      },
+    })
+  }
+
+  async notifyTaskCompleted(taskTitle: string, completedBy?: string) {
+    const completedByText = completedBy ? ` by ${completedBy}` : ''
+    return this.scheduleLocalNotification({
+      title: 'Task Completed ✅',
+      body: `"${taskTitle}" has been completed${completedByText}`,
+      data: { 
+        type: 'task_completed',
+        taskTitle,
+        completedBy
+      },
     })
   }
 
@@ -166,6 +267,181 @@ class NotificationService {
 
   getExpoPushToken() {
     return this.expoPushToken
+  }
+
+  // Register device token with backend
+  async registerDeviceToken(supabase: any, userId: string, organizationId: string) {
+    if (!this.expoPushToken) {
+      console.log('ℹ️ No push token available - push notifications disabled')
+      console.log('ℹ️ In-app notifications will still work perfectly!')
+      return true // Return true to allow other features to continue
+    }
+
+    try {
+      // First, try to find existing record
+      const { data: existingToken, error: selectError } = await supabase
+        .from('device_tokens')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('token', this.expoPushToken)
+        .single()
+
+      const tokenData = {
+        user_id: userId,
+        organization_id: organizationId,
+        token: this.expoPushToken,
+        platform: Platform.OS,
+        device_info: {
+          device_name: Device.deviceName,
+          device_model: Device.modelName,
+          os_version: Device.osVersion,
+        },
+        is_active: true,
+        last_used: new Date().toISOString()
+      }
+
+      let result
+      if (existingToken) {
+        // Update existing record
+        result = await supabase
+          .from('device_tokens')
+          .update(tokenData)
+          .eq('id', existingToken.id)
+      } else {
+        // Insert new record
+        result = await supabase
+          .from('device_tokens')
+          .insert(tokenData)
+      }
+
+      if (result.error) {
+        console.error('Error registering device token:', result.error)
+        return false
+      }
+
+      console.log('Device token registered successfully')
+      return true
+    } catch (error) {
+      console.error('Error registering device token:', error)
+      return false
+    }
+  }
+
+  // Process notification from database
+  async processNotificationFromDatabase(notificationData: any) {
+    const { type, title, message, metadata, priority } = notificationData
+    
+    try {
+      // Show local notification
+      await this.scheduleLocalNotification({
+        title,
+        body: message,
+        data: {
+          ...metadata,
+          notification_id: notificationData.id,
+          type,
+          priority
+        }
+      })
+      
+      return true
+    } catch (error) {
+      console.error('Error processing notification:', error)
+      return false
+    }
+  }
+
+  // Listen for notifications from database
+  async setupDatabaseNotificationListener(supabase: any, userId: string) {
+    try {
+      // Subscribe to notifications for the current user
+      const subscription = supabase
+        .channel('notifications')
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'notifications',
+            filter: `recipient_id=eq.${userId}`
+          }, 
+          (payload: any) => {
+            console.log('New notification received:', payload.new)
+            this.processNotificationFromDatabase(payload.new)
+          }
+        )
+        .subscribe()
+
+      return subscription
+    } catch (error) {
+      console.error('Error setting up notification listener:', error)
+      return null
+    }
+  }
+
+  // Fetch unread notifications from database
+  async fetchUnreadNotifications(supabase: any, userId: string) {
+    try {
+      const { data: notifications, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipient_id', userId)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (error) {
+        console.error('Error fetching notifications:', error)
+        return []
+      }
+
+      return notifications || []
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+      return []
+    }
+  }
+
+  // Mark notification as read
+  async markNotificationAsRead(supabase: any, notificationId: string) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ 
+          is_read: true
+        })
+        .eq('id', notificationId)
+
+      if (error) {
+        console.error('Error marking notification as read:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+      return false
+    }
+  }
+
+  // Get notification count
+  async getUnreadNotificationCount(supabase: any, userId: string) {
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', userId)
+        .eq('is_read', false)
+
+      if (error) {
+        console.error('Error getting notification count:', error)
+        return 0
+      }
+
+      return count || 0
+    } catch (error) {
+      console.error('Error getting notification count:', error)
+      return 0
+    }
   }
 
   // Set up notification response listeners

@@ -12,14 +12,20 @@ interface DialogContextType {
 const DialogContext = React.createContext<DialogContextType | undefined>(undefined)
 
 interface DialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   children: React.ReactNode
 }
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
+  const [internalOpen, setInternalOpen] = React.useState(false)
+  
+  // Use external state if provided, otherwise use internal state
+  const isOpen = open !== undefined ? open : internalOpen
+  const handleOpenChange = onOpenChange || setInternalOpen
+
   return (
-    <DialogContext.Provider value={{ open, onOpenChange }}>
+    <DialogContext.Provider value={{ open: isOpen, onOpenChange: handleOpenChange }}>
       {children}
     </DialogContext.Provider>
   )
@@ -28,22 +34,28 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 interface DialogTriggerProps {
   asChild?: boolean
   children: React.ReactNode
+  onClick?: () => void
 }
 
-export function DialogTrigger({ asChild, children }: DialogTriggerProps) {
+export function DialogTrigger({ asChild, children, onClick }: DialogTriggerProps) {
   const context = React.useContext(DialogContext)
   if (!context) {
     throw new Error("DialogTrigger must be used within a Dialog")
   }
 
+  const handleClick = React.useCallback(() => {
+    onClick?.() // Call external onClick if provided
+    context.onOpenChange(true) // Then update dialog state
+  }, [onClick, context])
+
   if (asChild) {
     return React.cloneElement(children as React.ReactElement, {
-      onClick: () => context.onOpenChange(true)
+      onClick: handleClick
     })
   }
 
   return (
-    <button onClick={() => context.onOpenChange(true)}>
+    <button onClick={handleClick}>
       {children}
     </button>
   )
@@ -63,25 +75,22 @@ export function DialogContent({ className, children }: DialogContentProps) {
   if (!context.open) return null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={() => context.onOpenChange(false)}
-        />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => context.onOpenChange(false)}
+      />
 
-        <span className="hidden sm:inline-block sm:h-screen sm:align-middle">
-          &#8203;
-        </span>
-
-        <div
-          className={cn(
-            "inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle",
-            className
-          )}
-        >
-          {children}
-        </div>
+      {/* Dialog Content */}
+      <div
+        className={cn(
+          "relative bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-auto",
+          className
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
       </div>
     </div>
   )
@@ -94,7 +103,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}>
+    <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left p-6 pb-0", className)}>
       {children}
     </div>
   )
@@ -107,7 +116,7 @@ interface DialogFooterProps {
 
 export function DialogFooter({ className, children }: DialogFooterProps) {
   return (
-    <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}>
+    <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-0", className)}>
       {children}
     </div>
   )

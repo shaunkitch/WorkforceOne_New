@@ -85,6 +85,14 @@ export default function OrganizationsPage() {
           .sort()
           .pop()
 
+        // Debug logging for subscription status
+        console.log(`🔍 Org "${org.name}" subscription data:`, {
+          hasSubscription: !!subscription,
+          status: subscription?.status,
+          subscriptionsArray: org.subscriptions,
+          subscriptionCount: org.subscriptions?.length || 0
+        })
+
         const orgData = {
           ...org,
           email: org.email || `admin@${org.slug || org.name.toLowerCase().replace(/\s+/g, '')}.com`, // Generate email if missing
@@ -152,6 +160,7 @@ export default function OrganizationsPage() {
   const getStatusBadge = (status: string, trialEnd?: string) => {
     const isExpired = trialEnd && new Date(trialEnd) < new Date()
     
+    
     switch (status) {
       case 'active':
         return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Active</span>
@@ -164,9 +173,16 @@ export default function OrganizationsPage() {
       case 'past_due':
         return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Past Due</span>
       case 'canceled':
+      case 'cancelled':
         return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">Canceled</span>
-      default:
+      case 'none':
+      case null:
+      case undefined:
+      case '':
         return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">No Subscription</span>
+      default:
+        console.warn(`Unknown subscription status: "${status}"`)
+        return <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">Unknown ({status})</span>
     }
   }
 

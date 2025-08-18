@@ -3,24 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // Fetch organizations with related data
+    // Fetch organizations and profiles separately due to join issues
     const { data: orgsData, error: orgsError } = await supabaseAdmin
       .from('organizations')
-      .select(`
-        *,
-        subscriptions (
-          status,
-          trial_ends_at,
-          monthly_total,
-          user_count,
-          updated_at
-        ),
-        profiles (
-          id,
-          created_at,
-          last_login
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (orgsError) {
@@ -32,9 +18,56 @@ export async function GET() {
       }, { status: 500 })
     }
 
+    // Fetch profiles for all organizations
+    const { data: profilesData, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, organization_id, created_at, last_login')
+
+    if (profilesError) {
+      console.warn('Warning: Could not fetch profiles:', profilesError.message)
+    }
+
+    // Manually join organizations with subscriptions and profiles
+    const enrichedOrgs = []
+    for (const org of orgsData || []) {
+      // Get subscription for this organization
+      const { data: subscription, error: subError } = await supabaseAdmin
+        .from('subscriptions')
+        .select('status, trial_ends_at, monthly_total, user_count, updated_at')
+        .eq('organization_id', org.id)
+        .maybeSingle()
+
+      if (subError && subError.code !== 'PGRST116') {
+        console.warn(`Warning: Could not fetch subscription for org ${org.id}:`, subError.message)
+      }
+
+      // Get profiles for this organization
+      const orgProfiles = profilesData?.filter(p => p.organization_id === org.id) || []
+
+      // Add subscription and profiles to organization
+      enrichedOrgs.push({
+        ...org,
+        subscriptions: subscription ? [subscription] : [],
+        profiles: orgProfiles
+      })
+    }
+
+    // Debug logging
+    console.log('📊 Organizations fetched:', enrichedOrgs?.length || 0)
+    enrichedOrgs?.forEach((org: any, index: number) => {
+      console.log(`Org ${index + 1}: ${org.name}`)
+      console.log(`  Subscriptions:`, org.subscriptions?.length || 0)
+      if (org.subscriptions?.[0]) {
+        console.log(`  Status: ${org.subscriptions[0].status}`)
+        console.log(`  Monthly Total: ${org.subscriptions[0].monthly_total}`)
+      } else {
+        console.log(`  No subscription data found`)
+      }
+    })
+
     return NextResponse.json({
       success: true,
-      data: orgsData || []
+      data: enrichedOrgs || []
     })
 
   } catch (error: any) {

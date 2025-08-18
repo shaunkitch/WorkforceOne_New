@@ -12,8 +12,10 @@ import {
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
-import { NotificationService } from '../lib/notifications/NotificationService'
+import { notificationService } from '../lib/notifications'
+import { supabase } from '../lib/supabase'
 import { useFocusEffect } from '@react-navigation/native'
+import { NotificationPreferencesService, NotificationPreferences } from '../lib/NotificationPreferences'
 
 interface Notification {
   id: string
@@ -29,7 +31,7 @@ interface Notification {
 export default function NotificationCenterScreen({ navigation }: any) {
   const { user, profile } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [settings, setSettings] = useState<Record<string, boolean>>({})
+  const [settings, setSettings] = useState<NotificationPreferences | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -43,8 +45,20 @@ export default function NotificationCenterScreen({ navigation }: any) {
 
   const loadNotifications = async () => {
     try {
-      const localNotifications = await NotificationService.getLocalNotifications()
-      setNotifications(localNotifications)
+      if (!user) return
+      const dbNotifications = await notificationService.fetchUnreadNotifications(supabase, user.id)
+      // Transform database notifications to match interface
+      const transformedNotifications = dbNotifications.map(notification => ({
+        id: notification.id,
+        title: notification.title,
+        body: notification.message,
+        type: notification.type,
+        priority: notification.priority,
+        data: notification.metadata,
+        received_at: notification.created_at,
+        read: notification.is_read
+      }))
+      setNotifications(transformedNotifications)
     } catch (error) {
       console.error('Error loading notifications:', error)
     } finally {
@@ -55,8 +69,8 @@ export default function NotificationCenterScreen({ navigation }: any) {
 
   const loadSettings = async () => {
     try {
-      const notificationSettings = await NotificationService.getNotificationSettings()
-      setSettings(notificationSettings)
+      const preferences = await NotificationPreferencesService.getPreferences()
+      setSettings(preferences)
     } catch (error) {
       console.error('Error loading settings:', error)
     }
@@ -70,13 +84,20 @@ export default function NotificationCenterScreen({ navigation }: any) {
   const handleNotificationPress = async (notification: Notification) => {
     // Mark as read
     if (!notification.read) {
-      await NotificationService.markAsRead(notification.id)
+      await notificationService.markNotificationAsRead(supabase, notification.id)
       setNotifications(prev => 
         prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
       )
     }
 
-    // Handle navigation based on type
+    // Handle navigation based on type and metadata
+    const isTaskNotification = notification.data?.notification_category === 'task_management' || notification.data?.task_id
+    
+    if (isTaskNotification) {
+      navigation.navigate('Tasks')
+      return
+    }
+    
     switch (notification.type) {
       case 'form_assignment':
         if (notification.data?.formId) {
@@ -84,9 +105,19 @@ export default function NotificationCenterScreen({ navigation }: any) {
         }
         break
       case 'task_assignment':
-        if (notification.data?.taskId) {
-          navigation.navigate('Tasks')
-        }
+      case 'reminder':
+        navigation.navigate('Tasks')
+        break
+      case 'attendance':
+        navigation.navigate('Attendance')
+        break
+      case 'announcement':
+        // Show full announcement
+        Alert.alert(notification.title, notification.body)
+        break
+      case 'system':
+        // Handle system notifications
+        Alert.alert(notification.title, notification.body)
         break
       default:
         // Show details alert for other types
@@ -97,34 +128,56 @@ export default function NotificationCenterScreen({ navigation }: any) {
   const clearAllNotifications = () => {
     Alert.alert(
       'Clear All Notifications',
-      'Are you sure you want to clear all notifications?',
+      'Are you sure you want to mark all notifications as read?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Clear',
+          text: 'Mark All Read',
           style: 'destructive',
           onPress: async () => {
-            await NotificationService.clearAllNotifications()
-            setNotifications([])
+            try {
+              // Mark all notifications as read
+              const promises = notifications
+                .filter(n => !n.read)
+                .map(n => notificationService.markNotificationAsRead(supabase, n.id))
+              
+              await Promise.all(promises)
+              
+              // Update local state
+              setNotifications(prev => 
+                prev.map(n => ({ ...n, read: true }))
+              )
+            } catch (error) {
+              console.error('Error clearing notifications:', error)
+              Alert.alert('Error', 'Failed to clear notifications')
+            }
           }
         }
       ]
     )
   }
 
-  const updateSetting = async (key: string, value: boolean) => {
+  const updateSetting = async (key: keyof NotificationPreferences, value: boolean | string) => {
+    if (!settings) return
+    
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
-    await NotificationService.updateNotificationSettings(newSettings)
+    await NotificationPreferencesService.updatePreferences({ [key]: value })
   }
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, data?: Record<string, any>) => {
+    // Check if this is a task-related notification based on metadata
+    if (data?.notification_category === 'task_management' || data?.task_id) {
+      return 'checkmark-circle'
+    }
+    
     switch (type) {
       case 'form_assignment': return 'document-text'
       case 'task_assignment': return 'checkmark-circle'
       case 'announcement': return 'megaphone'
       case 'reminder': return 'alarm'
       case 'system': return 'settings'
+      case 'attendance': return 'time'
       default: return 'notifications'
     }
   }
@@ -171,11 +224,11 @@ export default function NotificationCenterScreen({ navigation }: any) {
             <Text style={styles.sectionTitle}>Notification Types</Text>
             
             {[
-              { key: 'forms', label: 'Form Assignments', icon: 'document-text' },
-              { key: 'tasks', label: 'Task Assignments', icon: 'checkmark-circle' },
-              { key: 'announcements', label: 'Announcements', icon: 'megaphone' },
-              { key: 'reminders', label: 'Reminders', icon: 'alarm' },
-              { key: 'system', label: 'System Notifications', icon: 'settings' },
+              { key: 'form_assignment' as const, label: 'Form Assignments', icon: 'document-text' },
+              { key: 'task_assignment' as const, label: 'Task Assignments', icon: 'checkmark-circle' },
+              { key: 'announcement' as const, label: 'Announcements', icon: 'megaphone' },
+              { key: 'reminder' as const, label: 'Reminders', icon: 'alarm' },
+              { key: 'system' as const, label: 'System Notifications', icon: 'settings' },
             ].map((item) => (
               <View key={item.key} style={styles.settingItem}>
                 <View style={styles.settingInfo}>
@@ -183,10 +236,34 @@ export default function NotificationCenterScreen({ navigation }: any) {
                   <Text style={styles.settingLabel}>{item.label}</Text>
                 </View>
                 <Switch
-                  value={settings[item.key] || false}
+                  value={settings?.[item.key] || false}
                   onValueChange={(value) => updateSetting(item.key, value)}
                   trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
-                  thumbColor={settings[item.key] ? '#ffffff' : '#f3f4f6'}
+                  thumbColor={settings?.[item.key] ? '#ffffff' : '#f3f4f6'}
+                />
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>Preferences</Text>
+            
+            {[
+              { key: 'push_enabled' as const, label: 'Push Notifications', icon: 'notifications' },
+              { key: 'sound_enabled' as const, label: 'Sound', icon: 'volume-high' },
+              { key: 'vibration_enabled' as const, label: 'Vibration', icon: 'phone-portrait' },
+              { key: 'quiet_hours_enabled' as const, label: 'Quiet Hours (22:00 - 08:00)', icon: 'moon' },
+            ].map((item) => (
+              <View key={item.key} style={styles.settingItem}>
+                <View style={styles.settingInfo}>
+                  <Ionicons name={item.icon as any} size={20} color="#6b7280" />
+                  <Text style={styles.settingLabel}>{item.label}</Text>
+                </View>
+                <Switch
+                  value={settings?.[item.key] || false}
+                  onValueChange={(value) => updateSetting(item.key, value)}
+                  trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
+                  thumbColor={settings?.[item.key] ? '#ffffff' : '#f3f4f6'}
                 />
               </View>
             ))}
@@ -273,7 +350,7 @@ export default function NotificationCenterScreen({ navigation }: any) {
                   <View style={styles.notificationMeta}>
                     <View style={styles.iconContainer}>
                       <Ionicons 
-                        name={getNotificationIcon(notification.type) as any} 
+                        name={getNotificationIcon(notification.type, notification.data) as any} 
                         size={16} 
                         color={getPriorityColor(notification.priority)} 
                       />

@@ -3,7 +3,7 @@ import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { Profile } from '../types/database'
 import { syncService } from '../services/SyncService'
-import { NotificationService } from '../lib/notifications/NotificationService'
+import { notificationService } from '../lib/notifications'
 
 interface AuthContextType {
   session: Session | null
@@ -30,6 +30,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const initializeNotificationService = async (userId: string, organizationId: string) => {
+    try {
+      // Initialize push notifications
+      const success = await notificationService.initialize()
+      if (success) {
+        console.log('Notification service initialized')
+        
+        // Register device token with backend
+        await notificationService.registerDeviceToken(supabase, userId, organizationId)
+        
+        // Set up real-time notification listener
+        await notificationService.setupDatabaseNotificationListener(supabase, userId)
+        
+        console.log('Notification system fully initialized')
+      } else {
+        console.log('Notification service initialization failed - push notifications not available')
+      }
+    } catch (error) {
+      console.error('Error initializing notification service:', error)
+    }
+  }
 
   useEffect(() => {
     // Get initial session
@@ -76,13 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Downloading fresh data for offline use...')
         
         // Initialize notification service
-        NotificationService.initialize(userId, data.organization_id)
-          .then(() => {
-            console.log('Notification service initialized')
-          })
-          .catch(error => {
-            console.error('Error initializing notification service:', error)
-          })
+        initializeNotificationService(userId, data.organization_id)
         
         syncService.downloadFreshData(userId, data.organization_id)
           .then(success => {

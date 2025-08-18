@@ -46,7 +46,6 @@ import {
   CreditCard
 } from 'lucide-react'
 import { format } from 'date-fns'
-import BrandingDebug from '@/components/branding-debug'
 
 interface UserProfile {
   id: string
@@ -1174,7 +1173,6 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
-      <BrandingDebug />
     </div>
   )
 }
@@ -1203,6 +1201,9 @@ const ALL_FEATURES = [
   { id: 'projects', name: 'Project Management', category: 'Operations', description: 'Project tracking and management' },
   { id: 'maps', name: 'Team Location Map', category: 'Operations', description: 'Real-time team location tracking' },
   { id: 'outlets', name: 'Outlets Management', category: 'Operations', description: 'Manage office and outlet locations', requiresRole: ['admin', 'manager'] },
+  
+  // Security
+  { id: 'security', name: 'Security Guard Patrols', category: 'Security', description: 'Security guard patrol system with QR checkpoints and real-time tracking', requiresRole: ['admin', 'manager'] },
   
   // Analytics & Reports
   { id: 'analytics', name: 'Advanced Analytics', category: 'Analytics', description: 'Comprehensive workforce analytics and insights', requiresRole: ['admin', 'manager'] },
@@ -2737,7 +2738,7 @@ function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManag
             </div>
             
             {/* Group features by category */}
-            {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Mobile App', 'Administration'].map(category => {
+            {['Core', 'Human Resources', 'Time Management', 'Operations', 'Security', 'Analytics', 'Forms', 'Mobile App', 'Administration'].map(category => {
               const categoryFeatures = ALL_FEATURES.filter(f => f.category === category)
               if (categoryFeatures.length === 0) return null
               
@@ -2866,7 +2867,7 @@ function FeatureManagement({ organization, onUpdateFlags, saving }: FeatureManag
                       Customize which features this user can access
                     </p>
                     <div className="space-y-4">
-                      {['Core', 'Human Resources', 'Time Management', 'Operations', 'Analytics', 'Forms', 'Mobile App', 'Administration'].map(category => {
+                      {['Core', 'Human Resources', 'Time Management', 'Operations', 'Security', 'Analytics', 'Forms', 'Mobile App', 'Administration'].map(category => {
                         const categoryFeatures = ALL_FEATURES.filter(f => {
                           // Filter by role if user doesn't have required permissions
                           if (f.requiresRole && selectedUser?.role) {

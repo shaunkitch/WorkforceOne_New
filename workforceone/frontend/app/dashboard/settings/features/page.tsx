@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Shield, Info } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface FeatureFlags {
@@ -20,11 +21,13 @@ interface FeatureFlags {
   forms: boolean
   leave: boolean
   outlets: boolean
+  security: boolean
   settings: boolean
   analytics: boolean
   reports: boolean
   automation: boolean
   integrations: boolean
+  mobile_security: boolean
 }
 
 const featureDescriptions = {
@@ -38,11 +41,13 @@ const featureDescriptions = {
   forms: 'Custom forms and data collection',
   leave: 'Leave requests and management',
   outlets: 'Outlet/location management',
+  security: 'Security guard patrol system with QR checkpoints',
   settings: 'Settings and configuration access',
   analytics: 'Analytics and insights',
   reports: 'Reporting tools',
   automation: 'Automated workflows',
-  integrations: 'Third-party integrations'
+  integrations: 'Third-party integrations',
+  mobile_security: 'Enable security features in mobile app for security guards'
 }
 
 export default function FeaturesPage() {
@@ -94,11 +99,13 @@ export default function FeaturesPage() {
         forms: true,
         leave: true,
         outlets: true,
+        security: true,
         settings: true,
         analytics: true,
         reports: true,
         automation: true,
-        integrations: true
+        integrations: true,
+        mobile_security: true
       })
     } catch (error) {
       console.error('Error fetching organization features:', error)
@@ -218,18 +225,98 @@ export default function FeaturesPage() {
         </p>
       </div>
 
-      <Card>
+      {/* Security Management Section */}
+      <Card className="border-amber-200 bg-amber-50/50">
         <CardHeader>
-          <CardTitle>Mobile App Features</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-amber-600" />
+            Security Management
+          </CardTitle>
           <CardDescription>
-            Toggle features on or off to customize your team's mobile experience.
-            Changes will take effect immediately for all mobile app users.
+            Control access to security guard patrol features including QR code scanning, route management, and real-time tracking.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {featureFlags && Object.entries(featureFlags).map(([feature, enabled]) => (
-              <div key={feature} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-4 px-4 bg-white rounded-lg border border-amber-200">
+              <div className="flex-1">
+                <Label htmlFor="security" className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-600" />
+                  Security Guard Patrols (Web)
+                </Label>
+                <p className="text-sm text-gray-600 mt-1">
+                  Enable security guard patrol system management in the web dashboard
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                  <span>• Route Planning & Management</span>
+                  <span>• QR Code Generation</span>
+                  <span>• Guard Assignment</span>
+                </div>
+              </div>
+              <Switch
+                id="security"
+                checked={featureFlags?.security || false}
+                onCheckedChange={(checked) => updateFeatureFlag('security', checked)}
+                className="ml-4"
+              />
+            </div>
+
+            <div className="flex items-center justify-between py-4 px-4 bg-white rounded-lg border border-amber-200">
+              <div className="flex-1">
+                <Label htmlFor="mobile_security" className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-600" />
+                  Mobile Security Features
+                </Label>
+                <p className="text-sm text-gray-600 mt-1">
+                  Enable security patrol features in the mobile app for guards
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                  <span>• QR Code Checkpoint Scanning</span>
+                  <span>• Real-time Location Tracking</span>
+                  <span>• Incident Reporting</span>
+                  <span>• Patrol Dashboard</span>
+                </div>
+              </div>
+              <Switch
+                id="mobile_security"
+                checked={featureFlags?.mobile_security || false}
+                onCheckedChange={(checked) => updateFeatureFlag('mobile_security', checked)}
+                className="ml-4"
+              />
+            </div>
+          </div>
+          
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-900">Security Feature Requirements</p>
+                <ul className="text-blue-700 mt-1 space-y-1">
+                  <li>• Requires Admin or Manager role to configure</li>
+                  <li>• Set user work type to "Security Guard" for mobile access</li>
+                  <li>• Enable location permissions on mobile devices</li>
+                  <li>• Print and deploy QR codes at patrol checkpoints</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Core App Features Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Core App Features</CardTitle>
+          <CardDescription>
+            Essential features that control the main functionality of your workforce management system.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {featureFlags && Object.entries(featureFlags)
+              .filter(([feature]) => !['security', 'mobile_security'].includes(feature))
+              .map(([feature, enabled]) => (
+              <div key={feature} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
                 <div className="flex-1">
                   <Label htmlFor={feature} className="text-sm font-medium text-gray-900 capitalize">
                     {feature.replace(/_/g, ' ')}
@@ -284,6 +371,7 @@ export default function FeaturesPage() {
                 <li>• <strong>Time Tracking:</strong> Detailed hour logging</li>
                 <li>• <strong>Tasks:</strong> Task assignment and management</li>
                 <li>• <strong>Leave:</strong> Leave request system</li>
+                <li>• <strong>Security:</strong> Security guard patrols with QR scanning</li>
               </ul>
             </div>
           </div>
@@ -332,6 +420,7 @@ export default function FeaturesPage() {
                       <option value="remote">Remote Worker</option>
                       <option value="hybrid">Hybrid Worker</option>
                       <option value="office">Office Worker</option>
+                      <option value="security">Security Guard</option>
                     </select>
                   </div>
                 </div>
@@ -352,6 +441,7 @@ export default function FeaturesPage() {
               <li>• <strong>Remote Workers:</strong> Daily Visits automatically hidden</li>
               <li>• <strong>Hybrid Workers:</strong> See all features (can work both field and remote)</li>
               <li>• <strong>Office Workers:</strong> Daily Visits automatically hidden</li>
+              <li>• <strong>Security Guards:</strong> Optimized for security patrol features and QR scanning</li>
             </ul>
           </div>
         </CardContent>

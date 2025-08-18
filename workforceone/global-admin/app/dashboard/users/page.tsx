@@ -8,7 +8,7 @@ import {
   Search, Filter, MoreVertical, Edit, Trash2, 
   UserCheck, UserX, Clock, Activity, AlertTriangle
 } from 'lucide-react'
-import { supabaseAdmin } from '@/lib/supabase'
+// Remove direct supabase import - we'll use API routes instead
 import { formatDate, formatDateTime } from '@/lib/utils'
 
 interface User {
@@ -45,39 +45,19 @@ export default function UsersPage() {
     try {
       setLoading(true)
       
-      // Fetch users with organization data
-      const { data: profilesData, error: profilesError } = await supabaseAdmin
-        .from('profiles')
-        .select(`
-          *,
-          organizations (
-            name
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (profilesError) throw profilesError
-
-      // Fetch auth users for additional metadata
-      const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
-      if (authError) throw authError
-
-      // Combine profile and auth data
-      const usersWithAuth = profilesData.map(profile => {
-        const authUser = authUsers.users.find(u => u.id === profile.id)
-        return {
-          ...profile,
-          organization_name: profile.organizations?.name || 'Unknown',
-          is_active: !(authUser as any)?.banned_until,
-          auth_user: authUser,
-          email_confirmed_at: authUser?.email_confirmed_at,
-          last_sign_in_at: authUser?.last_sign_in_at
-        }
-      })
-
-      setUsers(usersWithAuth)
+      // Use API route instead of direct Supabase query
+      const response = await fetch('/api/users')
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch users')
+      }
+      
+      setUsers(result.data || [])
     } catch (error) {
       console.error('Error fetching users:', error)
+      // Set empty array on error to prevent UI issues
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -85,20 +65,26 @@ export default function UsersPage() {
 
   const handleToggleUserStatus = async (userId: string, banned: boolean) => {
     try {
-      if (banned) {
-        // Ban user
-        await supabaseAdmin.auth.admin.updateUserById(userId, {
-          ban_duration: '876000h' // ~100 years
+      // Use API route for user management
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: banned ? 'ban_user' : 'unban_user',
+          userId
         })
-      } else {
-        // Unban user  
-        await supabaseAdmin.auth.admin.updateUserById(userId, {
-          ban_duration: 'none'
-        })
-      }
+      })
       
-      fetchUsers()
-      alert(`User ${banned ? 'banned' : 'unbanned'} successfully`)
+      const result = await response.json()
+      
+      if (result.success) {
+        fetchUsers()
+        alert(`User ${banned ? 'banned' : 'unbanned'} successfully`)
+      } else {
+        alert(result.error || 'Failed to update user status')
+      }
     } catch (error) {
       console.error('Error updating user status:', error)
       alert('Failed to update user status')
@@ -111,11 +97,26 @@ export default function UsersPage() {
     }
     
     try {
-      // Delete auth user (this will cascade to profiles via RLS)
-      await supabaseAdmin.auth.admin.deleteUser(userId)
+      // Use API route for user deletion
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'delete_user',
+          userId
+        })
+      })
       
-      fetchUsers()
-      alert('User deleted successfully')
+      const result = await response.json()
+      
+      if (result.success) {
+        fetchUsers()
+        alert('User deleted successfully')
+      } else {
+        alert(result.error || 'Failed to delete user')
+      }
     } catch (error) {
       console.error('Error deleting user:', error)
       alert('Failed to delete user')
@@ -124,9 +125,25 @@ export default function UsersPage() {
 
   const handleResendConfirmation = async (userId: string) => {
     try {
-      // Note: resendConfirmation is not available in current Supabase admin API
-      // This would need to be implemented with a custom email service
-      alert('Resend confirmation feature not implemented')
+      // Use API route for resend confirmation
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'resend_confirmation',
+          userId
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        alert('Confirmation email sent successfully')
+      } else {
+        alert(result.error || 'Resend confirmation feature not implemented')
+      }
     } catch (error) {
       console.error('Error resending confirmation:', error)
       alert('Failed to send confirmation email')

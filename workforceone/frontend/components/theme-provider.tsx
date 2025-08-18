@@ -115,6 +115,12 @@ export function ThemeProvider({ children, organizationId }: ThemeProviderProps) 
     try {
       setLoading(true)
       
+      // Temporarily skip branding fetch to fix 406 error
+      console.log('🎨 Skipping branding fetch for org:', orgId)
+      setBranding(null)
+      setLoading(false)
+      return
+      
       const { data: brandingData, error } = await supabase
         .from('organization_branding')
         .select('*')

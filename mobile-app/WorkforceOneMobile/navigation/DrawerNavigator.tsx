@@ -1,10 +1,12 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { useFeatureFlags } from '../hooks/useFeatureFlags'
+import { notificationService } from '../lib/notifications'
+import { supabase } from '../lib/supabase'
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen'
@@ -16,6 +18,9 @@ import FormsScreen from '../screens/FormsScreen'
 import PayslipsScreen from '../screens/PayslipsScreen'
 import NotificationCenterScreen from '../screens/NotificationCenterScreen'
 import MessagesScreen from '../screens/MessagesScreen'
+import PatrolDashboardScreen from '../screens/PatrolDashboardScreen'
+import PatrolCheckpointsWrapper from '../screens/PatrolCheckpointsWrapper'
+import IncidentReportScreen from '../screens/IncidentReportScreen'
 
 const Drawer = createDrawerNavigator()
 
@@ -42,14 +47,40 @@ const drawerItems: DrawerItem[] = [
   { name: 'Leave', label: 'Leave Requests', icon: 'calendar-outline', component: LeaveScreen, section: 'HR' },
   { name: 'Payslips', label: 'Payslips', icon: 'document-text-outline', component: PayslipsScreen, section: 'HR' },
   
+  // Security Section
+  { name: 'PatrolDashboard', label: 'Security Patrol', icon: 'shield-outline', component: PatrolDashboardScreen, section: 'Security' },
+  { name: 'PatrolCheckpoints', label: 'Patrol Checkpoints', icon: 'checkmark-circle-outline', component: PatrolCheckpointsWrapper, section: 'Security' },
+  { name: 'IncidentReport', label: 'Report Incident', icon: 'warning-outline', component: IncidentReportScreen, section: 'Security' },
+  
   // Forms Section
   { name: 'Forms', label: 'Forms', icon: 'clipboard-outline', component: FormsScreen, section: 'Other' },
 ]
 
 function CustomDrawerContent(props: any) {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const { hasFeature, featureFlags } = useFeatureFlags()
   const insets = useSafeAreaInsets()
+  const [notificationCount, setNotificationCount] = useState(0)
+
+  // Load notification count
+  useEffect(() => {
+    const loadNotificationCount = async () => {
+      if (user) {
+        try {
+          const count = await notificationService.getUnreadNotificationCount(supabase, user.id)
+          setNotificationCount(count)
+        } catch (error) {
+          console.error('Error loading notification count:', error)
+        }
+      }
+    }
+
+    loadNotificationCount()
+    
+    // Refresh count every 30 seconds
+    const interval = setInterval(loadNotificationCount, 30000)
+    return () => clearInterval(interval)
+  }, [user])
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -98,6 +129,11 @@ function CustomDrawerContent(props: any) {
         return featureFlags?.mobile_payslips ?? true
       }
       
+      // Security features - only show to security guards and admin/manager roles
+      if (item.section === 'Security') {
+        return hasFeature('security')
+      }
+      
       // Default to showing the item if no specific feature check
       return true
     })
@@ -107,16 +143,41 @@ function CustomDrawerContent(props: any) {
   const mainItems = filterItemsByFeatures(drawerItems.filter(item => !item.section))
   const communicationItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Communication'))
   const hrItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'HR'))
+  const securityItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Security'))
   const otherItems = filterItemsByFeatures(drawerItems.filter(item => item.section === 'Other'))
+  
+  // Debug logging for security items
+  console.log('🔐 Security Navigation Debug:', {
+    totalSecurityItemsBeforeFilter: drawerItems.filter(item => item.section === 'Security').length,
+    securityItemsAfterFilter: securityItems.length,
+    securityItems: securityItems.map(item => ({ name: item.name, label: item.label })),
+    userProfile: { role: profile?.role, workType: profile?.work_type },
+    hasSecurityFeature: hasFeature('security')
+  });
 
   const renderDrawerItem = (item: DrawerItem) => (
     <DrawerItem
       key={item.name}
       label={item.label}
       icon={({ color, size }) => (
-        <Ionicons name={item.icon as any} size={size} color={color} />
+        <View style={{ position: 'relative' }}>
+          <Ionicons name={item.icon as any} size={size} color={color} />
+          {item.name === 'Notifications' && notificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </Text>
+            </View>
+          )}
+        </View>
       )}
-      onPress={() => props.navigation.navigate(item.name)}
+      onPress={() => {
+        props.navigation.navigate(item.name)
+        // Reset count when navigating to notifications
+        if (item.name === 'Notifications') {
+          setNotificationCount(0)
+        }
+      }}
       activeTintColor="#3b82f6"
       inactiveTintColor="#6b7280"
       style={styles.drawerItem}
@@ -167,6 +228,12 @@ function CustomDrawerContent(props: any) {
           {hrItems.map(renderDrawerItem)}
         </View>
 
+        {/* Security Section */}
+        {securityItems.length > 0 && renderSectionHeader('Security')}
+        <View style={styles.navigationSection}>
+          {securityItems.map(renderDrawerItem)}
+        </View>
+
         {/* Other Section */}
         {otherItems.length > 0 && renderSectionHeader('Other')}
         <View style={styles.navigationSection}>
@@ -208,6 +275,9 @@ export default function DrawerNavigator() {
       }
       if (item.name === 'Payslips') {
         return featureFlags?.mobile_payslips ?? true
+      }
+      if (item.section === 'Security') {
+        return hasFeature('security')
       }
       return true
     })
@@ -333,5 +403,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 12,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#f9fafb',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 })

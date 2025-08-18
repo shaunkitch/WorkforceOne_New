@@ -76,9 +76,111 @@ export async function GET() {
       error: teamError?.message
     }
     
+    // Additional test: Check subscription data specifically
+    let subscriptionDebug = {}
+    if (tableTests.subscriptions.exists && tableTests.organizations.exists) {
+      try {
+        // Get sample subscription data
+        const { data: subsData, error: subsError } = await supabaseAdmin
+          .from('subscriptions')
+          .select('*')
+          .limit(5)
+
+        // Test multiple join approaches
+        const { data: orgsWithSubs, error: orgsError } = await supabaseAdmin
+          .from('organizations')
+          .select(`
+            id,
+            name,
+            subscriptions (
+              status,
+              trial_ends_at,
+              monthly_total,
+              user_count,
+              updated_at
+            )
+          `)
+          .limit(5)
+
+        // Alternative approach: Manual join
+        const { data: manualJoin, error: manualError } = await supabaseAdmin
+          .from('organizations')
+          .select(`
+            id,
+            name
+          `)
+          .limit(5)
+
+        // For each org, fetch subscription separately
+        const manualResults = []
+        if (manualJoin && !manualError) {
+          for (const org of manualJoin) {
+            const { data: orgSub, error: subError } = await supabaseAdmin
+              .from('subscriptions')
+              .select('status, monthly_total, user_count')
+              .eq('organization_id', org.id)
+              .maybeSingle()
+            
+            manualResults.push({
+              ...org,
+              subscription: orgSub,
+              subscription_error: subError?.message
+            })
+          }
+        }
+
+        // Get organization IDs for comparison
+        const { data: allOrgs, error: allOrgsError } = await supabaseAdmin
+          .from('organizations')
+          .select('id, name')
+        
+        subscriptionDebug = {
+          direct_subscriptions_count: subsData?.length || 0,
+          organizations_with_subs_count: orgsWithSubs?.filter(org => org.subscriptions?.length > 0).length || 0,
+          organization_ids: allOrgs?.map(org => ({ id: org.id, name: org.name })) || [],
+          subscription_org_ids: subsData?.map(sub => sub.organization_id) || [],
+          join_query_error: orgsError?.message,
+          manual_join_error: manualError?.message,
+          id_mismatch: {
+            org_ids: allOrgs?.map(org => org.id) || [],
+            sub_org_ids: subsData?.map(sub => sub.organization_id) || [],
+            intersection: allOrgs?.filter(org => 
+              subsData?.some(sub => sub.organization_id === org.id)
+            ).map(org => org.id) || []
+          },
+          sample_subscription_statuses: subsData?.map(sub => ({
+            org_id: sub.organization_id,
+            status: sub.status,
+            monthly_total: sub.monthly_total
+          })) || [],
+          sample_orgs_with_subs: orgsWithSubs?.map(org => ({
+            id: org.id,
+            name: org.name,
+            subscription_count: org.subscriptions?.length || 0,
+            subscription_status: org.subscriptions?.[0]?.status || 'none'
+          })) || [],
+          manual_join_results: manualResults.map(org => ({
+            id: org.id,
+            name: org.name,
+            has_subscription: !!org.subscription,
+            subscription_status: org.subscription?.status || 'none',
+            subscription_error: org.subscription_error || null
+          }))
+        }
+
+        console.log('🔍 Subscription Debug Results:', subscriptionDebug)
+
+      } catch (subDebugError: any) {
+        subscriptionDebug = {
+          error: subDebugError.message
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       tables: tableTests,
+      subscription_debug: subscriptionDebug,
       summary: {
         totalTables: Object.keys(tableTests).filter(k => tableTests[k].exists).length,
         missingTables: Object.keys(tableTests).filter(k => !tableTests[k].exists)

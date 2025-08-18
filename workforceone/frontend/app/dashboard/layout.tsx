@@ -16,7 +16,7 @@ import {
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
   User, UserCheck, Zap, Route, ChevronRight,
-  BarChart3, Cog, UserPlus, FolderOpen, Phone
+  BarChart3, Cog, UserPlus, FolderOpen, Phone, Shield
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -128,6 +128,33 @@ const navigationGroups = [
         icon: Phone, 
         feature: 'outlets',
         description: 'Track and manage outlet visits'
+      },
+    ]
+  },
+  {
+    name: 'Security',
+    icon: Shield,
+    items: [
+      { 
+        name: 'Security Dashboard', 
+        href: '/dashboard/security', 
+        icon: Shield, 
+        feature: 'security',
+        description: 'Real-time security monitoring'
+      },
+      { 
+        name: 'Patrol Routes', 
+        href: '/dashboard/security/routes', 
+        icon: Route, 
+        feature: 'security',
+        description: 'Manage patrol routes & checkpoints'
+      },
+      { 
+        name: 'Security Map', 
+        href: '/dashboard/security/map', 
+        icon: MapPin, 
+        feature: 'security',
+        description: 'Real-time operations map & route planning'
       },
     ]
   },

@@ -13,6 +13,7 @@ interface FeatureFlags {
   forms: boolean
   leave: boolean
   outlets: boolean
+  security: boolean
   settings: boolean
   analytics: boolean
   reports: boolean
@@ -26,6 +27,7 @@ interface FeatureFlags {
   mobile_forms: boolean
   mobile_leave: boolean
   mobile_payslips: boolean
+  mobile_security: boolean // Add mobile-specific security flag
 }
 
 export const useFeatureFlags = () => {
@@ -77,6 +79,7 @@ export const useFeatureFlags = () => {
         forms: true,
         leave: true,
         outlets: true,
+        security: true,
         settings: true,
         analytics: true,
         reports: true,
@@ -89,7 +92,8 @@ export const useFeatureFlags = () => {
         mobile_tasks: true,
         mobile_forms: true,
         mobile_leave: true,
-        mobile_payslips: true
+        mobile_payslips: true,
+        mobile_security: true
       })
     } catch (error) {
       console.error('Error fetching feature flags:', error)
@@ -105,6 +109,7 @@ export const useFeatureFlags = () => {
         forms: true,
         leave: true,
         outlets: true,
+        security: true,
         settings: true,
         analytics: true,
         reports: true,
@@ -117,7 +122,8 @@ export const useFeatureFlags = () => {
         mobile_tasks: true,
         mobile_forms: true,
         mobile_leave: true,
-        mobile_payslips: true
+        mobile_payslips: true,
+        mobile_security: true
       })
     } finally {
       setLoading(false)
@@ -126,6 +132,18 @@ export const useFeatureFlags = () => {
 
   const hasFeature = (feature: keyof FeatureFlags): boolean => {
     const organizationHasFeature = featureFlags?.[feature] ?? true
+    
+    // Debug logging for security feature
+    if (feature === 'security') {
+      console.log('🔐 Security Feature Check:', {
+        feature,
+        organizationHasFeature,
+        userWorkType: profile?.work_type,
+        userRole: profile?.role,
+        profileId: profile?.id,
+        featureFlags: featureFlags
+      });
+    }
     
     // Special logic for maps/daily visits - disable for remote and office workers
     if (feature === 'maps') {
@@ -156,6 +174,33 @@ export const useFeatureFlags = () => {
     
     if (feature === 'leave') {
       return featureFlags?.mobile_leave ?? true
+    }
+    
+    // Security features - only show to security guards and admin/manager roles
+    if (feature === 'security') {
+      const userWorkType = profile?.work_type || 'field'
+      const userRole = profile?.role || 'employee'
+      
+      // Check both general security flag and mobile-specific security flag
+      const mobileSecurityEnabled = featureFlags?.mobile_security ?? true
+      
+      // Show security features to security guards (using specific security work type) or admin/manager roles
+      const hasSecurityAccess = (userWorkType as string) === 'security' || 
+                               userRole === 'admin' || 
+                               userRole === 'manager'
+      
+      const result = organizationHasFeature && mobileSecurityEnabled && hasSecurityAccess;
+      
+      console.log('🔐 Security Access Result:', {
+        hasSecurityAccess,
+        result,
+        userWorkType,
+        userRole,
+        organizationHasFeature,
+        mobileSecurityEnabled
+      });
+      
+      return result;
     }
     
     return organizationHasFeature

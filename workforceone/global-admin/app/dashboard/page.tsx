@@ -106,48 +106,141 @@ export default function DashboardPage() {
         invoices = mockData.invoices
       }
 
-      // Calculate statistics
-      const activeSubscriptions = subscriptions.filter(s => s.status === 'active').length
-      const trialOrganizations = subscriptions.filter(s => s.status === 'trial').length
-      const expiredTrials = subscriptions.filter(s => 
-        s.status === 'trial' && new Date(s.trial_ends_at) < new Date()
-      ).length
+      // Safely calculate statistics with better error handling
+      console.log('📊 Calculating statistics from data:', {
+        orgs: organizations?.length || 0,
+        users: users?.length || 0,
+        subs: subscriptions?.length || 0,
+        invoices: invoices?.length || 0
+      })
 
-      const paidInvoices = invoices.filter(i => i.status === 'paid')
+      const safeSubscriptions = Array.isArray(subscriptions) ? subscriptions : []
+      const safeInvoices = Array.isArray(invoices) ? invoices : []
+      const safeOrganizations = Array.isArray(organizations) ? organizations : []
+      const safeUsers = Array.isArray(users) ? users : []
+
+      const activeSubscriptions = safeSubscriptions.filter(s => s?.status === 'active').length
+      const trialOrganizations = safeSubscriptions.filter(s => s?.status === 'trial').length
+      
+      // Handle expired trials more safely
+      const expiredTrials = safeSubscriptions.filter(s => {
+        if (s?.status !== 'trial' || !s?.trial_ends_at) return false
+        try {
+          return new Date(s.trial_ends_at) < new Date()
+        } catch {
+          return false
+        }
+      }).length
+
+      // Calculate revenue more safely
+      const paidInvoices = safeInvoices.filter(i => i?.status === 'paid')
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+      
       const monthlyRevenue = paidInvoices
-        .filter(i => new Date(i.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
-        .reduce((sum, i) => sum + i.total_amount, 0)
+        .filter(i => {
+          try {
+            return i?.created_at && new Date(i.created_at) > thirtyDaysAgo
+          } catch {
+            return false
+          }
+        })
+        .reduce((sum, i) => sum + (Number(i?.total_amount) || 0), 0)
       
       const yearlyRevenue = paidInvoices
-        .filter(i => new Date(i.created_at) > new Date(Date.now() - 365 * 24 * 60 * 60 * 1000))
-        .reduce((sum, i) => sum + i.total_amount, 0)
+        .filter(i => {
+          try {
+            return i?.created_at && new Date(i.created_at) > oneYearAgo
+          } catch {
+            return false
+          }
+        })
+        .reduce((sum, i) => sum + (Number(i?.total_amount) || 0), 0)
 
-      // Calculate health score (simplified)
-      const healthScore = Math.round(
-        (activeSubscriptions / Math.max(organizations.length, 1)) * 100
-      )
+      // Calculate health score more safely
+      const totalOrgs = Math.max(safeOrganizations.length, 1)
+      const healthScore = Math.min(100, Math.round(
+        ((activeSubscriptions / totalOrgs) * 60) +  // 60% weight for active subscriptions
+        ((safeUsers.length > 0 ? 20 : 0)) +         // 20% for having users
+        ((safeSubscriptions.length > 0 ? 20 : 0))   // 20% for having any subscriptions
+      ))
 
-      // Recent activity (mock data - in production, implement activity tracking)
-      const recentActivity = [
-        {
+      console.log('📈 Calculated statistics:', {
+        activeSubscriptions,
+        trialOrganizations,
+        expiredTrials,
+        monthlyRevenue,
+        yearlyRevenue,
+        healthScore
+      })
+
+      // Generate activity based on actual data
+      const recentActivity = []
+      
+      // Add recent organizations
+      const recentOrgs = safeOrganizations
+        .filter(org => {
+          try {
+            return org?.created_at && new Date(org.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          } catch {
+            return false
+          }
+        })
+        .slice(0, 3)
+      
+      recentOrgs.forEach(org => {
+        recentActivity.push({
           type: 'new_organization',
-          description: 'New organization "TechCorp Inc" registered',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          description: `New organization "${org.name}" registered`,
+          timestamp: new Date(org.created_at),
           severity: 'info'
-        },
-        {
-          type: 'subscription_upgrade',
-          description: 'Organization "RetailChain" upgraded subscription',
-          timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
+        })
+      })
+      
+      // Add subscription activity
+      const recentSubs = safeSubscriptions
+        .filter(sub => {
+          try {
+            return sub?.created_at && new Date(sub.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          } catch {
+            return false
+          }
+        })
+        .slice(0, 2)
+      
+      recentSubs.forEach(sub => {
+        const org = safeOrganizations.find(o => o.id === sub.organization_id)
+        recentActivity.push({
+          type: 'subscription_created',
+          description: `Organization "${org?.name || 'Unknown'}" created ${sub.plan || 'new'} subscription`,
+          timestamp: new Date(sub.created_at),
           severity: 'success'
-        },
-        {
+        })
+      })
+      
+      // Add trial expiration warnings
+      if (expiredTrials > 0) {
+        recentActivity.push({
           type: 'trial_expiring',
-          description: '3 organizations have trials expiring within 24 hours',
+          description: `${expiredTrials} trial${expiredTrials > 1 ? 's have' : ' has'} expired and need${expiredTrials === 1 ? 's' : ''} attention`,
           timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
           severity: 'warning'
-        }
-      ]
+        })
+      }
+      
+      // Sort by most recent first and limit to 5
+      recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      const limitedActivity = recentActivity.slice(0, 5)
+      
+      // If no real activity, add some helpful info
+      if (limitedActivity.length === 0) {
+        limitedActivity.push({
+          type: 'system_status',
+          description: 'Dashboard loaded successfully - monitoring platform activity',
+          timestamp: new Date(),
+          severity: 'info'
+        })
+      }
 
       // Critical alerts
       const criticalAlerts = [
@@ -164,16 +257,16 @@ export default function DashboardPage() {
       ]
 
       setStats({
-        totalOrganizations: organizations.length,
-        totalUsers: users.length,
+        totalOrganizations: safeOrganizations.length,
+        totalUsers: safeUsers.length,
         activeSubscriptions,
         trialOrganizations,
         expiredTrials,
         monthlyRevenue,
         yearlyRevenue,
         healthScore,
-        systemUptime: 99.9, // Mock uptime
-        recentActivity,
+        systemUptime: 99.9, // Mock uptime - in production, calculate from monitoring
+        recentActivity: limitedActivity,
         criticalAlerts
       })
     } catch (err: any) {
