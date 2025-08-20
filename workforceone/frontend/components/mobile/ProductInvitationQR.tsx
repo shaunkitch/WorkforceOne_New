@@ -81,9 +81,27 @@ export default function ProductInvitationQR({
   const createProductInvitation = async (code: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!user) {
+        console.error('User not authenticated');
+        throw new Error('User not authenticated');
+      }
 
-      const { error } = await supabase
+      console.log('Creating invitation with data:', {
+        invitation_code: code,
+        products: selectedProducts,
+        organization_id: organizationId,
+        created_by: user.id,
+        status: 'pending'
+      });
+
+      console.log('QR Data that will be generated:', JSON.stringify({
+        type: 'product_invitation',
+        invitationCode: code,
+        products: selectedProducts,
+        organizationName: organizationName || 'Organization'
+      }));
+
+      const { data, error } = await supabase
         .from('product_invitations')
         .insert({
           invitation_code: code,
@@ -92,12 +110,19 @@ export default function ProductInvitationQR({
           created_by: user.id,
           status: 'pending',
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+
+      console.log('Invitation created successfully:', data);
       return true;
     } catch (error) {
       console.error('Error creating invitation:', error);
+      alert(`Failed to create invitation: ${error.message}`);
       return false;
     }
   };
