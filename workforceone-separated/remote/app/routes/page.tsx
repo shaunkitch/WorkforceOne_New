@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import Navbar from '@/components/navigation/Navbar'
 import { 
   Navigation, Plus, MapPin, Clock, Users, Fuel, 
-  TrendingUp, Route, Calendar, Filter, Play, Pause
+  TrendingUp, Map, Calendar, Filter, Play, Pause
 } from 'lucide-react'
 
 export default function RoutesPage() {
@@ -134,7 +134,7 @@ export default function RoutesPage() {
                   <p className="text-xs text-gray-500">miles today</p>
                 </div>
                 <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Route className="h-6 w-6 text-blue-600" />
+                  <Map className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -200,7 +200,7 @@ export default function RoutesPage() {
                       </div>
                       
                       <div className="flex items-center text-gray-600">
-                        <Route className="h-4 w-4 mr-2" />
+                        <Map className="h-4 w-4 mr-2" />
                         <span>{route.distance}</span>
                       </div>
                       

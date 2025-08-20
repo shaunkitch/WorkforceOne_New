@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "WorkforceOne",
+    "slug": "workforceone-unified",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.workforceone.unified"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.workforceone.unified",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow WorkforceOne to access camera for QR code scanning and photo capture.",
+          "microphonePermission": "Allow WorkforceOne to access your microphone.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ],
+    "scheme": "workforceone"
+  }
+}

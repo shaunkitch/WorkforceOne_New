@@ -52,6 +52,7 @@ import {
   Shuffle
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import Navbar from '@/components/navigation/Navbar';
 import QRCodeGenerator from '@/components/security/QRCodeGenerator';
 import AdhocRouteGenerator from '@/components/security/AdhocRouteGenerator';
 
@@ -432,7 +433,9 @@ export default function PatrolNavigationsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
+      <Navbar />
+      <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -851,6 +854,7 @@ export default function PatrolNavigationsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

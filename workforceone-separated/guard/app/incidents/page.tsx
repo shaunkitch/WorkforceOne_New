@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import Navbar from '@/components/navigation/Navbar'
 import { 
   AlertTriangle, Plus, Search, Filter, MapPin, 
   Clock, User, Camera, FileText, CheckCircle,
@@ -71,29 +72,8 @@ export default function IncidentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <div className="h-10 w-10 bg-red-600 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <h1 className="text-2xl font-bold text-gray-900">Incident Management</h1>
-                <p className="text-sm text-gray-600">Report and track security incidents</p>
-              </div>
-            </div>
-            <Link href="/">
-              <Button variant="outline">
-                ← Back to Dashboard
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
+      <Navbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Actions Header */}
         <div className="flex justify-between items-center">

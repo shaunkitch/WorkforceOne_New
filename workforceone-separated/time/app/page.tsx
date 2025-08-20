@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import Navbar from '@/components/navigation/Navbar'
 import { 
   Clock, Calendar, FileText, TrendingUp, Users, CheckCircle, 
   AlertCircle, ArrowRight, Plus, MapPin, DollarSign, 
@@ -52,26 +53,7 @@ export default function TimeDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <div className="h-10 w-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <h1 className="text-2xl font-bold text-gray-900">WorkforceOne Time</h1>
-                <p className="text-sm text-gray-600">Time Tracking & Attendance</p>
-              </div>
-            </div>
-            <Badge className="bg-green-600 text-lg px-4 py-2">
-              <Timer className="h-4 w-4 mr-2" />
-              Production Ready
-            </Badge>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Dashboard Header */}

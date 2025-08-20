@@ -1,0 +1,595 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
+import * as Haptics from 'expo-haptics';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface CheckInData {
+  siteId: string;
+  siteName: string;
+  timestamp: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  guardId: string;
+  type: 'check-in' | 'check-out';
+}
+
+export default function GuardCheckInScreen() {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanning, setScanning] = useState(false);
+  const [currentCheckIn, setCurrentCheckIn] = useState<CheckInData | null>(null);
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [checkInHistory, setCheckInHistory] = useState<CheckInData[]>([]);
+
+  useEffect(() => {
+    loadCheckInStatus();
+    requestLocationPermission();
+    loadCheckInHistory();
+  }, []);
+
+  const loadCheckInStatus = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('currentCheckIn');
+      if (stored) {
+        setCurrentCheckIn(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading check-in status:', error);
+    }
+  };
+
+  const loadCheckInHistory = async () => {
+    try {
+      const history = await AsyncStorage.getItem('checkInHistory');
+      if (history) {
+        setCheckInHistory(JSON.parse(history));
+      }
+    } catch (error) {
+      console.error('Error loading history:', error);
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status === 'granted') {
+      const loc = await Location.getCurrentPositionAsync({});
+      setLocation(loc);
+    }
+  };
+
+  const handleQRCodeScanned = async ({ data }: { data: string }) => {
+    setScanning(false);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    try {
+      const qrData = JSON.parse(data);
+      
+      if (qrData.type === 'site_checkin') {
+        await processCheckIn(qrData);
+      } else {
+        Alert.alert('Invalid QR Code', 'This QR code is not for site check-in');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Invalid QR code format');
+    }
+  };
+
+  const processCheckIn = async (qrData: any) => {
+    setLoading(true);
+    
+    try {
+      const checkInData: CheckInData = {
+        siteId: qrData.siteId,
+        siteName: qrData.siteName,
+        timestamp: new Date().toISOString(),
+        location: location ? {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        } : { latitude: 0, longitude: 0 },
+        guardId: 'guard-001', // In production, get from auth
+        type: currentCheckIn ? 'check-out' : 'check-in',
+      };
+
+      // Store check-in data
+      if (checkInData.type === 'check-in') {
+        await AsyncStorage.setItem('currentCheckIn', JSON.stringify(checkInData));
+        setCurrentCheckIn(checkInData);
+      } else {
+        await AsyncStorage.removeItem('currentCheckIn');
+        setCurrentCheckIn(null);
+      }
+
+      // Update history
+      const newHistory = [checkInData, ...checkInHistory].slice(0, 10);
+      setCheckInHistory(newHistory);
+      await AsyncStorage.setItem('checkInHistory', JSON.stringify(newHistory));
+
+      Alert.alert(
+        'Success',
+        `Successfully ${checkInData.type === 'check-in' ? 'checked in to' : 'checked out from'} ${qrData.siteName}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to process check-in');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualCheckIn = () => {
+    Alert.alert(
+      'Manual Check-In',
+      'Select your current site',
+      [
+        { text: 'Downtown Office', onPress: () => processManualCheckIn('Downtown Office') },
+        { text: 'Warehouse District', onPress: () => processManualCheckIn('Warehouse District') },
+        { text: 'Corporate HQ', onPress: () => processManualCheckIn('Corporate HQ') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const processManualCheckIn = async (siteName: string) => {
+    const qrData = {
+      siteId: `site-${Date.now()}`,
+      siteName,
+      type: 'site_checkin',
+    };
+    await processCheckIn(qrData);
+  };
+
+  const handleEmergency = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    Alert.alert(
+      '🚨 Emergency',
+      'Are you sure you want to trigger an emergency alert?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Confirm Emergency', 
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Emergency Alert Sent', 'Help is on the way. Stay safe.');
+          }
+        },
+      ]
+    );
+  };
+
+  if (scanning && permission?.granted) {
+    return (
+      <View style={styles.scannerContainer}>
+        <CameraView
+          style={styles.camera}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+          onBarcodeScanned={handleQRCodeScanned}
+        />
+        <View style={styles.scannerOverlay}>
+          <Text style={styles.scannerText}>Point camera at QR code</Text>
+          <TouchableOpacity
+            style={styles.cancelScanButton}
+            onPress={() => setScanning(false)}
+          >
+            <Text style={styles.cancelScanText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <LinearGradient
+        colors={['#7c3aed', '#a855f7']}
+        style={styles.header}
+      >
+        <Text style={styles.headerTitle}>Guard Check-In System</Text>
+        <Text style={styles.headerSubtitle}>
+          {currentCheckIn ? `Checked in at ${currentCheckIn.siteName}` : 'Not checked in'}
+        </Text>
+      </LinearGradient>
+
+      {/* Current Status Card */}
+      <View style={styles.statusCard}>
+        <View style={styles.statusHeader}>
+          <Text style={styles.statusTitle}>Current Status</Text>
+          <View style={[
+            styles.statusIndicator,
+            { backgroundColor: currentCheckIn ? '#10b981' : '#ef4444' }
+          ]} />
+        </View>
+        
+        {currentCheckIn ? (
+          <View style={styles.statusContent}>
+            <Text style={styles.statusSite}>{currentCheckIn.siteName}</Text>
+            <Text style={styles.statusTime}>
+              Since {new Date(currentCheckIn.timestamp).toLocaleTimeString()}
+            </Text>
+            <Text style={styles.statusDuration}>
+              Duration: {Math.floor((Date.now() - new Date(currentCheckIn.timestamp).getTime()) / 60000)} minutes
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.statusMessage}>Please check in to your assigned site</Text>
+        )}
+      </View>
+
+      {/* Check-In Actions */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity
+          style={[styles.primaryButton, loading && styles.disabledButton]}
+          onPress={() => {
+            if (permission?.granted) {
+              setScanning(true);
+            } else {
+              requestPermission();
+            }
+          }}
+          disabled={loading}
+        >
+          <LinearGradient
+            colors={currentCheckIn ? ['#ef4444', '#dc2626'] : ['#7c3aed', '#a855f7']}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.buttonIcon}>📱</Text>
+            <Text style={styles.buttonText}>
+              {currentCheckIn ? 'Check Out with QR' : 'Check In with QR'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={handleManualCheckIn}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonIcon}>📍</Text>
+          <Text style={styles.secondaryButtonText}>Manual Check-In</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.actionGrid}>
+          <TouchableOpacity style={styles.actionCard}>
+            <Text style={styles.actionIcon}>📋</Text>
+            <Text style={styles.actionText}>Start Patrol</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionCard}>
+            <Text style={styles.actionIcon}>📸</Text>
+            <Text style={styles.actionText}>Report Incident</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionCard}>
+            <Text style={styles.actionIcon}>👥</Text>
+            <Text style={styles.actionText}>Request Backup</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionCard}>
+            <Text style={styles.actionIcon}>📝</Text>
+            <Text style={styles.actionText}>Daily Report</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Check-In History */}
+      <View style={styles.historySection}>
+        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        {checkInHistory.map((item, index) => (
+          <View key={index} style={styles.historyItem}>
+            <View style={styles.historyIcon}>
+              <Text>{item.type === 'check-in' ? '✅' : '🚪'}</Text>
+            </View>
+            <View style={styles.historyContent}>
+              <Text style={styles.historyTitle}>
+                {item.type === 'check-in' ? 'Checked In' : 'Checked Out'}
+              </Text>
+              <Text style={styles.historyLocation}>{item.siteName}</Text>
+              <Text style={styles.historyTime}>
+                {new Date(item.timestamp).toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Emergency Button */}
+      <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergency}>
+        <Text style={styles.emergencyIcon}>🚨</Text>
+        <Text style={styles.emergencyText}>EMERGENCY</Text>
+      </TouchableOpacity>
+
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#7c3aed" />
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  header: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  statusCard: {
+    backgroundColor: '#ffffff',
+    margin: 20,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  statusContent: {
+    gap: 8,
+  },
+  statusSite: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#10b981',
+  },
+  statusTime: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  statusDuration: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  statusMessage: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  actionsContainer: {
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 24,
+  },
+  primaryButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  buttonGradient: {
+    padding: 20,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  buttonIcon: {
+    fontSize: 24,
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  secondaryButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#7c3aed',
+  },
+  secondaryButtonIcon: {
+    fontSize: 24,
+  },
+  secondaryButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#7c3aed',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  quickActions: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 16,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  actionCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4b5563',
+    textAlign: 'center',
+  },
+  historySection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  historyLocation: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  historyTime: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
+  emergencyButton: {
+    backgroundColor: '#fee2e2',
+    borderRadius: 16,
+    paddingVertical: 20,
+    marginHorizontal: 20,
+    marginBottom: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 2,
+    borderColor: '#ef4444',
+  },
+  emergencyIcon: {
+    fontSize: 24,
+  },
+  emergencyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#dc2626',
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    gap: 20,
+  },
+  scannerText: {
+    fontSize: 18,
+    color: '#ffffff',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  cancelScanButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  cancelScanText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

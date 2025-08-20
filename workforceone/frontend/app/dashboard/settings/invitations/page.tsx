@@ -10,8 +10,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Copy, RefreshCw, Users, Link2, Mail, 
   Shield, Share2, CheckCircle, AlertCircle,
-  Loader2, UserPlus, Clock, Eye, EyeOff
+  Loader2, UserPlus, Clock, Eye, EyeOff, Smartphone
 } from 'lucide-react'
+import ProductInvitationQR from '@/components/mobile/ProductInvitationQR'
 
 export default function InvitationsPage() {
   const [organization, setOrganization] = useState<any>(null)
@@ -343,6 +344,14 @@ export default function InvitationsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Mobile App QR Code */}
+      {organization && (
+        <ProductInvitationQR 
+          organizationId={organization.id}
+          className="border-2 border-green-200 bg-green-50"
+        />
+      )}
 
       {/* Pending Invitations */}
       <Card>
