@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Mail, Lock, User, Building, Users, Plus } from 'lucide-react'
+import { Loader2, Mail, Lock, User, Building, Users, Plus, Clock, Shield, CheckCircle, Badge as BadgeIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 
 function SignupForm() {
   const [formData, setFormData] = useState({
@@ -24,6 +26,7 @@ function SignupForm() {
     department: ''
   })
   const [signupMode, setSignupMode] = useState<'join' | 'create'>('create')
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [invitationData, setInvitationData] = useState<any>(null)
@@ -33,6 +36,37 @@ function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Product definitions
+  const products = [
+    {
+      id: 'remote',
+      name: 'WorkforceOne Remote',
+      displayName: 'Remote',
+      description: 'Team & task management',
+      monthlyPrice: 8,
+      icon: Users,
+      color: 'blue'
+    },
+    {
+      id: 'time',
+      name: 'WorkforceOne Time',
+      displayName: 'Time',
+      description: 'Time tracking & attendance',
+      monthlyPrice: 6,
+      icon: Clock,
+      color: 'green'
+    },
+    {
+      id: 'guard',
+      name: 'WorkforceOne Guard',
+      displayName: 'Guard',
+      description: 'Security patrol management',
+      monthlyPrice: 12,
+      icon: Shield,
+      color: 'purple'
+    }
+  ]
 
   useEffect(() => {
     // Check for invitation token first
@@ -45,6 +79,11 @@ function SignupForm() {
       const codeParam = searchParams.get('code')
       const emailParam = searchParams.get('email')
       const nameParam = searchParams.get('name')
+      const typeParam = searchParams.get('type')
+      const orgParam = searchParams.get('org')
+      const productParam = searchParams.get('product')
+      const productsParam = searchParams.get('products')
+      const onboardingCompleteParam = searchParams.get('onboarding')
       
       if (codeParam) {
         setFormData(prev => ({ ...prev, organizationCode: codeParam }))
@@ -58,12 +97,89 @@ function SignupForm() {
       if (nameParam) {
         setFormData(prev => ({ ...prev, fullName: decodeURIComponent(nameParam) }))
       }
+      
+      // Handle security guard invitation
+      if (typeParam === 'security' && codeParam) {
+        console.log('🛡️ Security Guard invitation detected');
+        setInvitationData({
+          type: 'security',
+          code: codeParam,
+          email: emailParam
+        });
+      }
+
+      // Handle product selection from URL parameters
+      if (onboardingCompleteParam && productsParam) {
+        // Products were selected from onboarding
+        setSelectedProducts(productsParam.split(','))
+      } else if (productParam) {
+        // Single product was selected from landing page
+        setSelectedProducts([productParam])
+      }
+
+      console.log('Product selection detected:', { productParam, productsParam, onboardingCompleteParam })
     }
   }, [searchParams])
+
+  // Product selection functions
+  const toggleProduct = (productId: string) => {
+    setSelectedProducts(prev => 
+      prev.includes(productId)
+        ? prev.filter(p => p !== productId)
+        : [...prev, productId]
+    )
+  }
+
+  const calculateTotal = () => {
+    const selectedProductsData = products.filter(p => selectedProducts.includes(p.id))
+    const isBundle = selectedProductsData.length === 3
+    const bundlePrice = 20
+    
+    if (isBundle) return bundlePrice
+    
+    return selectedProductsData.reduce((total, product) => total + product.monthlyPrice, 0)
+  }
 
   // Function to validate organization code and get org details
   const validateOrganizationCode = async (code: string) => {
     try {
+      // Check if this is a security guard invitation code first
+      if (invitationData?.type === 'security') {
+        const { data: invitation, error: inviteError } = await supabase
+          .from('security_guard_invitations')
+          .select(`
+            id,
+            organization_id,
+            email,
+            status,
+            expires_at,
+            organizations (
+              id,
+              name
+            )
+          `)
+          .eq('invitation_code', code.toUpperCase())
+          .eq('status', 'pending')
+          .single();
+
+        if (inviteError || !invitation) {
+          throw new Error('Invalid or expired security guard invitation code');
+        }
+
+        // Check if invitation has expired
+        if (new Date(invitation.expires_at) < new Date()) {
+          throw new Error('Security guard invitation has expired');
+        }
+
+        return {
+          id: invitation.organization_id,
+          name: invitation.organizations.name,
+          join_code: code.toUpperCase(),
+          isSecurityInvite: true
+        };
+      }
+
+      // Regular organization join code validation
       const { data, error } = await supabase
         .from('organizations')
         .select('id, name, join_code')
@@ -74,9 +190,9 @@ function SignupForm() {
         throw new Error('Invalid organization code')
       }
 
-      return data
+      return { ...data, isSecurityInvite: false }
     } catch (error) {
-      throw new Error('Invalid organization code')
+      throw new Error(error.message || 'Invalid organization code')
     }
   }
 
@@ -297,40 +413,57 @@ function SignupForm() {
 
         // Create user profile
         if (authData.user && organizationId) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: authData.user.id,
-              email: formData.email,
-              full_name: formData.fullName,
-              phone: formData.phone || null,
-              organization_id: organizationId,
-              role: signupMode === 'create' ? 'admin' : 'employee', // Creator is admin, joiners are employees
-              status: 'active',
-              department: formData.department || null,
-              job_title: null,
-              hire_date: null,
-              salary: null,
-              hourly_rate: null,
-              employee_id: null,
-              manager_id: null,
-              last_login: null,
-              timezone: 'UTC',
-              settings: {},
-              feature_flags: {},
-              is_active: true
-            })
+          // Check if this is a security guard invitation
+          if (invitationData?.type === 'security') {
+            // Use the security guard invitation acceptance function
+            const { data: success, error: acceptError } = await supabase.rpc('accept_security_guard_invitation', {
+              p_invitation_code: formData.organizationCode,
+              p_user_id: authData.user.id,
+              p_full_name: formData.fullName
+            });
 
-          if (profileError) throw profileError
+            if (acceptError || !success) {
+              throw new Error('Failed to accept security guard invitation: ' + (acceptError?.message || 'Unknown error'));
+            }
+
+            console.log('🛡️ Security guard invitation accepted successfully');
+          } else {
+            // Regular profile creation
+            let workType = 'field'; // default
+            let role = signupMode === 'create' ? 'admin' : 'employee';
+            
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                id: authData.user.id,
+                email: formData.email,
+                full_name: formData.fullName,
+                phone: formData.phone || null,
+                organization_id: organizationId,
+                role: role, // Creator is admin, joiners are employees
+                status: 'active',
+                work_type: workType,
+                department: formData.department || null,
+                job_title: null,
+                hire_date: null,
+                salary: null,
+                hourly_rate: null,
+                employee_id: null,
+                manager_id: null,
+                last_login: null,
+                timezone: 'UTC',
+                settings: {},
+                feature_flags: {},
+                is_active: true
+              })
+
+            if (profileError) throw profileError
+          }
         }
       }
 
-      // Redirect to welcome page if admin created organization, otherwise dashboard
-      if (signupMode === 'create') {
-        router.push('/welcome')
-      } else {
-        router.push('/dashboard')
-      }
+      // Always redirect to dashboard after successful signup
+      router.push('/dashboard')
       router.refresh()
     } catch (error: any) {
       // Handle rate limiting specifically
@@ -373,12 +506,62 @@ function SignupForm() {
               : signupMode === 'create' ? 'Create your organization' : 'Join an organization with code'
             }
           </p>
+          
+          {/* Show product selection from URL parameters */}
+          {(searchParams.get('product') || searchParams.get('products') || searchParams.get('onboarding')) && !isInvitationMode && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                {searchParams.get('onboarding') === 'complete' ? (
+                  <>✓ Product selection completed via onboarding</>
+                ) : searchParams.get('product') ? (
+                  <>✓ Selected: <strong>{searchParams.get('product')?.charAt(0).toUpperCase() + (searchParams.get('product')?.slice(1) || '')}</strong> product</>
+                ) : (
+                  <>✓ Products pre-selected</>
+                )}
+                {!searchParams.get('onboarding') && (
+                  <span className="ml-2">
+                    <Link href="/onboarding" className="text-blue-600 hover:text-blue-500 underline">
+                      Change selection
+                    </Link>
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
           {isInvitationMode && (
             <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-800">
                 ✓ You've been invited to join as a <strong>{invitationData?.role}</strong>
                 {invitationData?.department && ` in ${invitationData.department}`}
               </p>
+            </div>
+          )}
+          
+          {/* Security Guard Invitation Notice */}
+          {invitationData?.type === 'security' && (
+            <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-semibold text-amber-800">
+                    🛡️ Security Guard Invitation
+                  </h3>
+                  <p className="text-sm text-amber-700 mt-1">
+                    You've been invited to join as a <strong>Security Guard</strong>. 
+                    After registration, you'll have access to mobile security patrol features including:
+                  </p>
+                  <ul className="text-xs text-amber-600 mt-2 ml-4 list-disc">
+                    <li>QR Code checkpoint scanning</li>
+                    <li>Real-time location tracking</li>
+                    <li>Incident reporting</li>
+                    <li>Patrol route management</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -558,6 +741,92 @@ function SignupForm() {
                 />
               </div>
             </div>
+
+            {/* Product Selection - Only show for organization creators */}
+            {!isInvitationMode && signupMode === 'create' && (
+              <div className="border-t pt-6">
+                <div className="mb-4">
+                  <Label className="text-base font-medium">Choose Your Products</Label>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Select the products you need. You can change this later.
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  {products.map((product) => {
+                    const IconComponent = product.icon
+                    const isSelected = selectedProducts.includes(product.id)
+                    return (
+                      <Card 
+                        key={product.id}
+                        className={`cursor-pointer transition-all ${
+                          isSelected 
+                            ? `border-${product.color}-500 bg-${product.color}-50 shadow-md` 
+                            : 'hover:shadow-md border-gray-200'
+                        }`}
+                        onClick={() => toggleProduct(product.id)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                                product.color === 'blue' ? 'bg-blue-100' :
+                                product.color === 'green' ? 'bg-green-100' : 'bg-purple-100'
+                              }`}>
+                                <IconComponent className={`h-5 w-5 ${
+                                  product.color === 'blue' ? 'text-blue-600' :
+                                  product.color === 'green' ? 'text-green-600' : 'text-purple-600'
+                                }`} />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{product.displayName}</h3>
+                                <p className="text-sm text-gray-600">{product.description}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <div className="text-right mr-3">
+                                <div className="font-bold text-gray-900">${product.monthlyPrice}</div>
+                                <div className="text-xs text-gray-600">per user/month</div>
+                              </div>
+                              {isSelected && (
+                                <CheckCircle className={`h-5 w-5 ${
+                                  product.color === 'blue' ? 'text-blue-600' :
+                                  product.color === 'green' ? 'text-green-600' : 'text-purple-600'
+                                }`} />
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                {selectedProducts.length === 3 && (
+                  <div className="mt-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold text-green-800">Complete Bundle Selected!</span>
+                        <p className="text-sm text-green-700">Save 23% with all three products</p>
+                      </div>
+                      <Badge className="bg-green-600">23% OFF</Badge>
+                    </div>
+                  </div>
+                )}
+
+                {selectedProducts.length > 0 && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900">Total per user/month:</span>
+                      <span className="text-xl font-bold text-gray-900">${calculateTotal()}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      14-day free trial • No credit card required
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <Button

@@ -7,7 +7,7 @@ import { useState, useEffect, Fragment, useCallback, useMemo, memo } from 'react
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useFeatureFlags } from '@/components/feature-flags-provider'
+import { useProductAccess } from '@/hooks/useProductAccess'
 import { Dialog, Transition, Menu as HeadlessMenu } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,256 +16,259 @@ import {
   FileText, Settings, LogOut, Menu, X, ChevronDown,
   ClipboardList, MapPin, Building, Bell, Search,
   User, UserCheck, Zap, Route, ChevronRight,
-  BarChart3, Cog, UserPlus, FolderOpen, Phone, Shield
+  BarChart3, Cog, UserPlus, FolderOpen, Phone, Shield,
+  AlertTriangle, Monitor
 } from 'lucide-react'
 import NotificationSystem from '@/components/notifications/NotificationSystem'
 import { ThemeProvider } from '@/components/theme-provider'
 
-// Grouped navigation structure
-const navigationGroups = [
-  {
+// Product-specific navigation groups
+const PRODUCT_NAVIGATION = {
+  remote: [
+    {
+      name: 'Remote Dashboard',
+      items: [
+        { 
+          name: 'Overview', 
+          href: '/dashboard/remote', 
+          icon: Home, 
+          description: 'Remote workforce overview'
+        }
+      ]
+    },
+    {
+      name: 'Team Management',
+      icon: Users,
+      items: [
+        { 
+          name: 'Teams', 
+          href: '/dashboard/teams', 
+          icon: Users, 
+          description: 'Team management and structure'
+        },
+        { 
+          name: 'Tasks', 
+          href: '/dashboard/tasks', 
+          icon: CheckSquare, 
+          description: 'Task assignments and progress'
+        },
+        { 
+          name: 'Projects', 
+          href: '/dashboard/projects', 
+          icon: Briefcase, 
+          description: 'Project tracking and management'
+        }
+      ]
+    },
+    {
+      name: 'Operations',
+      icon: Route,
+      items: [
+        { 
+          name: 'Routes', 
+          href: '/dashboard/routes', 
+          icon: Route, 
+          description: 'Route optimization and planning'
+        },
+        { 
+          name: 'Forms', 
+          href: '/dashboard/forms', 
+          icon: ClipboardList, 
+          description: 'Dynamic form builder and responses'
+        },
+        { 
+          name: 'Outlets', 
+          href: '/dashboard/outlets', 
+          icon: Building, 
+          description: 'Manage office locations'
+        }
+      ]
+    }
+  ],
+  time: [
+    {
+      name: 'Time Dashboard',
+      items: [
+        { 
+          name: 'Overview', 
+          href: '/dashboard/time', 
+          icon: Home, 
+          description: 'Time tracking overview'
+        }
+      ]
+    },
+    {
+      name: 'Time Tracking',
+      icon: Clock,
+      items: [
+        { 
+          name: 'Time Tracker', 
+          href: '/dashboard/time-tracker', 
+          icon: Clock, 
+          description: 'Clock in and track time'
+        },
+        { 
+          name: 'Attendance', 
+          href: '/dashboard/attendance', 
+          icon: Calendar, 
+          description: 'Check-in and attendance records'
+        },
+        { 
+          name: 'Shifts', 
+          href: '/dashboard/shifts', 
+          icon: Calendar, 
+          description: 'Shift management'
+        }
+      ]
+    },
+    {
+      name: 'Leave Management',
+      icon: FileText,
+      items: [
+        { 
+          name: 'Leave Requests', 
+          href: '/dashboard/leave', 
+          icon: FileText, 
+          description: 'Time off requests and approvals'
+        },
+        { 
+          name: 'Payroll', 
+          href: '/dashboard/payroll', 
+          icon: BarChart3, 
+          description: 'Time and payroll reports'
+        }
+      ]
+    }
+  ],
+  guard: [
+    {
+      name: 'Security Dashboard',
+      items: [
+        { 
+          name: 'Overview', 
+          href: '/dashboard/guard', 
+          icon: Home, 
+          description: 'Security overview'
+        }
+      ]
+    },
+    {
+      name: 'Patrol Operations',
+      icon: Shield,
+      items: [
+        { 
+          name: 'Patrols', 
+          href: '/dashboard/patrols', 
+          icon: Shield, 
+          description: 'Active patrols and routes'
+        },
+        { 
+          name: 'Patrol Routes', 
+          href: '/dashboard/security/routes', 
+          icon: Route, 
+          description: 'Manage patrol routes & checkpoints'
+        },
+        { 
+          name: 'Checkpoints', 
+          href: '/dashboard/checkpoints', 
+          icon: Monitor, 
+          description: 'QR code checkpoints'
+        }
+      ]
+    },
+    {
+      name: 'Incident Management',
+      icon: AlertTriangle,
+      items: [
+        { 
+          name: 'Incidents', 
+          href: '/dashboard/incidents', 
+          icon: AlertTriangle, 
+          description: 'Incident reports'
+        },
+        { 
+          name: 'Live Monitor', 
+          href: '/dashboard/monitoring', 
+          icon: Monitor, 
+          description: 'Real-time security monitoring'
+        },
+        { 
+          name: 'Security Map', 
+          href: '/dashboard/security/map', 
+          icon: MapPin, 
+          description: 'Real-time operations map'
+        }
+      ]
+    },
+    {
+      name: 'Guard Management',
+      icon: Users,
+      items: [
+        { 
+          name: 'Guards', 
+          href: '/dashboard/guards', 
+          icon: Users, 
+          description: 'Guard scheduling and management'
+        }
+      ]
+    }
+  ]
+}
+
+// Generate navigation groups based on user's product access
+function getNavigationForProducts(products: any[]) {
+  const navigationGroups = [];
+  
+  // Always add main dashboard
+  navigationGroups.push({
     name: 'Dashboard',
     items: [
       { 
         name: 'Overview', 
         href: '/dashboard', 
         icon: Home, 
-        feature: 'dashboard',
-        description: 'Overview and quick stats'
+        description: 'Main dashboard overview'
       }
     ]
-  },
-  {
-    name: 'Human Resources',
-    icon: UserPlus,
-    items: [
-      { 
-        name: 'Leave Requests', 
-        href: '/dashboard/leave', 
-        icon: FileText, 
-        feature: 'leave',
-        description: 'Time off requests and approvals'
-      },
-      { 
-        name: 'Teams', 
-        href: '/dashboard/teams', 
-        icon: Users, 
-        feature: 'teams',
-        description: 'Team management and structure'
-      },
-    ]
-  },
-  {
-    name: 'Time Management',
-    icon: Clock,
-    items: [
-      { 
-        name: 'Attendance', 
-        href: '/dashboard/attendance', 
-        icon: Calendar, 
-        feature: 'attendance',
-        description: 'Check-in and attendance records'
-      },
-      { 
-        name: 'Time Tracking', 
-        href: '/dashboard/time', 
-        icon: Clock, 
-        feature: 'time_tracking',
-        description: 'Track work hours and productivity'
-      },
-      { 
-        name: 'Attendance Management', 
-        href: '/dashboard/attendance/manage', 
-        icon: UserCheck, 
-        feature: 'attendance',
-        requiresRole: ['admin', 'manager'],
-        description: 'Monitor team attendance and send reminders'
-      },
-    ]
-  },
-  {
-    name: 'Operations',
-    icon: Route,
-    items: [
-      { 
-        name: 'Routes', 
-        href: '/dashboard/routes', 
-        icon: Route, 
-        feature: 'routes',
-        description: 'Route optimization and planning'
-      },
-      { 
-        name: 'Tasks', 
-        href: '/dashboard/tasks', 
-        icon: CheckSquare, 
-        feature: 'tasks',
-        description: 'Task assignments and progress'
-      },
-      { 
-        name: 'Projects', 
-        href: '/dashboard/projects', 
-        icon: Briefcase, 
-        feature: 'projects',
-        description: 'Project tracking and management'
-      },
-      { 
-        name: 'Team Map', 
-        href: '/dashboard/maps', 
-        icon: MapPin, 
-        feature: 'maps',
-        description: 'Real-time team locations'
-      },
-      { 
-        name: 'Outlets', 
-        href: '/dashboard/outlets', 
-        icon: Building, 
-        feature: 'outlets',
-        description: 'Manage office locations'
-      },
-      { 
-        name: 'Outlet Visits', 
-        href: '/dashboard/outlet-visits', 
-        icon: Phone, 
-        feature: 'outlets',
-        description: 'Track and manage outlet visits'
-      },
-    ]
-  },
-  {
-    name: 'Security',
-    icon: Shield,
-    items: [
-      { 
-        name: 'Security Dashboard', 
-        href: '/dashboard/security', 
-        icon: Shield, 
-        feature: 'security',
-        description: 'Real-time security monitoring'
-      },
-      { 
-        name: 'Patrol Routes', 
-        href: '/dashboard/security/routes', 
-        icon: Route, 
-        feature: 'security',
-        description: 'Manage patrol routes & checkpoints'
-      },
-      { 
-        name: 'Security Map', 
-        href: '/dashboard/security/map', 
-        icon: MapPin, 
-        feature: 'security',
-        description: 'Real-time operations map & route planning'
-      },
-    ]
-  },
-  {
-    name: 'Analytics & Reports',
-    icon: BarChart3,
-    items: []  // Will be populated from advancedNavigation
-  },
-  {
-    name: 'Forms & Processes',
-    icon: FolderOpen,
-    items: [
-      { 
-        name: 'Forms', 
-        href: '/dashboard/forms', 
-        icon: ClipboardList, 
-        feature: 'forms',
-        description: 'Dynamic form builder and responses'
-      },
-      { 
-        name: 'Submissions', 
-        href: '/dashboard/forms/submissions', 
-        icon: FileText, 
-        feature: 'forms',
-        description: 'View and manage form submissions'
-      },
-    ]
-  },
-  {
-    name: 'Administration',
-    icon: Cog,
-    items: []  // Will be populated from advancedNavigation
+  });
+
+  // Add navigation for each product the user has access to
+  products.forEach(product => {
+    const productNav = PRODUCT_NAVIGATION[product.code as keyof typeof PRODUCT_NAVIGATION];
+    if (productNav) {
+      navigationGroups.push(...productNav);
+    }
+  });
+
+  return navigationGroups;
+}
+
+// Shared navigation items (always available)
+const SHARED_ROUTES = [
+  { 
+    name: 'Settings', 
+    href: '/dashboard/settings', 
+    icon: Settings,
+    description: 'Account and organization settings'
   }
 ]
 
-// Legacy flat navigation for backward compatibility
-const allNavigation = navigationGroups.flatMap(group => group.items)
 
-// Advanced features - will be distributed into groups
-const advancedFeatures = {
-  analytics: [
-    {
-      name: 'Analytics',
-      href: '/dashboard/analytics',
-      icon: ({ className }: { className?: string }) => (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <path d="M3 3v18h18v-2H5V3H3zm16 5h-2v8h2v-8zm-4-3h-2v11h2V5zm-4 6h-2v5h2v-5z"/>
-        </svg>
-      ),
-      feature: 'analytics',
-      requiresRole: ['admin', 'manager'],
-      description: 'Advanced reporting and insights'
-    }
-  ],
-  administration: [
-    {
-      name: 'Automation',
-      href: '/dashboard/automation',
-      icon: ({ className }: { className?: string }) => (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2L2 7v10c0 5.55 3.84 10 9 10s9-4.45 9-10V7l-10-5z"/>
-          <path d="M8 11h8l-4 4-4-4z"/>
-        </svg>
-      ),
-      feature: 'automation',
-      requiresRole: ['admin', 'manager'],
-      description: 'Workflow automation and triggers'
-    },
-    {
-      name: 'Integrations',
-      href: '/dashboard/integrations',
-      icon: Zap,
-      feature: 'integrations',
-      requiresRole: ['admin', 'manager'],
-      description: 'Slack and Teams integrations'
-    },
-    {
-      name: 'Payroll Export',
-      href: '/dashboard/payroll',
-      icon: ({ className }: { className?: string }) => (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-        </svg>
-      ),
-      feature: 'payroll',
-      requiresRole: ['admin'],
-      description: 'Payroll generation and export'
-    }
-  ]
-}
-
-// Legacy advanced navigation for backward compatibility
-const advancedNavigation = [...advancedFeatures.analytics, ...advancedFeatures.administration]
-
-
-// Modern Grouped Sidebar Navigation Component
-function GroupedSidebarNav({ 
-  navigationGroups, 
+// Product-Based Sidebar Navigation Component
+function ProductBasedSidebarNav({ 
+  products,
   pathname, 
-  mobile = false,
-  userProfile,
-  featureFlags
+  mobile = false
 }: { 
-  navigationGroups: typeof navigationGroups,
+  products: any[],
   pathname: string,
-  mobile?: boolean,
-  userProfile: any,
-  featureFlags: any
+  mobile?: boolean
 }) {
+  // Generate navigation based on products
+  const navigationGroups = getNavigationForProducts(products);
+  
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
-    'Dashboard', 'Human Resources', 'Time Management', 'Operations'
+    'Dashboard', 'Team Management', 'Time Tracking', 'Patrol Operations', 'Incident Management'
   ])
 
   const toggleGroup = (groupName: string) => {
@@ -276,41 +279,9 @@ function GroupedSidebarNav({
     )
   }
 
-  // Filter and populate groups with advanced features
-  const processedGroups = navigationGroups.map(group => {
-    let items = [...group.items]
-    
-    // Add advanced features to appropriate groups
-    if (group.name === 'Analytics & Reports') {
-      items = [...items, ...advancedFeatures.analytics]
-    }
-    if (group.name === 'Administration') {
-      items = [...items, ...advancedFeatures.administration]
-    }
-
-    // Filter items based on feature flags and user role
-    const filteredItems = items.filter(item => {
-      // Check feature flag
-      const hasFeature = featureFlags?.featureFlags?.[item.feature] !== false
-      
-      // Check role requirement if specified
-      if (item.requiresRole && userProfile) {
-        const hasRole = item.requiresRole.includes(userProfile.role)
-        return hasFeature && hasRole
-      }
-      
-      return hasFeature
-    })
-
-    return {
-      ...group,
-      items: filteredItems
-    }
-  }).filter(group => group.items.length > 0) // Only show groups with visible items
-
   return (
     <nav className="space-y-2 px-3">
-      {processedGroups.map((group) => {
+      {navigationGroups.map((group) => {
         const isExpanded = expandedGroups.includes(group.name)
         const hasIcon = group.icon
 
@@ -350,7 +321,7 @@ function GroupedSidebarNav({
                       className={`
                         group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
                         ${isActive 
-                          ? 'bg-brand-primary text-white shadow-sm' 
+                          ? 'bg-blue-600 text-white shadow-sm' 
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
                         }
                         ${mobile ? 'text-base py-2.5' : ''}
@@ -386,61 +357,53 @@ function GroupedSidebarNav({
           </div>
         )
       })}
+      
+      {/* Shared Routes */}
+      <div className="pt-4 border-t border-gray-200">
+        <div className="space-y-0.5">
+          {SHARED_ROUTES.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`
+                  group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
+                  ${isActive 
+                    ? 'bg-gray-200 text-gray-900 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
+                  }
+                  ${mobile ? 'text-base py-2.5' : ''}
+                `}
+              >
+                <item.icon 
+                  className={`
+                    flex-shrink-0 h-4 w-4 mr-3 transition-colors
+                    ${isActive ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-700'}
+                    ${mobile ? 'h-5 w-5' : ''}
+                  `} 
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">{item.name}</div>
+                  {!mobile && (
+                    <div className={`text-xs mt-0.5 truncate ${
+                      isActive 
+                        ? 'text-gray-700 opacity-80' 
+                        : 'text-gray-500 group-hover:text-gray-600'
+                    }`}>
+                      {item.description}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
     </nav>
   )
 }
 
-// Legacy Sidebar Navigation Component (for backward compatibility)
-function SidebarNav({ navigation, pathname, mobile = false }: { 
-  navigation: typeof allNavigation, 
-  pathname: string,
-  mobile?: boolean 
-}) {
-  return (
-    <nav className="space-y-1 px-3">
-      {navigation.map((item) => {
-        const isActive = pathname === item.href
-        return (
-          <Link
-            key={item.name}
-            href={item.href}
-            className={`
-              group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200
-              ${isActive 
-                ? 'bg-brand-primary text-white shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
-              }
-              ${mobile ? 'text-base py-3' : ''}
-            `}
-          >
-            <item.icon 
-              className={`
-                flex-shrink-0 h-5 w-5 mr-3 transition-colors
-                ${isActive ? 'text-white' : 'text-gray-600 group-hover:text-gray-900'}
-                ${mobile ? 'h-6 w-6' : ''}
-              `} 
-            />
-            <div className="flex-1 min-w-0">
-              <div className="font-medium">{item.name}</div>
-              {!mobile && (
-                <div className={`text-xs mt-0.5 truncate ${
-                  isActive 
-                    ? 'text-white opacity-80' 
-                    : 'text-gray-600 group-hover:text-gray-700'
-                }`}>
-                  {item.description}
-                </div>
-              )}
-            </div>
-            {isActive && (
-              <div className="w-2 h-2 bg-white rounded-full ml-2" />
-            )}
-          </Link>
-        )
-      })}
-    </nav>
-  )
-}
 
 // Logo Brand Component
 function LogoBrand({ organization, className = "" }: { organization: any, className?: string }) {
@@ -544,35 +507,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userProfile, setUserProfile] = useState<any>(null)
   const [organization, setOrganization] = useState<any>(null)
   const pathname = usePathname()
-  const featureFlags = useFeatureFlags()
+  const { products, loading: productLoading } = useProductAccess()
   const supabase = createClient()
-
-  // Filter navigation based on feature flags and user role (wait for loading to complete)
-  const enabledNavigation = featureFlags?.isLoading ? 
-    [] : // Show empty navigation while loading
-    allNavigation.filter(item => {
-      // Check feature flag
-      const hasFeature = featureFlags.featureFlags[item.feature] !== false
-      
-      // Check role requirement if specified
-      if (item.requiresRole && userProfile) {
-        const hasRole = item.requiresRole.includes(userProfile.role)
-        return hasFeature && hasRole
-      }
-      
-      return hasFeature
-    })
-
-  // Filter advanced navigation
-  const enabledAdvancedNavigation = featureFlags?.isLoading ? 
-    [] : 
-    advancedNavigation.filter(item => {
-      // Check role requirement for advanced features
-      if (item.requiresRole && userProfile) {
-        return item.requiresRole.includes(userProfile.role)
-      }
-      return false
-    })
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -649,14 +585,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </button>
                   </div>
                   <nav className="flex flex-1 flex-col">
-                    <GroupedSidebarNav 
-                      navigationGroups={navigationGroups} 
-                      pathname={pathname} 
-                      mobile={true}
-                      userProfile={userProfile}
-                      featureFlags={featureFlags}
-                    />
-                    <div className="mt-auto pt-6 border-t border-border">
+                    {productLoading ? (
+                      <div className="space-y-2 px-3">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} className="animate-pulse bg-gray-200 h-10 w-full rounded" />
+                        ))}
+                      </div>
+                    ) : (
+                      <ProductBasedSidebarNav 
+                        products={products}
+                        pathname={pathname} 
+                        mobile={true}
+                      />
+                    )}
+                    <div className="mt-auto pt-6 border-t border-gray-200">
                       {userProfile && <UserProfile profile={userProfile} />}
                     </div>
                   </nav>
@@ -674,15 +616,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <LogoBrand organization={organization} />
           </div>
           <nav className="flex flex-1 flex-col gap-y-7">
-            <GroupedSidebarNav 
-              navigationGroups={navigationGroups} 
-              pathname={pathname} 
-              mobile={false}
-              userProfile={userProfile}
-              featureFlags={featureFlags}
-            />
+            {productLoading ? (
+              <div className="space-y-2 px-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="animate-pulse bg-gray-200 h-10 w-full rounded" />
+                ))}
+              </div>
+            ) : (
+              <ProductBasedSidebarNav 
+                products={products}
+                pathname={pathname} 
+                mobile={false}
+              />
+            )}
             <div className="mt-auto space-y-4">
-              <div className="border-t border-border pt-4">
+              <div className="border-t border-gray-200 pt-4">
                 {userProfile && <UserProfile profile={userProfile} />}
               </div>
             </div>

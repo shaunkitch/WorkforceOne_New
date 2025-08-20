@@ -457,6 +457,18 @@ export default function TasksPage() {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
 
+      // Get user's organization
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.user.id)
+        .single()
+
+      if (!profile?.organization_id) {
+        alert('Unable to determine organization. Please contact support.')
+        return
+      }
+
       // Handle assignment based on type
       const assigneeId = assignmentType === 'user' 
         ? (taskForm.assignee_id && taskForm.assignee_id !== 'none' ? taskForm.assignee_id : null)
@@ -470,6 +482,7 @@ export default function TasksPage() {
           priority: taskForm.priority,
           assignee_id: assigneeId,
           reporter_id: user.user.id,
+          organization_id: profile.organization_id,
           project_id: taskForm.project_id && taskForm.project_id !== 'none' ? taskForm.project_id : null,
           outlet_id: taskForm.outlet_id && taskForm.outlet_id !== 'none' ? taskForm.outlet_id : null,
           due_date: taskForm.due_date || null,
@@ -480,7 +493,15 @@ export default function TasksPage() {
         .select('*')
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Task creation error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        throw error
+      }
 
       // If assigning to team, create task assignments for all team members
       if (assignmentType === 'team' && taskForm.team_id && taskForm.team_id !== 'none') {
@@ -518,9 +539,16 @@ export default function TasksPage() {
       })
       setShowCreateTask(false)
       setSelectedTask(data)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating task:', error)
-      alert('Failed to create task. Please try again.')
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        fullError: JSON.stringify(error, null, 2)
+      })
+      alert(`Failed to create task: ${error?.message || 'Unknown error'}`)
     }
   }
 

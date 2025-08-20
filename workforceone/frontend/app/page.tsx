@@ -12,7 +12,8 @@ import {
   Brain, Sparkles, Globe, Smartphone, Cloud, Lock,
   TrendingUp, Award, Headphones, BookOpen, Play,
   DollarSign, Target, Layers, GitBranch, Settings,
-  UserCheck, BellRing, Workflow, FormInput, PieChart
+  UserCheck, BellRing, Workflow, FormInput, PieChart,
+  Package, Check, Minus, AlertTriangle, Patrol, Camera
 } from 'lucide-react'
 
 const stats = [
@@ -22,107 +23,138 @@ const stats = [
   { label: 'Uptime', value: '99.99%', growth: 'SLA' }
 ]
 
-const features = [
+// New product-focused structure
+const products = [
   {
-    category: 'Workforce Management',
-    icon: Users,
+    code: 'remote',
+    name: 'WorkforceOne Remote',
+    displayName: 'Remote',
+    tagline: 'Team & Task Management',
+    description: 'Complete workforce management for distributed teams. Manage projects, assign tasks, track progress, and keep everyone connected.',
+    monthlyPrice: 8,
+    annualPrice: 76.80,
     color: 'blue',
-    items: [
-      { name: 'Multi-tenant Organization', desc: 'Manage multiple organizations with complete data isolation' },
-      { name: 'Team Hierarchy', desc: 'Create complex team structures with managers and reporting lines' },
-      { name: 'Role-based Access', desc: 'Granular permissions for admins, managers, and employees' },
-      { name: 'Employee Profiles', desc: 'Comprehensive profiles with skills, documents, and history' }
+    icon: Users,
+    popularWith: 'Remote teams, Service companies, Consultancies',
+    features: [
+      'Advanced Team Management & User Roles',
+      'AI-Powered Task Assignment & Tracking', 
+      'Project Management with Templates',
+      'Drag & Drop Form Builder',
+      'Smart Route Optimization',
+      'Multi-Location Outlet Management',
+      'White Label & Custom Branding',
+      'Client Portal Access',
+      'Workflow Automation',
+      'Real-time Notifications & Communication'
+    ],
+    useCases: [
+      'Manage distributed sales teams',
+      'Coordinate field service operations',
+      'Track project deliverables',
+      'Automate approval workflows'
     ]
   },
   {
-    category: 'Time & Attendance',
-    icon: Clock,
+    code: 'time',
+    name: 'WorkforceOne Time',
+    displayName: 'Time',
+    tagline: 'Time & Attendance Tracking',
+    description: 'Comprehensive time tracking and attendance management. Perfect for businesses that need accurate time records and payroll integration.',
+    monthlyPrice: 6,
+    annualPrice: 57.60,
     color: 'green',
-    items: [
-      { name: 'GPS Check-in/out', desc: 'Location-based attendance with geofencing support' },
-      { name: 'Shift Management', desc: 'Create and manage complex shift patterns and schedules' },
-      { name: 'Leave Management', desc: 'Handle vacation requests, sick leaves, and approvals' },
-      { name: 'Overtime Tracking', desc: 'Automatic overtime calculation with custom rules' }
+    icon: Clock,
+    popularWith: 'Hourly workers, Manufacturing, Retail',
+    features: [
+      'GPS Time Clock with Geofencing',
+      'Automated Attendance Monitoring',
+      'Complex Shift Scheduling',
+      'Leave Management & Balance Tracking',
+      'FLSA-Compliant Overtime Calculation',
+      'Break & Meal Period Tracking',
+      'Payroll Integration (QuickBooks, ADP, etc.)',
+      'Time Theft Prevention with Photo Verification',
+      'Team Management & User Roles',
+      'Compliance Reporting & Analytics'
+    ],
+    useCases: [
+      'Track employee attendance',
+      'Manage shift schedules',
+      'Process leave requests',
+      'Generate payroll reports'
     ]
   },
   {
-    category: 'Field Operations',
-    icon: MapPin,
+    code: 'guard',
+    name: 'WorkforceOne Guard',
+    displayName: 'Guard',
+    tagline: 'Security & Patrol Management',
+    description: 'Specialized security management system for patrol operations, incident reporting, and checkpoint monitoring.',
+    monthlyPrice: 12,
+    annualPrice: 115.20,
     color: 'purple',
-    items: [
-      { name: 'Route Optimization', desc: 'AI-powered route planning for field teams' },
-      { name: 'Outlet Management', desc: 'Track visits, manage outlets, and monitor performance' },
-      { name: 'Daily Call Reports', desc: 'Structured reporting for field sales and service teams' },
-      { name: 'Live Location Tracking', desc: 'Real-time team member location for better coordination' }
-    ]
-  },
-  {
-    category: 'Forms & Workflows',
-    icon: FileText,
-    color: 'orange',
-    items: [
-      { name: 'Dynamic Form Builder', desc: 'Drag-and-drop form creation with conditional logic' },
-      { name: 'Workflow Automation', desc: 'Automate approvals and multi-step processes' },
-      { name: 'Digital Signatures', desc: 'Legally binding e-signatures for documents' },
-      { name: 'Template Library', desc: 'Pre-built templates for common business forms' }
-    ]
-  },
-  {
-    category: 'Analytics & Insights',
-    icon: Brain,
-    color: 'red',
-    items: [
-      { name: 'Predictive Analytics', desc: 'AI-powered predictions for attendance and performance' },
-      { name: 'Custom Dashboards', desc: 'Build personalized dashboards with drag-and-drop widgets' },
-      { name: 'Real-time Reports', desc: 'Live data updates with export to Excel, PDF, and CSV' },
-      { name: 'Power BI Integration', desc: 'Native integration with Microsoft Power BI' }
-    ]
-  },
-  {
-    category: 'Communication',
-    icon: BellRing,
-    color: 'teal',
-    items: [
-      { name: 'Push Notifications', desc: 'Instant alerts for important events and updates' },
-      { name: 'Team Announcements', desc: 'Broadcast messages to teams or entire organization' },
-      { name: 'Task Comments', desc: 'Collaborate on tasks with threaded discussions' },
-      { name: 'Email Integration', desc: 'Automated email notifications and reminders' }
+    icon: Shield,
+    popularWith: 'Security companies, Guard services, Properties',
+    features: [
+      'Dynamic Patrol Route Management',
+      'QR Code & NFC Checkpoint Scanning',
+      'Real-time GPS Guard Tracking',
+      'Detailed Incident Reporting with Evidence',
+      'Photo & Video Evidence Capture',
+      'Guard Scheduling & Site Assignment',
+      'Emergency Escalation & One-Touch Alerts',
+      'Automated Client Reporting Dashboards',
+      'Team Management & User Roles',
+      'Industry Compliance (ASIS, SOC 2, ISO 27001)'
+    ],
+    useCases: [
+      'Monitor security patrols',
+      'Track checkpoint scans',
+      'Report security incidents',
+      'Manage guard assignments'
     ]
   }
 ]
 
+const bundleDiscount = 23; // 23% off for all three products
+const bundlePrice = 20; // $20/user/month for all three
+
 const testimonials = [
   {
-    quote: "WorkforceOne transformed how we manage our distributed sales team. The route optimization alone saved us 30% in travel costs.",
+    quote: "The Remote product transformed how we manage our distributed sales team. Task tracking and route optimization alone saved us 30% in operational costs.",
     author: "Sarah Chen",
-    role: "VP of Operations",
+    role: "VP of Operations", 
     company: "TechCorp Global",
+    product: "Remote",
     rating: 5
   },
   {
-    quote: "The forms and workflow automation features eliminated hours of paperwork. Our HR team is now 50% more productive.",
+    quote: "WorkforceOne Time eliminated our attendance headaches. GPS time clock and automated overtime calculations are game-changers for our hourly workforce.",
     author: "Michael Rodriguez",
     role: "HR Director",
-    company: "Innovate Solutions",
+    company: "Innovate Manufacturing",
+    product: "Time", 
     rating: 5
   },
   {
-    quote: "Real-time attendance tracking and predictive analytics helped us reduce absenteeism by 40% in just 3 months.",
+    quote: "The Guard product gave us complete visibility into our security operations. Incident reporting and checkpoint monitoring improved our service quality dramatically.",
     author: "Emily Watson",
-    role: "CEO",
-    company: "NextGen Retail",
+    role: "Security Operations Manager",
+    company: "Metro Security Services",
+    product: "Guard",
     rating: 5
   }
 ]
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [activeFeature, setActiveFeature] = useState(0)
+  const [selectedProduct, setSelectedProduct] = useState(0)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveFeature((prev) => (prev + 1) % features.length)
-    }, 5000)
+      setSelectedProduct((prev) => (prev + 1) % products.length)
+    }, 6000)
     return () => clearInterval(interval)
   }, [])
 
@@ -133,18 +165,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              {/* Logo - Replace /logo.png with your actual logo path */}
-              <img 
-                src="/logo.png" 
-                alt="WorkforceOne Logo" 
-                className="h-10 w-auto"
-                onError={(e) => {
-                  // Fallback to icon if logo doesn't exist
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-              <div className="hidden w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
                 <Users className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -157,14 +178,14 @@ export default function LandingPage() {
             
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              <Link href="/guides" className="text-gray-600 hover:text-gray-900 font-medium">
-                Guides
+              <Link href="#products" className="text-gray-600 hover:text-gray-900 font-medium">
+                Products
               </Link>
-              <Link href="#features" className="text-gray-600 hover:text-gray-900 font-medium">
-                Features
-              </Link>
-              <Link href="/pricing" className="text-gray-600 hover:text-gray-900 font-medium">
+              <Link href="/pricing-calculator" className="text-gray-600 hover:text-gray-900 font-medium">
                 Pricing
+              </Link>
+              <Link href="#guides" className="text-gray-600 hover:text-gray-900 font-medium">
+                Resources
               </Link>
               <Link href="/help" className="text-gray-600 hover:text-gray-900 font-medium">
                 Help
@@ -196,14 +217,14 @@ export default function LandingPage() {
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t">
             <div className="px-4 py-2 space-y-1">
-              <Link href="/guides" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
-                Guides
+              <Link href="#products" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                Products
               </Link>
-              <Link href="#features" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
-                Features
-              </Link>
-              <Link href="/pricing" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+              <Link href="/pricing-calculator" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
                 Pricing
+              </Link>
+              <Link href="#guides" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
+                Resources
               </Link>
               <Link href="/help" className="block px-3 py-2 text-gray-600 hover:text-gray-900 font-medium">
                 Help
@@ -231,44 +252,82 @@ export default function LandingPage() {
             <div className="flex justify-center mb-6">
               <Badge variant="outline" className="px-4 py-1">
                 <Sparkles className="h-3 w-3 mr-1" />
-                AI-Powered Workforce Management
+                Three Products. One Platform. Complete Control.
               </Badge>
             </div>
             <h1 className="text-5xl lg:text-7xl font-bold mb-6 leading-tight">
-              The Complete Platform for
+              Choose Your Perfect
               <span className="block bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Modern Workforce Management
+                Workforce Solution
               </span>
             </h1>
             <p className="text-xl lg:text-2xl text-gray-600 mt-4 mb-8 max-w-4xl mx-auto leading-relaxed">
-              From attendance tracking to predictive analytics, manage your entire workforce 
-              with one powerful platform. Built for teams of all sizes, from startups to enterprises.
+              Pay only for what you need. Start with one product or get the complete bundle. 
+              Each solution is designed for specific workforce challenges.
             </p>
             
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mb-10">
-              {stats.map((stat, idx) => (
-                <div key={idx} className="bg-white rounded-xl p-4 shadow-sm border">
-                  <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                  <div className="text-sm text-gray-600">{stat.label}</div>
-                  <Badge variant="secondary" className="mt-1 text-xs">
-                    {stat.growth}
-                  </Badge>
-                </div>
-              ))}
+            {/* Quick Product Selector */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-10">
+              {products.map((product, idx) => {
+                const IconComponent = product.icon
+                const isSelected = selectedProduct === idx
+                return (
+                  <div 
+                    key={idx} 
+                    className={`p-4 rounded-xl cursor-pointer transition-all duration-300 ${
+                      isSelected
+                        ? product.color === 'blue' 
+                          ? 'bg-blue-100 border-2 border-blue-500 shadow-lg transform scale-105'
+                          : product.color === 'green'
+                          ? 'bg-green-100 border-2 border-green-500 shadow-lg transform scale-105'
+                          : 'bg-purple-100 border-2 border-purple-500 shadow-lg transform scale-105'
+                        : 'bg-white border border-gray-200 hover:shadow-md'
+                    }`}
+                    onClick={() => setSelectedProduct(idx)}
+                  >
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3 ${
+                      product.color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-600' :
+                      product.color === 'green' ? 'bg-gradient-to-br from-green-500 to-green-600' :
+                      'bg-gradient-to-br from-purple-500 to-purple-600'
+                    }`}>
+                      <IconComponent className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="font-bold text-lg">{product.displayName}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{product.tagline}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${product.monthlyPrice}
+                      <span className="text-sm font-normal text-gray-600">/user/mo</span>
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Bundle Offer */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
+              <div className="flex items-center justify-center mb-3">
+                <Package className="h-6 w-6 text-green-600 mr-2" />
+                <span className="font-bold text-green-800">Complete Bundle</span>
+                <Badge className="ml-2 bg-green-600">Save {bundleDiscount}%</Badge>
+              </div>
+              <p className="text-3xl font-bold text-green-900 mb-2">
+                ${bundlePrice}/user/month
+                <span className="text-lg line-through text-gray-500 ml-2">${products.reduce((sum, p) => sum + p.monthlyPrice, 0)}</span>
+              </p>
+              <p className="text-green-700">Get all three products for maximum savings</p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 shadow-xl">
-                  Start 14-Day Free Trial
+                  Start Free 14-Day Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/guides">
+              <Link href="/pricing-calculator">
                 <Button variant="outline" size="lg" className="text-lg px-8 border-2">
-                  <BookOpen className="mr-2 h-5 w-5" />
-                  View Guides
+                  <DollarSign className="mr-2 h-5 w-5" />
+                  Calculate Your Cost
                 </Button>
               </Link>
             </div>
@@ -279,121 +338,412 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Core Features Grid */}
-      <section id="features" className="py-20 bg-white">
+      {/* Product Deep Dive */}
+      <section id="products" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge variant="outline" className="mb-4">
-              <Layers className="h-3 w-3 mr-1" />
-              Complete Feature Set
+              <Target className="h-3 w-3 mr-1" />
+              Three Focused Solutions
             </Badge>
             <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-              Everything You Need in One Platform
+              Built for Your Specific Needs
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Comprehensive tools designed for the modern distributed workforce
+              Each product is expertly crafted to solve specific workforce challenges. 
+              Choose one or combine them for maximum impact.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-16">
-            {features.map((category, idx) => (
-              <Card 
-                key={idx} 
-                className={`border-2 hover:shadow-xl transition-all cursor-pointer ${
-                  activeFeature === idx ? 'border-blue-500 shadow-xl' : ''
-                }`}
-                onClick={() => setActiveFeature(idx)}
-              >
-                <CardContent className="p-6">
-                  <div className={`w-12 h-12 bg-gradient-to-br from-${category.color}-500 to-${category.color}-600 rounded-xl flex items-center justify-center mb-4`}>
-                    <category.icon className="h-6 w-6 text-white" />
+          {/* Product Tabs */}
+          <div className="flex flex-wrap justify-center gap-2 mb-12">
+            {products.map((product, idx) => {
+              const IconComponent = product.icon
+              const isSelected = selectedProduct === idx
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedProduct(idx)}
+                  className={`flex items-center px-6 py-3 rounded-xl font-medium transition-all ${
+                    isSelected
+                      ? product.color === 'blue'
+                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-500'
+                        : product.color === 'green'
+                        ? 'bg-green-100 text-green-700 border-2 border-green-500'
+                        : 'bg-purple-100 text-purple-700 border-2 border-purple-500'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <IconComponent className="h-5 w-5 mr-2" />
+                  {product.displayName}
+                  <span className="ml-2 text-sm opacity-75">${product.monthlyPrice}/mo</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Selected Product Details */}
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-8 lg:p-12">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <div className="flex items-center mb-6">
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center mr-4 ${
+                    products[selectedProduct].color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-600' :
+                    products[selectedProduct].color === 'green' ? 'bg-gradient-to-br from-green-500 to-green-600' :
+                    'bg-gradient-to-br from-purple-500 to-purple-600'
+                  }`}>
+                    {(() => {
+                      const IconComponent = products[selectedProduct].icon
+                      return <IconComponent className="h-8 w-8 text-white" />
+                    })()}
                   </div>
-                  <h3 className="text-xl font-bold mb-4">{category.category}</h3>
-                  <ul className="space-y-3">
-                    {category.items.map((item, itemIdx) => (
-                      <li key={itemIdx} className="flex items-start">
-                        <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <div className="font-medium text-gray-900">{item.name}</div>
-                          <div className="text-sm text-gray-600">{item.desc}</div>
-                        </div>
+                  <div>
+                    <h3 className="text-3xl font-bold text-gray-900">{products[selectedProduct].name}</h3>
+                    <p className="text-lg text-gray-600">{products[selectedProduct].tagline}</p>
+                  </div>
+                </div>
+                
+                <p className="text-xl text-gray-700 mb-6 leading-relaxed">
+                  {products[selectedProduct].description}
+                </p>
+
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-3">Perfect for:</h4>
+                  <p className="text-gray-600">{products[selectedProduct].popularWith}</p>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-3">Common Use Cases:</h4>
+                  <ul className="space-y-2">
+                    {products[selectedProduct].useCases.map((useCase, idx) => (
+                      <li key={idx} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">{useCase}</span>
                       </li>
                     ))}
                   </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
 
-          {/* Platform Highlights */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Smartphone className="h-8 w-8 text-white" />
+                <div className="flex items-center space-x-4">
+                  <div>
+                    <span className="text-3xl font-bold text-gray-900">
+                      ${products[selectedProduct].monthlyPrice}
+                    </span>
+                    <span className="text-lg text-gray-600">/user/month</span>
+                  </div>
+                  <span className="text-gray-400">or</span>
+                  <div>
+                    <span className="text-2xl font-bold text-gray-900">
+                      ${products[selectedProduct].annualPrice}
+                    </span>
+                    <span className="text-sm text-gray-600">/user/year</span>
+                    <Badge className="ml-2 bg-green-600">Save 20%</Badge>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-lg font-bold mb-2">Mobile First</h3>
-              <p className="text-gray-600">Native iOS and Android apps with offline support</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Cloud className="h-8 w-8 text-white" />
+
+              <div>
+                <div className="bg-white rounded-xl p-6 shadow-lg">
+                  <h4 className="font-bold text-xl mb-4 text-gray-900">Core Features</h4>
+                  <ul className="space-y-3">
+                    {products[selectedProduct].features.map((feature, idx) => (
+                      <li key={idx} className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6 pt-6 border-t">
+                    <Link href={`/signup?product=${products[selectedProduct].code}`}>
+                      <Button className={`w-full ${
+                        products[selectedProduct].color === 'blue' 
+                          ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                          : products[selectedProduct].color === 'green'
+                          ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+                          : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
+                      }`}>
+                        Start Free Trial
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-lg font-bold mb-2">Cloud Native</h3>
-              <p className="text-gray-600">Scalable infrastructure with 99.99% uptime SLA</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Lock className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-lg font-bold mb-2">Enterprise Security</h3>
-              <p className="text-gray-600">SOC 2 compliant with end-to-end encryption</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* Comparison Table */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4">
-              <Workflow className="h-3 w-3 mr-1" />
-              Simple Setup Process
+              <GitBranch className="h-3 w-3 mr-1" />
+              Product Comparison
             </Badge>
-            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-              Get Started in Minutes
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Choose What Fits Your Business
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our guided setup makes it easy to get your team up and running quickly
+            <p className="text-xl text-gray-600 max-w-4xl mx-auto">
+              All products share core workforce management capabilities, but each excels in specific areas. 
+              Compare features to find your perfect match.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {[
-              { step: '1', title: 'Sign Up', desc: 'Create your free account in seconds', icon: UserCheck },
-              { step: '2', title: 'Setup Organization', desc: 'Configure your company settings', icon: Building2 },
-              { step: '3', title: 'Invite Team', desc: 'Add team members and assign roles', icon: Users },
-              { step: '4', title: 'Start Managing', desc: 'Begin tracking and managing your workforce', icon: Target }
-            ].map((item, idx) => (
-              <div key={idx} className="relative">
-                <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-lg mb-4">
-                    {item.step}
-                  </div>
-                  <item.icon className="h-8 w-8 text-blue-600 mb-3" />
-                  <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                  <p className="text-gray-600 text-sm">{item.desc}</p>
+          {/* Key Distinctions */}
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-6">
+                <div className="flex items-center mb-4">
+                  <Users className="h-8 w-8 text-blue-600 mr-3" />
+                  <h3 className="font-bold text-lg text-blue-900">Remote Excels At</h3>
                 </div>
-                {idx < 3 && (
-                  <ChevronRight className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 h-8 w-8 text-gray-300" />
-                )}
+                <ul className="space-y-2 text-sm text-blue-800">
+                  <li>• <strong>Project Management:</strong> Complex workflows and task dependencies</li>
+                  <li>• <strong>Route Optimization:</strong> AI-powered routing for field teams</li>
+                  <li>• <strong>Outlet Management:</strong> Multi-location business operations</li>
+                  <li>• <strong>White Labeling:</strong> Custom branding for resellers</li>
+                  <li>• <strong>Client Portals:</strong> Customer-facing dashboards</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="p-6">
+                <div className="flex items-center mb-4">
+                  <Clock className="h-8 w-8 text-green-600 mr-3" />
+                  <h3 className="font-bold text-lg text-green-900">Time Excels At</h3>
+                </div>
+                <ul className="space-y-2 text-sm text-green-800">
+                  <li>• <strong>GPS Time Tracking:</strong> Location-verified clock in/out</li>
+                  <li>• <strong>Labor Compliance:</strong> FLSA overtime and break tracking</li>
+                  <li>• <strong>Payroll Integration:</strong> Direct export to accounting systems</li>
+                  <li>• <strong>Shift Management:</strong> Complex scheduling patterns</li>
+                  <li>• <strong>Time Theft Prevention:</strong> Photo verification and geofencing</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-purple-200 bg-purple-50">
+              <CardContent className="p-6">
+                <div className="flex items-center mb-4">
+                  <Shield className="h-8 w-8 text-purple-600 mr-3" />
+                  <h3 className="font-bold text-lg text-purple-900">Guard Excels At</h3>
+                </div>
+                <ul className="space-y-2 text-sm text-purple-800">
+                  <li>• <strong>Patrol Management:</strong> Dynamic routes with GPS waypoints</li>
+                  <li>• <strong>Checkpoint Verification:</strong> QR code and NFC scanning</li>
+                  <li>• <strong>Incident Documentation:</strong> Evidence capture and chain of custody</li>
+                  <li>• <strong>Emergency Response:</strong> One-touch alerts and escalation</li>
+                  <li>• <strong>Security Compliance:</strong> Industry standards (ASIS, SOC 2)</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Shared Core Features */}
+          <div className="bg-gray-50 rounded-2xl p-8 mb-12">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+              Core Features Available in All Products
+            </h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { name: 'Team Management', desc: 'Add members, assign roles, manage permissions' },
+                { name: 'Mobile Apps', desc: 'Native iOS & Android applications' },
+                { name: 'Real-time GPS', desc: 'Live location tracking and geofencing' },
+                { name: 'Notifications', desc: 'Push alerts and messaging system' },
+                { name: 'Custom Reporting', desc: 'Analytics and dashboard customization' },
+                { name: 'API Access', desc: 'REST API and webhook integrations' },
+                { name: 'Multi-language', desc: 'Localization for global teams' },
+                { name: 'Data Export', desc: 'CSV exports and automated backups' }
+              ].map((feature, idx) => (
+                <div key={idx} className="bg-white p-4 rounded-lg">
+                  <div className="font-semibold text-gray-900 mb-1">{feature.name}</div>
+                  <div className="text-xs text-gray-600">{feature.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Feature Legend */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div className="flex items-center p-3 bg-blue-50 rounded-lg">
+              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+              <span className="text-sm font-medium text-gray-700">Core Features</span>
+            </div>
+            <div className="flex items-center p-3 bg-blue-25 rounded-lg">
+              <div className="w-3 h-3 bg-blue-600 rounded-full mr-2"></div>
+              <span className="text-sm font-medium text-gray-700">Remote Features</span>
+            </div>
+            <div className="flex items-center p-3 bg-green-25 rounded-lg">
+              <div className="w-3 h-3 bg-green-600 rounded-full mr-2"></div>
+              <span className="text-sm font-medium text-gray-700">Time Features</span>
+            </div>
+            <div className="flex items-center p-3 bg-purple-25 rounded-lg">
+              <div className="w-3 h-3 bg-purple-600 rounded-full mr-2"></div>
+              <span className="text-sm font-medium text-gray-700">Guard Features</span>
+            </div>
+            <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+              <div className="w-3 h-3 bg-gray-500 rounded-full mr-2"></div>
+              <span className="text-sm font-medium text-gray-700">Shared Features</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Features</th>
+                    {products.map((product) => {
+                      const IconComponent = product.icon
+                      return (
+                        <th key={product.code} className="px-6 py-4 text-center">
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-2 ${
+                            product.color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-600' :
+                            product.color === 'green' ? 'bg-gradient-to-br from-green-500 to-green-600' :
+                            'bg-gradient-to-br from-purple-500 to-purple-600'
+                          }`}>
+                            <IconComponent className="h-6 w-6 text-white" />
+                          </div>
+                          <div className="font-bold text-gray-900">{product.displayName}</div>
+                          <div className="text-sm text-gray-600">${product.monthlyPrice}/user/mo</div>
+                        </th>
+                      )
+                    })}
+                    <th className="px-6 py-4 text-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mx-auto mb-2">
+                        <Package className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="font-bold text-gray-900">Bundle</div>
+                      <div className="text-sm text-gray-600">${bundlePrice}/user/mo</div>
+                      <Badge className="mt-1 bg-green-600 text-xs">Save {bundleDiscount}%</Badge>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {[
+                    // Core Foundation Features (All Products Need These)
+                    { category: 'Team Management & User Roles', remote: true, time: true, guard: true, type: 'foundation', description: 'Add team members, assign roles, manage permissions' },
+                    { category: 'Organization Management', remote: true, time: true, guard: true, type: 'foundation', description: 'Multi-tenant organization structure' },
+                    { category: 'Mobile Apps (iOS & Android)', remote: true, time: true, guard: true, type: 'foundation', description: 'Native mobile applications' },
+                    { category: 'Real-time Notifications', remote: true, time: true, guard: true, type: 'foundation', description: 'Push notifications and alerts' },
+                    { category: 'API Access & Integrations', remote: true, time: true, guard: true, type: 'foundation', description: 'REST API and webhook support' },
+                    
+                    // Remote Product Specific Features
+                    { category: 'Advanced Task Assignment', remote: true, time: false, guard: false, type: 'remote', description: 'AI-powered task distribution and project management' },
+                    { category: 'Route Optimization', remote: true, time: false, guard: false, type: 'remote', description: 'Smart routing for field teams and service calls' },
+                    { category: 'Outlet Management', remote: true, time: false, guard: false, type: 'remote', description: 'Multi-location business management' },
+                    { category: 'Dynamic Form Builder', remote: true, time: false, guard: false, type: 'remote', description: 'Drag-and-drop custom forms with conditional logic' },
+                    { category: 'Workflow Automation', remote: true, time: false, guard: false, type: 'remote', description: 'Automated business processes and approvals' },
+                    { category: 'Project Templates', remote: true, time: false, guard: false, type: 'remote', description: 'Pre-built templates for common projects' },
+                    { category: 'White Label Options', remote: true, time: false, guard: false, type: 'remote', description: 'Custom branding and white-label deployment' },
+                    { category: 'Client Portal Access', remote: true, time: false, guard: false, type: 'remote', description: 'Customer-facing project dashboards' },
+                    
+                    // Time Product Specific Features
+                    { category: 'GPS Time Clock', remote: false, time: true, guard: false, type: 'time', description: 'Location-verified time tracking with geofencing' },
+                    { category: 'Automated Attendance', remote: false, time: true, guard: false, type: 'time', description: 'Real-time attendance monitoring and alerts' },
+                    { category: 'Leave Management', remote: false, time: true, guard: false, type: 'time', description: 'PTO requests, approvals, and balance tracking' },
+                    { category: 'Payroll Integration', remote: false, time: true, guard: false, type: 'time', description: 'Direct export to QuickBooks, ADP, Paychex, etc.' },
+                    { category: 'Overtime Calculation', remote: false, time: true, guard: false, type: 'time', description: 'FLSA-compliant overtime tracking and reporting' },
+                    { category: 'Break & Meal Tracking', remote: false, time: true, guard: false, type: 'time', description: 'Labor law compliance for breaks' },
+                    { category: 'Shift Scheduling', remote: false, time: true, guard: false, type: 'time', description: 'Complex shift patterns and scheduling' },
+                    { category: 'Time Theft Prevention', remote: false, time: true, guard: false, type: 'time', description: 'Photo verification and GPS validation' },
+                    
+                    // Guard Product Specific Features
+                    { category: 'Patrol Route Management', remote: false, time: false, guard: true, type: 'guard', description: 'Dynamic patrol routes with GPS waypoints' },
+                    { category: 'QR Code Checkpoints', remote: false, time: false, guard: true, type: 'guard', description: 'Checkpoint verification with QR/NFC scanning' },
+                    { category: 'Incident Reporting', remote: false, time: false, guard: true, type: 'guard', description: 'Detailed incident reports with evidence capture' },
+                    { category: 'Evidence Management', remote: false, time: false, guard: true, type: 'guard', description: 'Photo/video evidence with chain of custody' },
+                    { category: 'Emergency Escalation', remote: false, time: false, guard: true, type: 'guard', description: 'One-touch emergency alerts and response' },
+                    { category: 'Guard Scheduling & Assignment', remote: false, time: false, guard: true, type: 'guard', description: 'Site-specific guard assignments and skills matching' },
+                    { category: 'Client Reporting Dashboard', remote: false, time: false, guard: true, type: 'guard', description: 'Automated security reports for clients' },
+                    { category: 'Compliance Monitoring', remote: false, time: false, guard: true, type: 'guard', description: 'ASIS, SOC 2, and industry standard compliance' },
+                    
+                    // Shared Features (Multiple Products)
+                    { category: 'Advanced GPS Tracking', remote: true, time: true, guard: true, type: 'shared', description: 'Real-time location tracking and geofencing' },
+                    { category: 'Custom Reporting', remote: true, time: true, guard: true, type: 'shared', description: 'Customizable reports and analytics dashboards' },
+                    { category: 'Data Export & Backup', remote: true, time: true, guard: true, type: 'shared', description: 'CSV exports and automated backups' },
+                    { category: 'Multi-language Support', remote: true, time: true, guard: true, type: 'shared', description: 'Localization for global teams' },
+                    
+                  ].map((feature, idx) => {
+                    const getRowClass = (type: string) => {
+                      switch(type) {
+                        case 'foundation': return 'bg-blue-50'
+                        case 'remote': return 'bg-blue-25'
+                        case 'time': return 'bg-green-25'  
+                        case 'guard': return 'bg-purple-25'
+                        case 'shared': return 'bg-gray-50'
+                        default: return ''
+                      }
+                    }
+                    
+                    return (
+                      <tr key={idx} className={`${getRowClass(feature.type)} hover:bg-opacity-75`}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-start">
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900">{feature.category}</div>
+                              <div className="text-xs text-gray-600 mt-1">{feature.description}</div>
+                            </div>
+                            {feature.type === 'foundation' && (
+                              <Badge className="ml-2 bg-blue-600 text-xs">Core</Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {feature.remote ? (
+                            <Check className="h-5 w-5 text-green-500 mx-auto" />
+                          ) : (
+                            <Minus className="h-5 w-5 text-gray-300 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {feature.time ? (
+                            <Check className="h-5 w-5 text-green-500 mx-auto" />
+                          ) : (
+                            <Minus className="h-5 w-5 text-gray-300 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {feature.guard ? (
+                            <Check className="h-5 w-5 text-green-500 mx-auto" />
+                          ) : (
+                            <Minus className="h-5 w-5 text-gray-300 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <Check className="h-5 w-5 text-green-500 mx-auto" />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="bg-gray-50 px-6 py-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/signup">
+                  <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link href="/pricing-calculator">
+                  <Button variant="outline" size="lg">
+                    <DollarSign className="mr-2 h-5 w-5" />
+                    Calculate Your Cost
+                  </Button>
+                </Link>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Testimonials - Updated for Products */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -402,111 +752,115 @@ export default function LandingPage() {
               Customer Success Stories
             </Badge>
             <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-              Trusted by Industry Leaders
+              Real Results from Real Customers
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              See how companies are transforming their workforce management
+              See how our focused product approach delivers targeted solutions
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, idx) => (
-              <Card key={idx} className="hover:shadow-xl transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
-                    ))}
+            {testimonials.map((testimonial, idx) => {
+              const product = products.find(p => p.displayName === testimonial.product)
+              const badgeColor = product?.color === 'blue' ? 'bg-blue-600' :
+                                product?.color === 'green' ? 'bg-green-600' : 'bg-purple-600'
+              return (
+                <Card key={idx} className="hover:shadow-xl transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center mb-4">
+                      <Badge className={`mr-2 ${badgeColor}`}>
+                        {testimonial.product}
+                      </Badge>
+                    <div className="flex">
+                      {[...Array(testimonial.rating)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-gray-700 mb-4 italic">"{testimonial.quote}"</p>
-                  <div className="border-t pt-4">
-                    <div className="font-bold text-gray-900">{testimonial.author}</div>
-                    <div className="text-sm text-gray-600">{testimonial.role}</div>
-                    <div className="text-sm text-blue-600">{testimonial.company}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <p className="text-gray-700 mb-4 italic">"{testimonial.quote}"</p>
+                    <div className="border-t pt-4">
+                      <div className="font-bold text-gray-900">{testimonial.author}</div>
+                      <div className="text-sm text-gray-600">{testimonial.role}</div>
+                      <div className="text-sm text-blue-600">{testimonial.company}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </section>
 
-      {/* Quick Start Guides */}
-      <section className="py-20 bg-gradient-to-br from-blue-50 to-indigo-50">
+      {/* Getting Started Guides */}
+      <section id="guides" className="py-20 bg-gradient-to-br from-blue-50 to-indigo-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4">
               <BookOpen className="h-3 w-3 mr-1" />
-              Learning Resources
+              Quick Start Guides
             </Badge>
             <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-              How-To Guides & Resources
+              Get Up and Running Fast
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Everything you need to master WorkforceOne
+              Product-specific guides to help you maximize value from day one
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Link href="/guides/getting-started">
-              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4">
-                    <Play className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Getting Started</h3>
-                  <p className="text-gray-600 text-sm mb-3">Complete setup guide for new users</p>
-                  <div className="text-blue-600 font-medium text-sm flex items-center">
-                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/guides/team-management">
-              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mb-4">
-                    <Users className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Team Management</h3>
-                  <p className="text-gray-600 text-sm mb-3">Organize teams and assign roles</p>
-                  <div className="text-blue-600 font-medium text-sm flex items-center">
-                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/guides/attendance">
-              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4">
-                    <Clock className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Time & Attendance</h3>
-                  <p className="text-gray-600 text-sm mb-3">Track time and manage attendance</p>
-                  <div className="text-blue-600 font-medium text-sm flex items-center">
-                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/guides/forms-workflows">
-              <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mb-4">
-                    <FileText className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">Forms & Workflows</h3>
-                  <p className="text-gray-600 text-sm mb-3">Create forms and automate workflows</p>
-                  <div className="text-blue-600 font-medium text-sm flex items-center">
-                    View Guide <ChevronRight className="h-4 w-4 ml-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+            {[
+              {
+                title: 'Getting Started',
+                description: 'Complete setup guide for new users',
+                icon: Play,
+                color: 'green',
+                href: '/guides/getting-started'
+              },
+              {
+                title: 'Remote Setup',
+                description: 'Configure teams, tasks, and workflows',
+                icon: Users,
+                color: 'blue', 
+                href: '/guides/remote'
+              },
+              {
+                title: 'Time Tracking',
+                description: 'Set up attendance and time management',
+                icon: Clock,
+                color: 'green',
+                href: '/guides/time'
+              },
+              {
+                title: 'Guard Operations',
+                description: 'Configure patrols and security workflows',
+                icon: Shield,
+                color: 'purple',
+                href: '/guides/guard'
+              }
+            ].map((guide, idx) => {
+              const IconComponent = guide.icon
+              return (
+                <Link key={idx} href={guide.href}>
+                  <Card className="hover:shadow-xl transition-all cursor-pointer h-full">
+                    <CardContent className="p-6">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
+                        guide.color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-600' :
+                        guide.color === 'green' ? 'bg-gradient-to-br from-green-500 to-green-600' :
+                        guide.color === 'purple' ? 'bg-gradient-to-br from-purple-500 to-purple-600' :
+                        'bg-gradient-to-br from-gray-500 to-gray-600'
+                      }`}>
+                        <IconComponent className="h-6 w-6 text-white" />
+                      </div>
+                    <h3 className="font-bold text-lg mb-2">{guide.title}</h3>
+                    <p className="text-gray-600 text-sm mb-3">{guide.description}</p>
+                      <div className="text-blue-600 font-medium text-sm flex items-center">
+                        View Guide <ChevronRight className="h-4 w-4 ml-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
 
           <div className="text-center mt-8">
@@ -527,8 +881,31 @@ export default function LandingPage() {
             Ready to Transform Your Workforce Management?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join 500+ companies already using WorkforceOne to streamline their operations
+            Choose the perfect product combination for your business. Start free, scale as you grow.
           </p>
+          
+          {/* Pricing Summary */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8 max-w-2xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
+              <div>
+                <div className="text-2xl font-bold">$8</div>
+                <div className="text-sm opacity-90">Remote</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">$6</div>
+                <div className="text-sm opacity-90">Time</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">$12</div>
+                <div className="text-sm opacity-90">Guard</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">$20</div>
+                <div className="text-sm opacity-90">Bundle (Save 23%)</div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link href="/signup">
               <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-50 text-lg px-8 shadow-xl">
@@ -536,14 +913,16 @@ export default function LandingPage() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Button 
-              variant="outline" 
-              size="lg" 
-              className="text-white border-2 border-white/80 hover:bg-white hover:text-blue-600 hover:border-white transition-all duration-300 text-lg px-8 backdrop-blur-sm bg-white/10"
-            >
-              <Headphones className="mr-2 h-5 w-5" />
-              Talk to Sales
-            </Button>
+            <Link href="/pricing-calculator">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="text-white border-2 border-white/80 hover:bg-white hover:text-blue-600 hover:border-white transition-all duration-300 text-lg px-8 backdrop-blur-sm bg-white/10"
+              >
+                <DollarSign className="mr-2 h-5 w-5" />
+                Calculate Your Cost
+              </Button>
+            </Link>
           </div>
           <div className="flex flex-wrap justify-center gap-6 text-white/90 text-sm">
             <div className="flex items-center">
@@ -574,8 +953,8 @@ export default function LandingPage() {
                 <span className="text-2xl font-bold">WorkforceOne</span>
               </div>
               <p className="text-gray-400 mb-6 max-w-md">
-                The complete workforce management platform trusted by 500+ companies worldwide. 
-                Streamline operations, boost productivity, and scale with confidence.
+                Three focused workforce management products designed for modern businesses. 
+                Pay only for what you need, scale as you grow.
               </p>
               <div className="flex space-x-4">
                 <Badge variant="secondary" className="bg-gray-800">
@@ -591,26 +970,26 @@ export default function LandingPage() {
             </div>
             
             <div>
-              <h3 className="font-semibold mb-4 text-gray-100">Product</h3>
+              <h3 className="font-semibold mb-4 text-gray-100">Products</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><Link href="/features" className="hover:text-white transition">Features</Link></li>
-                <li><Link href="/pricing" className="hover:text-white transition">Pricing</Link></li>
-                <li><Link href="/guides" className="hover:text-white transition">Guides</Link></li>
-                <li><Link href="/integrations" className="hover:text-white transition">Integrations</Link></li>
+                <li><Link href="/products/remote" className="hover:text-white transition">Remote ($8/user)</Link></li>
+                <li><Link href="/products/time" className="hover:text-white transition">Time ($6/user)</Link></li>
+                <li><Link href="/products/guard" className="hover:text-white transition">Guard ($12/user)</Link></li>
+                <li><Link href="/products/bundle" className="hover:text-white transition">Complete Bundle ($20)</Link></li>
+                <li><Link href="/pricing-calculator" className="hover:text-white transition">Pricing Calculator</Link></li>
                 <li><Link href="/mobile" className="hover:text-white transition">Mobile Apps</Link></li>
-                <li><Link href="/changelog" className="hover:text-white transition">Changelog</Link></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold mb-4 text-gray-100">Resources</h3>
               <ul className="space-y-2 text-gray-400">
+                <li><Link href="/guides" className="hover:text-white transition">Setup Guides</Link></li>
                 <li><Link href="/help" className="hover:text-white transition">Help Center</Link></li>
-                <li><Link href="/guides" className="hover:text-white transition">How-To Guides</Link></li>
                 <li><Link href="/api-docs" className="hover:text-white transition">API Docs</Link></li>
                 <li><Link href="/status" className="hover:text-white transition">System Status</Link></li>
                 <li><Link href="/security" className="hover:text-white transition">Security</Link></li>
-                <li><Link href="/community" className="hover:text-white transition">Community</Link></li>
+                <li><Link href="/integrations" className="hover:text-white transition">Integrations</Link></li>
               </ul>
             </div>
             
@@ -618,7 +997,7 @@ export default function LandingPage() {
               <h3 className="font-semibold mb-4 text-gray-100">Company</h3>
               <ul className="space-y-2 text-gray-400">
                 <li><Link href="/about" className="hover:text-white transition">About Us</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
+                <li><Link href="/contact" className="hover:text-white transition">Contact Sales</Link></li>
                 <li><Link href="/careers" className="hover:text-white transition">Careers</Link></li>
                 <li><Link href="/press" className="hover:text-white transition">Press Kit</Link></li>
                 <li><Link href="/partners" className="hover:text-white transition">Partners</Link></li>

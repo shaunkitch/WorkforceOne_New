@@ -289,14 +289,7 @@ export default function SecurityDashboard() {
   // Guard invitation functions
   const generateInviteCode = () => {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setInviteCode(code);
-    
-    // Generate registration link with embedded code
-    const baseUrl = window.location.origin;
-    const registrationLink = `${baseUrl}/auth/register?type=security&code=${code}&email=${encodeURIComponent(inviteEmail.trim())}`;
-    setInviteLink(registrationLink);
-    
-    return { code, link: registrationLink };
+    return code;
   };
 
   const sendGuardInvitation = async () => {
@@ -307,8 +300,6 @@ export default function SecurityDashboard() {
 
     setInviting(true);
     try {
-      const { code, link } = generateInviteCode();
-      
       // Get current user's organization
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -321,11 +312,37 @@ export default function SecurityDashboard() {
 
       if (!profile) throw new Error('Profile not found');
 
-      // Success - invitation generated
-      console.log('Guard invitation generated:', { code, link, email: inviteEmail.trim() });
+      // Create security guard invitation record
+      const code = generateInviteCode();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
       
-      // Don't close dialog - let user copy/share the information
-      // setShowInviteDialog(false);
+      const { data: invitation, error: inviteError } = await supabase
+        .from('security_guard_invitations')
+        .insert({
+          organization_id: profile.organization_id,
+          invited_by: user.id,
+          email: inviteEmail.trim(),
+          invitation_code: code,
+          status: 'pending',
+          expires_at: expiresAt.toISOString(),
+          metadata: {
+            invited_by_name: profile.full_name
+          }
+        })
+        .select()
+        .single();
+
+      if (inviteError) {
+        throw new Error('Failed to create invitation record: ' + inviteError.message);
+      }
+
+      // Set the generated code and link
+      setInviteCode(code);
+      const baseUrl = window.location.origin;
+      const registrationLink = `${baseUrl}/signup?type=security&code=${code}&email=${encodeURIComponent(inviteEmail.trim())}`;
+      setInviteLink(registrationLink);
+      
+      console.log('🛡️ Guard invitation created successfully:', { id: invitation.id, code, email: inviteEmail.trim() });
 
     } catch (error: any) {
       console.error('Error generating invitation:', error);
