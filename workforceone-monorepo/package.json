@@ -1,0 +1,26 @@
+{
+  "name": "workforceone-monorepo",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "dev:remote": "turbo dev --filter=@workforceone/remote",
+    "dev:time": "turbo dev --filter=@workforceone/time",
+    "dev:guard": "turbo dev --filter=@workforceone/guard",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^2.5.0",
+    "eslint": "^9.16.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
