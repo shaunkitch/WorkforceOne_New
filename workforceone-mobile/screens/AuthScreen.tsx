@@ -136,34 +136,36 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
             
             if (qrData.guardInvite) {
               // Handle guard invitation with auto sign-up
-              if (userEmail) {
-                try {
-                  // Attempt actual automatic sign-up with Supabase Auth
-                  console.log('Attempting auto sign-up for guard invitation...');
-                  const { autoSignUpWithInvitation } = await import('../lib/supabase');
-                  const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, userEmail, userName);
-                  
-                  if (!authResponse.error && authResponse.data?.auto_signed_in) {
-                    // User was actually created and automatically signed in
-                    console.log('Auto sign-in successful for guard invitation, navigating to dashboard...');
-                    // Navigate directly to Dashboard without any popup
-                    onAuthSuccess();
-                    return;
-                  } else if (authResponse.data?.needs_confirmation) {
-                    // Account created but needs email confirmation
-                    console.log('Account created but needs email confirmation');
-                    Alert.alert(
-                      '📧 Check Your Email', 
-                      `Account created for ${userEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
-                      [{ text: 'OK' }]
-                    );
-                    return;
-                  } else {
-                    console.log('Auto sign-up failed, will try validation only:', authResponse.error);
-                  }
-                } catch (autoError) {
-                  console.log('Auto sign-up exception, will try validation only:', autoError);
+              // Try auto sign-up even without email by generating one from invitation code
+              const autoEmail = userEmail || `${qrData.invitationCode.toLowerCase()}@auto-invite.temp`;
+              console.log('Auto sign-up attempt with email:', autoEmail);
+              
+              try {
+                // Attempt actual automatic sign-up with Supabase Auth
+                console.log('Attempting auto sign-up for guard invitation...');
+                const { autoSignUpWithInvitation } = await import('../lib/supabase');
+                const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, autoEmail, userName);
+                
+                if (!authResponse.error && authResponse.data?.auto_signed_in) {
+                  // User was actually created and automatically signed in
+                  console.log('Auto sign-in successful for guard invitation, navigating to dashboard...');
+                  // Navigate directly to Dashboard without any popup
+                  onAuthSuccess();
+                  return;
+                } else if (authResponse.data?.needs_confirmation) {
+                  // Account created but needs email confirmation
+                  console.log('Account created but needs email confirmation');
+                  Alert.alert(
+                    '📧 Check Your Email', 
+                    `Account created for ${autoEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                } else {
+                  console.log('Auto sign-up failed, will try validation only:', authResponse.error);
                 }
+              } catch (autoError) {
+                console.log('Auto sign-up exception, will try validation only:', autoError);
               }
               
               // Fallback: Just validate invitation and show manual signup
@@ -173,34 +175,36 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
               error = response.error;
             } else {
               // Handle regular product invitation with auto sign-up
-              if (userEmail) {
-                try {
-                  // Attempt actual automatic sign-up with Supabase Auth
-                  console.log('Attempting auto sign-up for product invitation...');
-                  const { autoSignUpWithInvitation } = await import('../lib/supabase');
-                  const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, userEmail, userName);
-                  
-                  if (!authResponse.error && authResponse.data?.auto_signed_in) {
-                    // User was actually created and automatically signed in
-                    console.log('Auto sign-in successful for product invitation, navigating to dashboard...');
-                    // Navigate directly to Dashboard without any popup
-                    onAuthSuccess();
-                    return;
-                  } else if (authResponse.data?.needs_confirmation) {
-                    // Account created but needs email confirmation
-                    console.log('Account created but needs email confirmation');
-                    Alert.alert(
-                      '📧 Check Your Email', 
-                      `Account created for ${userEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
-                      [{ text: 'OK' }]
-                    );
-                    return;
-                  } else {
-                    console.log('Auto sign-up failed, will try validation only:', authResponse.error);
-                  }
-                } catch (autoError) {
-                  console.log('Auto sign-up exception, will try validation only:', autoError);
+              // Try auto sign-up even without email by generating one from invitation code
+              const autoEmail = userEmail || `${qrData.invitationCode.toLowerCase()}@auto-invite.temp`;
+              console.log('Auto sign-up attempt with email:', autoEmail);
+              
+              try {
+                // Attempt actual automatic sign-up with Supabase Auth
+                console.log('Attempting auto sign-up for product invitation...');
+                const { autoSignUpWithInvitation } = await import('../lib/supabase');
+                const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, autoEmail, userName);
+                
+                if (!authResponse.error && authResponse.data?.auto_signed_in) {
+                  // User was actually created and automatically signed in
+                  console.log('Auto sign-in successful for product invitation, navigating to dashboard...');
+                  // Navigate directly to Dashboard without any popup
+                  onAuthSuccess();
+                  return;
+                } else if (authResponse.data?.needs_confirmation) {
+                  // Account created but needs email confirmation
+                  console.log('Account created but needs email confirmation');
+                  Alert.alert(
+                    '📧 Check Your Email', 
+                    `Account created for ${autoEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                } else {
+                  console.log('Auto sign-up failed, will try validation only:', authResponse.error);
                 }
+              } catch (autoError) {
+                console.log('Auto sign-up exception, will try validation only:', autoError);
               }
               
               // Fallback: Just validate invitation and show manual signup
