@@ -31,6 +31,149 @@ export const signUpWithEmail = async (email: string, password: string) => {
   return { data, error }
 }
 
+// Auto sign-up with invitation (creates account and processes invitation)
+export const autoSignUpWithInvitation = async (
+  invitationCode: string,
+  email: string,
+  name?: string
+) => {
+  try {
+    console.log('Auto signing up with invitation:', { invitationCode, email, name });
+    
+    // Generate a random password for the user
+    const tempPassword = 'TempPass' + Math.random().toString(36).substring(2, 8) + '!';
+    
+    // Create the user account with email confirmation disabled
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password: tempPassword,
+      options: {
+        data: {
+          full_name: name || 'New User',
+          invitation_code: invitationCode,
+        },
+        emailRedirectTo: undefined // Disable email confirmation redirect
+      },
+    });
+
+    if (signUpError) {
+      console.error('Sign up error:', signUpError);
+      return { data: null, error: signUpError.message };
+    }
+
+    // If user was created successfully, try to sign them in immediately
+    if (signUpData.user) {
+      console.log('User created, attempting immediate sign-in...');
+      
+      // Try to sign in immediately with the credentials
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: tempPassword,
+      });
+
+      if (signInError) {
+        console.log('Immediate sign-in failed (likely email confirmation required):', signInError.message);
+        
+        // Process invitation anyway for when they do confirm
+        try {
+          const { data: inviteData, error: inviteError } = await supabase.rpc('complete_invitation_after_auth', {
+            invitation_code_param: invitationCode,
+            user_id_param: signUpData.user.id
+          });
+
+          return { 
+            data: { 
+              user: signUpData.user, 
+              session: null,
+              needs_confirmation: true,
+              invitation_result: inviteData,
+              temp_password: tempPassword
+            }, 
+            error: 'Account created but email confirmation required' 
+          };
+        } catch (inviteError) {
+          return { 
+            data: { 
+              user: signUpData.user, 
+              session: null,
+              needs_confirmation: true,
+              temp_password: tempPassword
+            }, 
+            error: 'Account created but email confirmation required' 
+          };
+        }
+      }
+
+      // If sign-in was successful, complete the invitation
+      if (signInData.session) {
+        console.log('User signed in successfully, processing invitation...');
+        
+        const { data: inviteData, error: inviteError } = await supabase.rpc('complete_invitation_after_auth', {
+          invitation_code_param: invitationCode,
+          user_id_param: signInData.user.id
+        });
+
+        if (inviteError) {
+          console.error('Invitation completion error:', inviteError);
+          // User signed in but invitation failed - still a success
+          return { 
+            data: { 
+              user: signInData.user, 
+              session: signInData.session,
+              invitation_error: inviteError.message,
+              temp_password: tempPassword
+            }, 
+            error: null 
+          };
+        }
+
+        console.log('Complete auto sign-in successful!');
+        return { 
+          data: { 
+            user: signInData.user, 
+            session: signInData.session,
+            invitation_result: inviteData,
+            temp_password: tempPassword,
+            auto_signed_in: true
+          }, 
+          error: null 
+        };
+      }
+    }
+
+    return { data: null, error: 'Failed to create user account' };
+  } catch (error: any) {
+    console.error('Auto sign-up error:', error);
+    return { data: null, error: error.message || 'Failed to auto sign-up' };
+  }
+}
+
+// Complete invitation after manual authentication
+export const completeInvitationAfterAuth = async (invitationCode: string) => {
+  try {
+    const { user } = await getUser();
+    
+    if (!user) {
+      return { data: null, error: 'User not authenticated' };
+    }
+
+    const { data, error } = await supabase.rpc('complete_invitation_after_auth', {
+      invitation_code_param: invitationCode,
+      user_id_param: user.id
+    });
+
+    if (error) {
+      console.error('Error completing invitation:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data, error: null };
+  } catch (error: any) {
+    console.error('Error in completeInvitationAfterAuth:', error);
+    return { data: null, error: error.message || 'Failed to complete invitation' };
+  }
+}
+
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut()
   return { error }
@@ -102,15 +245,19 @@ export const getUserProfile = async () => {
 
 // QR Code invitation functions
 export const acceptProductInvitation = async (
-  invitationCode: string
+  invitationCode: string,
+  userEmail?: string,
+  userName?: string
 ) => {
   try {
     const { user } = await getUser()
     
-    // Call Supabase function to accept/validate invitation
-    const { data, error } = await supabase.rpc('accept_product_invitation', {
+    // Call enhanced Supabase function that supports auto sign-up
+    const { data, error } = await supabase.rpc('accept_product_invitation_with_signup', {
       invitation_code_param: invitationCode,
-      user_email_param: user?.email || ''
+      user_email_param: userEmail || user?.email || '',
+      user_name_param: userName || null,
+      auto_create_user: true
     })
 
     if (error) {
@@ -144,32 +291,23 @@ export const validateInvitationCode = async (invitationCode: string) => {
   }
 }
 
-// Handle guard invitations (existing system)
-export const acceptGuardInvitation = async (invitationCode: string) => {
+// Handle guard invitations with automatic sign-up
+export const acceptGuardInvitation = async (invitationCode: string, userEmail?: string, userName?: string) => {
   try {
-    // Check if guard invitation exists and is valid
-    const { data: invitation, error: fetchError } = await supabase
-      .from('security_guard_invitations')
-      .select('*')
-      .eq('invitation_code', invitationCode)
-      .eq('status', 'pending')
-      .single();
+    // Use the enhanced function that supports auto sign-up
+    const { data, error } = await supabase.rpc('accept_product_invitation_with_signup', {
+      invitation_code_param: invitationCode,
+      user_email_param: userEmail || '',
+      user_name_param: userName || null,
+      auto_create_user: true
+    });
 
-    if (fetchError || !invitation) {
-      return { data: null, error: 'Invalid or expired guard invitation' };
+    if (error) {
+      console.error('Error processing guard invitation:', error);
+      return { data: null, error: error.message || 'Failed to process guard invitation' };
     }
 
-    // For now, just validate - actual acceptance happens after authentication
-    return { 
-      data: { 
-        success: true, 
-        requires_signup: true,
-        products: ['guard-management'],
-        message: 'Valid guard invitation. Please sign up to join.',
-        organization_id: invitation.organization_id
-      }, 
-      error: null 
-    };
+    return { data, error: null };
   } catch (error) {
     console.error('Error in acceptGuardInvitation:', error);
     return { data: null, error: 'Failed to process guard invitation' };

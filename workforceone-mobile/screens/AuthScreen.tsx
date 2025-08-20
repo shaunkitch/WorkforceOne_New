@@ -48,26 +48,30 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
       } else {
         // Check if there's a pending invitation to process
         if (global.pendingInvitationCode) {
-          if (global.pendingInvitationType === 'guard') {
-            // Handle guard invitation acceptance after authentication
-            Alert.alert(
-              'Welcome to Guard Management!', 
-              `Successfully joined as a security guard. You now have access to Guard Management features.`, 
-              [{ text: 'Continue', onPress: onAuthSuccess }]
-            );
-          } else {
-            // Handle regular product invitation
-            const { acceptProductInvitation } = await import('../lib/supabase');
-            const { data: result, error: inviteError } = await acceptProductInvitation(global.pendingInvitationCode);
+          try {
+            // Process the pending invitation using the complete function
+            const { completeInvitationAfterAuth } = await import('../lib/supabase');
+            const { data: result, error: inviteError } = await completeInvitationAfterAuth(global.pendingInvitationCode);
             
             if (!inviteError && result?.success) {
+              const inviteType = global.pendingInvitationType === 'guard' ? 'Guard Management' : 'WorkforceOne';
               Alert.alert(
-                'Welcome to WorkforceOne!', 
-                `Successfully joined and got access to: ${result.products.join(', ')}`, 
-                [{ text: 'Continue', onPress: onAuthSuccess }]
+                '✅ Welcome!', 
+                `Successfully joined ${inviteType}! Access granted to: ${result.products.join(', ')}`, 
+                [{ text: 'Continue', onPress: onAuthSuccess }],
+                { cancelable: false }
               );
+            } else {
+              // Even if invitation processing failed, continue to dashboard
+              console.error('Pending invitation processing failed:', inviteError);
+              onAuthSuccess();
             }
+          } catch (error) {
+            console.error('Error processing pending invitation:', error);
+            // Continue to dashboard even if invitation processing fails
+            onAuthSuccess();
           }
+          
           // Clear the pending invitation
           global.pendingInvitationCode = undefined;
           global.pendingInvitationType = undefined;
@@ -122,16 +126,94 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
             
             let result, error;
             
+            // Extract user info from QR data for auto sign-up
+            const userEmail = qrData.originalData?.email || 
+                             qrData.originalData?.contact?.email || 
+                             null;
+            const userName = qrData.originalData?.name || 
+                            qrData.originalData?.contact?.name || 
+                            'New User';
+            
             if (qrData.guardInvite) {
-              // Handle guard invitation
+              // Handle guard invitation with auto sign-up
+              if (userEmail) {
+                try {
+                  // Attempt actual automatic sign-up with Supabase Auth
+                  console.log('Attempting auto sign-up for guard invitation...');
+                  const { autoSignUpWithInvitation } = await import('../lib/supabase');
+                  const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, userEmail, userName);
+                  
+                  if (!authResponse.error && authResponse.data?.auto_signed_in) {
+                    // User was actually created and automatically signed in
+                    console.log('Auto sign-in successful for guard invitation, navigating to dashboard...');
+                    Alert.alert(
+                      '✅ Welcome!', 
+                      `Account created and signed in successfully! Welcome ${userName}!`,
+                      [{ text: 'Enter App', onPress: onAuthSuccess }],
+                      { cancelable: false }
+                    );
+                    return;
+                  } else if (authResponse.data?.needs_confirmation) {
+                    // Account created but needs email confirmation
+                    console.log('Account created but needs email confirmation');
+                    Alert.alert(
+                      '📧 Check Your Email', 
+                      `Account created for ${userEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
+                      [{ text: 'OK' }]
+                    );
+                    return;
+                  } else {
+                    console.log('Auto sign-up failed, will try validation only:', authResponse.error);
+                  }
+                } catch (autoError) {
+                  console.log('Auto sign-up exception, will try validation only:', autoError);
+                }
+              }
+              
+              // Fallback: Just validate invitation and show manual signup
               const { acceptGuardInvitation } = await import('../lib/supabase');
-              const response = await acceptGuardInvitation(qrData.invitationCode);
+              const response = await acceptGuardInvitation(qrData.invitationCode, userEmail, userName);
               result = response.data;
               error = response.error;
             } else {
-              // Handle regular product invitation
-              const { acceptProductInvitation, validateInvitationCode } = await import('../lib/supabase');
-              const response = await acceptProductInvitation(qrData.invitationCode);
+              // Handle regular product invitation with auto sign-up
+              if (userEmail) {
+                try {
+                  // Attempt actual automatic sign-up with Supabase Auth
+                  console.log('Attempting auto sign-up for product invitation...');
+                  const { autoSignUpWithInvitation } = await import('../lib/supabase');
+                  const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, userEmail, userName);
+                  
+                  if (!authResponse.error && authResponse.data?.auto_signed_in) {
+                    // User was actually created and automatically signed in
+                    console.log('Auto sign-in successful for product invitation, navigating to dashboard...');
+                    Alert.alert(
+                      '✅ Welcome!', 
+                      `Account created and signed in successfully! Welcome ${userName}!`,
+                      [{ text: 'Enter App', onPress: onAuthSuccess }],
+                      { cancelable: false }
+                    );
+                    return;
+                  } else if (authResponse.data?.needs_confirmation) {
+                    // Account created but needs email confirmation
+                    console.log('Account created but needs email confirmation');
+                    Alert.alert(
+                      '📧 Check Your Email', 
+                      `Account created for ${userEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
+                      [{ text: 'OK' }]
+                    );
+                    return;
+                  } else {
+                    console.log('Auto sign-up failed, will try validation only:', authResponse.error);
+                  }
+                } catch (autoError) {
+                  console.log('Auto sign-up exception, will try validation only:', autoError);
+                }
+              }
+              
+              // Fallback: Just validate invitation and show manual signup
+              const { acceptProductInvitation } = await import('../lib/supabase');
+              const response = await acceptProductInvitation(qrData.invitationCode, userEmail, userName);
               result = response.data;
               error = response.error;
             }
@@ -142,7 +224,7 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
               console.error('Invitation error:', error);
               Alert.alert('Invitation Error', error);
             } else if (result?.success) {
-              if (result.requires_signup) {
+              if (result.requires_signup || result.auto_signup) {
                 const inviteType = qrData.guardInvite ? 'Guard Management' : 'WorkforceOne';
                 Alert.alert(
                   `🎉 ${inviteType} Invitation!`, 
@@ -153,10 +235,13 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
                 global.pendingInvitationCode = qrData.invitationCode;
                 global.pendingInvitationType = qrData.guardInvite ? 'guard' : 'product';
               } else {
+                // User is already authenticated and invitation processed successfully
+                console.log('Invitation processed successfully, navigating to dashboard...');
                 Alert.alert(
-                  'Welcome to WorkforceOne!', 
-                  `Successfully joined ${qrData.organizationName || 'organization'}.\n\nAccess granted to: ${qrData.products.join(', ')}`, 
-                  [{ text: 'Continue', onPress: onAuthSuccess }]
+                  '✅ Access Granted!', 
+                  `Welcome! You now have access to: ${qrData.products.join(', ')}`,
+                  [{ text: 'Continue', onPress: onAuthSuccess }],
+                  { cancelable: false }
                 );
               }
             } else {
