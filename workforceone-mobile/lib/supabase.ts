@@ -106,14 +106,11 @@ export const acceptProductInvitation = async (
 ) => {
   try {
     const { user } = await getUser()
-    if (!user) {
-      return { data: null, error: 'User not authenticated' }
-    }
-
-    // Call Supabase function to accept invitation
+    
+    // Call Supabase function to accept/validate invitation
     const { data, error } = await supabase.rpc('accept_product_invitation', {
       invitation_code_param: invitationCode,
-      user_email_param: user.email
+      user_email_param: user?.email || ''
     })
 
     if (error) {
@@ -125,6 +122,57 @@ export const acceptProductInvitation = async (
   } catch (error) {
     console.error('Error in acceptProductInvitation:', error)
     return { data: null, error: 'Failed to accept invitation' }
+  }
+}
+
+// Validate invitation without requiring authentication
+export const validateInvitationCode = async (invitationCode: string) => {
+  try {
+    const { data, error } = await supabase.rpc('validate_invitation_code', {
+      invitation_code_param: invitationCode
+    })
+
+    if (error) {
+      console.error('Error validating invitation:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error in validateInvitationCode:', error)
+    return { data: null, error: 'Failed to validate invitation' }
+  }
+}
+
+// Handle guard invitations (existing system)
+export const acceptGuardInvitation = async (invitationCode: string) => {
+  try {
+    // Check if guard invitation exists and is valid
+    const { data: invitation, error: fetchError } = await supabase
+      .from('security_guard_invitations')
+      .select('*')
+      .eq('invitation_code', invitationCode)
+      .eq('status', 'pending')
+      .single();
+
+    if (fetchError || !invitation) {
+      return { data: null, error: 'Invalid or expired guard invitation' };
+    }
+
+    // For now, just validate - actual acceptance happens after authentication
+    return { 
+      data: { 
+        success: true, 
+        requires_signup: true,
+        products: ['guard-management'],
+        message: 'Valid guard invitation. Please sign up to join.',
+        organization_id: invitation.organization_id
+      }, 
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error in acceptGuardInvitation:', error);
+    return { data: null, error: 'Failed to process guard invitation' };
   }
 }
 

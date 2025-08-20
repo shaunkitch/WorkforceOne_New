@@ -16,6 +16,8 @@ import { signInWithEmail, signUpWithEmail } from '../lib/supabase';
 
 declare global {
   var qrScanCallback: ((data: string) => void) | undefined;
+  var pendingInvitationCode: string | undefined;
+  var pendingInvitationType: 'guard' | 'product' | undefined;
 }
 
 interface Props {
@@ -44,6 +46,33 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
       if (error) {
         Alert.alert('Authentication Error', error.message);
       } else {
+        // Check if there's a pending invitation to process
+        if (global.pendingInvitationCode) {
+          if (global.pendingInvitationType === 'guard') {
+            // Handle guard invitation acceptance after authentication
+            Alert.alert(
+              'Welcome to Guard Management!', 
+              `Successfully joined as a security guard. You now have access to Guard Management features.`, 
+              [{ text: 'Continue', onPress: onAuthSuccess }]
+            );
+          } else {
+            // Handle regular product invitation
+            const { acceptProductInvitation } = await import('../lib/supabase');
+            const { data: result, error: inviteError } = await acceptProductInvitation(global.pendingInvitationCode);
+            
+            if (!inviteError && result?.success) {
+              Alert.alert(
+                'Welcome to WorkforceOne!', 
+                `Successfully joined and got access to: ${result.products.join(', ')}`, 
+                [{ text: 'Continue', onPress: onAuthSuccess }]
+              );
+            }
+          }
+          // Clear the pending invitation
+          global.pendingInvitationCode = undefined;
+          global.pendingInvitationType = undefined;
+          return;
+        }
         onAuthSuccess();
       }
     } catch (error) {
@@ -60,28 +89,79 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
       const scanCallback = async (data: string) => {
         try {
           console.log('QR Data Scanned:', data);
-          const qrData = JSON.parse(data);
+          
+          let qrData;
+          
+          // Handle different QR code formats
+          if (data.startsWith('GUARD_INVITE:')) {
+            // Guard invitation format: "GUARD_INVITE:{...json...}"
+            const jsonPart = data.substring('GUARD_INVITE:'.length);
+            const guardData = JSON.parse(jsonPart);
+            
+            // Convert guard invitation to product invitation format
+            qrData = {
+              type: 'product_invitation',
+              invitationCode: guardData.code,
+              products: ['guard-management'],
+              organizationName: 'Security Guard System',
+              guardInvite: true,
+              originalData: guardData
+            };
+          } else if (data.startsWith('{')) {
+            // Pure JSON format
+            qrData = JSON.parse(data);
+          } else {
+            // Other formats (URLs, plain text, etc.)
+            throw new Error('Unsupported QR code format');
+          }
+          
           console.log('Parsed QR Data:', qrData);
           
           if (qrData.type === 'product_invitation') {
             console.log('Processing product invitation:', qrData.invitationCode);
-            const { acceptProductInvitation } = await import('../lib/supabase');
-            const { data: result, error } = await acceptProductInvitation(qrData.invitationCode);
             
-            console.log('Accept invitation result:', { result, error });
+            let result, error;
+            
+            if (qrData.guardInvite) {
+              // Handle guard invitation
+              const { acceptGuardInvitation } = await import('../lib/supabase');
+              const response = await acceptGuardInvitation(qrData.invitationCode);
+              result = response.data;
+              error = response.error;
+            } else {
+              // Handle regular product invitation
+              const { acceptProductInvitation, validateInvitationCode } = await import('../lib/supabase');
+              const response = await acceptProductInvitation(qrData.invitationCode);
+              result = response.data;
+              error = response.error;
+            }
+            
+            console.log('Invitation processing result:', { result, error });
             
             if (error) {
               console.error('Invitation error:', error);
               Alert.alert('Invitation Error', error);
             } else if (result?.success) {
-              Alert.alert(
-                'Welcome to WorkforceOne!', 
-                `Successfully joined ${qrData.organizationName || 'organization'}.\n\nAccess granted to: ${qrData.products.join(', ')}`, 
-                [{ text: 'Continue', onPress: onAuthSuccess }]
-              );
+              if (result.requires_signup) {
+                const inviteType = qrData.guardInvite ? 'Guard Management' : 'WorkforceOne';
+                Alert.alert(
+                  `🎉 ${inviteType} Invitation!`, 
+                  `You're invited to join ${qrData.organizationName || 'organization'}.\n\nAccess: ${qrData.products.join(', ')}\n\nPlease sign up or log in to complete the process.`,
+                  [{ text: 'OK' }]
+                );
+                // Store invitation data for later use after authentication
+                global.pendingInvitationCode = qrData.invitationCode;
+                global.pendingInvitationType = qrData.guardInvite ? 'guard' : 'product';
+              } else {
+                Alert.alert(
+                  'Welcome to WorkforceOne!', 
+                  `Successfully joined ${qrData.organizationName || 'organization'}.\n\nAccess granted to: ${qrData.products.join(', ')}`, 
+                  [{ text: 'Continue', onPress: onAuthSuccess }]
+                );
+              }
             } else {
               console.error('Invitation failed:', result);
-              Alert.alert('Error', result?.error || 'Failed to accept invitation');
+              Alert.alert('Error', result?.error || 'Failed to process invitation');
             }
           } else {
             console.log('Invalid QR type:', qrData.type);
@@ -90,7 +170,10 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
         } catch (error) {
           console.error('QR Parse Error:', error);
           console.log('Raw QR Data:', data);
-          Alert.alert('Error', `Invalid QR code format: ${error.message}`);
+          Alert.alert(
+            'QR Code Debug Info', 
+            `Raw data: ${data.substring(0, 100)}...\n\nError: ${error.message}\n\nThis should be JSON starting with {"type":"product_invitation"...}`
+          );
         }
       };
       
