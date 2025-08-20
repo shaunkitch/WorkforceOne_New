@@ -146,12 +146,8 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
                   if (!authResponse.error && authResponse.data?.auto_signed_in) {
                     // User was actually created and automatically signed in
                     console.log('Auto sign-in successful for guard invitation, navigating to dashboard...');
-                    Alert.alert(
-                      '✅ Welcome!', 
-                      `Account created and signed in successfully! Welcome ${userName}!`,
-                      [{ text: 'Enter App', onPress: onAuthSuccess }],
-                      { cancelable: false }
-                    );
+                    // Navigate directly to Dashboard without any popup
+                    onAuthSuccess();
                     return;
                   } else if (authResponse.data?.needs_confirmation) {
                     // Account created but needs email confirmation
@@ -187,12 +183,8 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
                   if (!authResponse.error && authResponse.data?.auto_signed_in) {
                     // User was actually created and automatically signed in
                     console.log('Auto sign-in successful for product invitation, navigating to dashboard...');
-                    Alert.alert(
-                      '✅ Welcome!', 
-                      `Account created and signed in successfully! Welcome ${userName}!`,
-                      [{ text: 'Enter App', onPress: onAuthSuccess }],
-                      { cancelable: false }
-                    );
+                    // Navigate directly to Dashboard without any popup
+                    onAuthSuccess();
                     return;
                   } else if (authResponse.data?.needs_confirmation) {
                     // Account created but needs email confirmation
@@ -237,12 +229,8 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
               } else {
                 // User is already authenticated and invitation processed successfully
                 console.log('Invitation processed successfully, navigating to dashboard...');
-                Alert.alert(
-                  '✅ Access Granted!', 
-                  `Welcome! You now have access to: ${qrData.products.join(', ')}`,
-                  [{ text: 'Continue', onPress: onAuthSuccess }],
-                  { cancelable: false }
-                );
+                // Navigate directly to Dashboard without any popup
+                onAuthSuccess();
               }
             } else {
               console.error('Invitation failed:', result);
