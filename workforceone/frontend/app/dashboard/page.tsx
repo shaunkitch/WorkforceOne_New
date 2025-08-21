@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProductAccess } from '@/hooks/useProductAccess'
+import UnifiedOverview from './UnifiedOverview'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -125,7 +126,12 @@ export default function DashboardPage() {
     )
   }
 
-  // Show product selection interface for multiple products with no primary
+  // For multiple products, show the unified overview dashboard
+  if (products.length > 1) {
+    return <UnifiedOverview />
+  }
+
+  // Show product selection interface for users with products but no primary set
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
