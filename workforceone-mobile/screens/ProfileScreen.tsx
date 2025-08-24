@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { getUserProfile, signOut } from '../lib/supabase';
 import { getAvailableProducts } from '../lib/products';
 
@@ -19,6 +20,7 @@ interface Props {
 export default function ProfileScreen({ onSignOut }: Props) {
   const [profile, setProfile] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const navigation = useNavigation() as any;
 
   useEffect(() => {
     loadProfile();
@@ -60,6 +62,14 @@ export default function ProfileScreen({ onSignOut }: Props) {
     );
   };
 
+  const handleMenuItemPress = (item: any) => {
+    if (item.action === 'syncDebug') {
+      navigation.navigate('SyncDebug');
+    } else {
+      Alert.alert(item.title, item.subtitle);
+    }
+  };
+
   const profileSections = [
     {
       title: 'Account',
@@ -74,7 +84,6 @@ export default function ProfileScreen({ onSignOut }: Props) {
       items: [
         { icon: '💳', title: 'Billing', subtitle: 'Manage subscriptions' },
         { icon: '📱', title: 'Mobile Settings', subtitle: 'App preferences' },
-        { icon: '🔄', title: 'Sync', subtitle: 'Data synchronization' },
       ]
     },
     {
@@ -84,17 +93,24 @@ export default function ProfileScreen({ onSignOut }: Props) {
         { icon: '📞', title: 'Contact Us', subtitle: 'Reach our support team' },
         { icon: '⭐', title: 'Rate App', subtitle: 'Share your feedback' },
       ]
+    },
+    {
+      title: 'Debug & Sync',
+      items: [
+        { icon: '🔧', title: 'Sync Status', subtitle: 'Monitor data synchronization', action: 'syncDebug' },
+        { icon: '📊', title: 'Debug Logs', subtitle: 'View technical debug information', action: 'syncDebug' },
+      ]
     }
   ];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <LinearGradient
           colors={['#4f46e5', '#7c3aed', '#ec4899']}
           style={styles.header}
         >
-          <SafeAreaView style={styles.headerContent}>
+          <View style={styles.headerContent}>
             <View style={styles.avatarContainer}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>
@@ -120,7 +136,7 @@ export default function ProfileScreen({ onSignOut }: Props) {
                 </View>
               ))}
             </View>
-          </SafeAreaView>
+          </View>
         </LinearGradient>
 
         <View style={styles.content}>
@@ -149,7 +165,7 @@ export default function ProfileScreen({ onSignOut }: Props) {
                   <TouchableOpacity
                     key={itemIndex}
                     style={styles.menuItem}
-                    onPress={() => Alert.alert(item.title, item.subtitle)}
+                    onPress={() => handleMenuItemPress(item)}
                   >
                     <View style={styles.menuItemLeft}>
                       <View style={styles.menuItemIcon}>
@@ -181,7 +197,7 @@ export default function ProfileScreen({ onSignOut }: Props) {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

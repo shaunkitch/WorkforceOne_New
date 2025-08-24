@@ -5,12 +5,14 @@ import LoadingScreen from '../screens/LoadingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import DashboardNavigator from './DashboardNavigator';
 import QRScannerScreen from '../screens/QRScannerScreen';
+import SyncDebugScreen from '../screens/SyncDebugScreen';
 
 export type RootStackParamList = {
   Loading: undefined;
   Auth: undefined;
   Dashboard: undefined;
   QRScanner?: { onScan: (data: string) => void };
+  SyncDebug: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -28,10 +30,13 @@ export default function MainNavigator() {
     try {
       const { user } = await getUser();
       if (user) {
+        console.log('User authenticated:', user.email);
         const products = await getUserProducts();
+        console.log('User products loaded:', products);
         setUserProducts(products);
         setIsAuthenticated(true);
       } else {
+        console.log('No user found');
         setIsAuthenticated(false);
       }
     } catch (error) {
@@ -77,10 +82,17 @@ export default function MainNavigator() {
             component={QRScannerScreen}
             options={{
               presentation: 'modal',
+              headerShown: false
+            }}
+          />
+          <Stack.Screen 
+            name="SyncDebug" 
+            component={SyncDebugScreen}
+            options={{
+              presentation: 'modal',
               headerShown: true,
-              headerTitle: 'Scan QR Code',
-              headerStyle: { backgroundColor: '#000' },
-              headerTintColor: '#fff'
+              headerTitle: 'Sync Debug',
+              headerBackTitle: 'Back'
             }}
           />
         </>
@@ -96,10 +108,7 @@ export default function MainNavigator() {
             component={QRScannerScreen}
             options={{
               presentation: 'modal',
-              headerShown: true,
-              headerTitle: 'Scan QR Code',
-              headerStyle: { backgroundColor: '#000' },
-              headerTintColor: '#fff'
+              headerShown: false
             }}
           />
         </>

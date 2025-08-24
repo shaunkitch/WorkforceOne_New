@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import QRCode from 'qrcode'
+import { createClient } from '@/lib/supabase/client'
+import { getCurrentUserProfile, hasWebPortalAccess } from '@/lib/rbac'
 import { 
   UserPlus, QrCode, Mail, Copy, RefreshCw, Eye, EyeOff,
   CheckCircle, AlertTriangle, Timer, MapPin, Shield,
@@ -39,6 +41,8 @@ export default function GuardInvitationsPage() {
   const [showQRModal, setShowQRModal] = useState(false)
   const [qrCodeUrl, setQRCodeUrl] = useState('')
   const [loading, setLoading] = useState(false)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [hasCreateAccess, setHasCreateAccess] = useState(false)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -52,41 +56,125 @@ export default function GuardInvitationsPage() {
   })
   
   const qrRef = useRef<HTMLCanvasElement>(null)
+  const supabase = createClient()
   
-  // Mock data for demonstration
+  // Load real data from database
   useEffect(() => {
-    const mockInvitations: GuardInvitation[] = [
-      {
-        id: 'INV-001',
-        guardName: 'John Martinez',
-        email: 'john.martinez@email.com',
-        phoneNumber: '+1 (555) 123-4567',
-        invitationType: 'qr',
-        status: 'pending',
-        createdAt: '2025-01-20T10:30:00Z',
-        expiresAt: '2025-01-27T10:30:00Z',
-        qrCodeData: 'GUARD_INVITE:{"id":"INV-001","code":"GRD-ABC123","expires":"2025-01-27T10:30:00Z"}',
-        assignedSite: 'Downtown Financial Plaza',
-        accessLevel: 'basic',
-        inviteCode: 'GRD-ABC123'
-      },
-      {
-        id: 'INV-002',
-        guardName: 'Sarah Chen',
-        email: 'sarah.chen@security.com',
-        phoneNumber: '+1 (555) 234-5678',
-        invitationType: 'both',
-        status: 'accepted',
-        createdAt: '2025-01-19T14:15:00Z',
-        expiresAt: '2025-01-26T14:15:00Z',
-        qrCodeData: 'GUARD_INVITE:{"id":"INV-002","code":"GRD-XYZ789","expires":"2025-01-26T14:15:00Z"}',
-        assignedSite: 'Tech Campus North',
-        accessLevel: 'supervisor',
-        inviteCode: 'GRD-XYZ789'
-      }
-    ]
-    setInvitations(mockInvitations)
+    loadInvitations()
+    checkUserPermissions()
   }, [])
+
+  const checkUserPermissions = async () => {
+    try {
+      const profile = await getCurrentUserProfile()
+      setUserProfile(profile)
+      
+      if (profile) {
+        const canCreate = hasWebPortalAccess(profile, 'userManagement')
+        setHasCreateAccess(canCreate)
+      }
+    } catch (error) {
+      console.error('Error checking permissions:', error)
+    }
+  }
+
+  const loadInvitations = async () => {
+    try {
+      setLoading(true)
+      console.log('🔄 Loading invitations from database...')
+
+      // First try to get from security_guard_invitations table
+      const { data: guardInvitations, error: guardError } = await supabase
+        .from('security_guard_invitations')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (guardError) {
+        console.error('Guard invitations error:', guardError)
+      }
+
+      // Also try to get from general product_invitations table
+      const { data: productInvitations, error: productError } = await supabase
+        .from('product_invitations')
+        .select('*')
+        .in('products', ['guard-management'])
+        .order('created_at', { ascending: false })
+
+      if (productError) {
+        console.error('Product invitations error:', productError)
+      }
+
+      // Transform database data to UI format
+      const transformedInvitations: GuardInvitation[] = []
+
+      // Process guard invitations
+      if (guardInvitations && guardInvitations.length > 0) {
+        guardInvitations.forEach(inv => {
+          transformedInvitations.push({
+            id: inv.id,
+            guardName: inv.guard_name || inv.email?.split('@')[0] || 'Unknown',
+            email: inv.email || '',
+            phoneNumber: inv.phone_number || '',
+            invitationType: 'qr' as const,
+            status: inv.status || 'pending',
+            createdAt: inv.created_at || new Date().toISOString(),
+            expiresAt: inv.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            qrCodeData: inv.qr_code_data || `GUARD_INVITE:{"code":"${inv.invitation_code}"}`,
+            assignedSite: inv.assigned_site || 'No site assigned',
+            accessLevel: inv.access_level || 'basic',
+            inviteCode: inv.invitation_code || inv.id
+          })
+        })
+      }
+
+      // Process product invitations
+      if (productInvitations && productInvitations.length > 0) {
+        productInvitations.forEach(inv => {
+          transformedInvitations.push({
+            id: inv.id,
+            guardName: inv.invited_name || inv.invited_email?.split('@')[0] || 'Unknown',
+            email: inv.invited_email || '',
+            phoneNumber: '',
+            invitationType: 'qr' as const,
+            status: inv.status || 'pending',
+            createdAt: inv.created_at || new Date().toISOString(),
+            expiresAt: inv.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            qrCodeData: `GUARD_INVITE:{"code":"${inv.invitation_code}","products":${JSON.stringify(inv.products)}}`,
+            assignedSite: 'Multiple sites',
+            accessLevel: 'basic',
+            inviteCode: inv.invitation_code
+          })
+        })
+      }
+
+      console.log(`✅ Loaded ${transformedInvitations.length} invitations from database`)
+      setInvitations(transformedInvitations)
+
+      // If no invitations found, show some sample data
+      if (transformedInvitations.length === 0) {
+        console.log('No invitations found, showing sample data for demo')
+        setInvitations([{
+          id: 'DEMO-001',
+          guardName: 'Demo Guard',
+          email: 'demo@example.com',
+          phoneNumber: '+1 (555) 000-0000',
+          invitationType: 'qr',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          qrCodeData: 'GUARD_INVITE:{"code":"DEMO-123","type":"demo"}',
+          assignedSite: 'Demo Site',
+          accessLevel: 'basic',
+          inviteCode: 'DEMO-123'
+        }])
+      }
+
+    } catch (error) {
+      console.error('❌ Error loading invitations:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const generateQRCode = async (inviteData: string) => {
     try {
@@ -110,6 +198,12 @@ export default function GuardInvitationsPage() {
     setLoading(true)
     
     try {
+      // Check permissions
+      if (!hasCreateAccess) {
+        console.error('User does not have permission to create invitations')
+        return
+      }
+
       // Generate unique invitation code
       const inviteCode = `GRD-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
       const expiresAt = new Date()
@@ -125,15 +219,46 @@ export default function GuardInvitationsPage() {
         expires: expiresAt.toISOString(),
         type: 'guard_invitation'
       })}`
+
+      console.log('🔄 Creating invitation in database...')
       
+      // Save to database - use security_guard_invitations table with correct schema
+      const { data: dbInvitation, error: dbError } = await supabase
+        .from('security_guard_invitations')
+        .insert({
+          invitation_code: inviteCode,
+          email: formData.email || `${inviteCode.toLowerCase()}@auto-invite.temp`, // Use auto-generated email if none provided
+          status: 'pending',
+          expires_at: expiresAt.toISOString(),
+          metadata: {
+            guard_name: formData.guardName,
+            guard_phone: formData.phoneNumber,
+            assigned_site: formData.assignedSite,
+            access_level: formData.accessLevel,
+            invitation_type: formData.invitationType,
+            custom_message: formData.customMessage,
+            qr_code_data: qrData
+          }
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('Database error:', dbError)
+        throw new Error('Failed to create invitation in database')
+      }
+
+      console.log('✅ Invitation created in database:', dbInvitation)
+      
+      // Create UI representation
       const newInvitation: GuardInvitation = {
-        id: `INV-${Date.now()}`,
+        id: dbInvitation.id,
         guardName: formData.guardName,
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         invitationType: formData.invitationType as 'qr' | 'email' | 'both',
         status: 'pending',
-        createdAt: new Date().toISOString(),
+        createdAt: dbInvitation.created_at,
         expiresAt: expiresAt.toISOString(),
         qrCodeData: qrData,
         assignedSite: formData.assignedSite,
@@ -141,7 +266,7 @@ export default function GuardInvitationsPage() {
         inviteCode
       }
       
-      // In real implementation, this would be saved to database
+      // Update UI state
       setInvitations([newInvitation, ...invitations])
       
       // Reset form
@@ -164,7 +289,8 @@ export default function GuardInvitationsPage() {
       }
       
     } catch (error) {
-      console.error('Error creating invitation:', error)
+      console.error('❌ Error creating invitation:', error)
+      // In real implementation, show user-friendly error message
     } finally {
       setLoading(false)
     }
@@ -221,13 +347,15 @@ export default function GuardInvitationsPage() {
             </h1>
             <p className="text-gray-600 mt-2">Invite new guards using QR codes or traditional methods</p>
           </div>
-          <Button 
-            onClick={() => setShowCreateForm(true)}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Invite Guard
-          </Button>
+          {hasCreateAccess && (
+            <Button 
+              onClick={() => setShowCreateForm(true)}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Invite Guard
+            </Button>
+          )}
         </div>
 
         {/* Stats Cards */}

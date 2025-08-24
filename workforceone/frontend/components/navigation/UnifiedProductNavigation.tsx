@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { getCurrentUserProfile, hasWebPortalAccess, hasProductAccess, getIncidentsAccess, getGuardsAccess, UserProfile } from '@/lib/rbac'
 
 interface MenuItem {
   name: string
@@ -31,69 +33,258 @@ interface ProductSection {
 
 export function UnifiedProductNavigation() {
   const pathname = usePathname()
-  
-  const products: ProductSection[] = [
-    {
-      id: 'guard',
-      title: '🛡️ Guard Management',
-      icon: Shield,
-      color: 'purple',
-      description: 'Security workforce management',
-      items: [
-        { name: 'Guard Dashboard', href: '/dashboard/guard', icon: Home },
-        { name: 'All Guards', href: '/dashboard/guards', icon: Users, badge: 'Real Data', badgeColor: 'green' },
-        { name: 'Onboard Guard', href: '/dashboard/guards/onboard', icon: UserPlus },
-        { name: 'QR Invitations', href: '/dashboard/invitations', icon: QrCode, badge: 'Working', badgeColor: 'blue' },
-        { name: 'Live Map', href: '/dashboard/security/map', icon: MapPin, badge: 'Live', badgeColor: 'red' },
-        { name: 'Patrol Routes', href: '/dashboard/security/routes', icon: Navigation },
-        { name: 'Incidents', href: '/dashboard/incidents', icon: AlertTriangle },
-        { name: 'Report Incident', href: '/dashboard/incidents/create', icon: FileText },
-        { name: 'Sites', href: '/dashboard/sites', icon: Building },
-        { name: 'Checkpoints', href: '/dashboard/checkpoints', icon: QrCode },
-        { name: 'Operations Center', href: '/dashboard/operations', icon: Radio },
-        { name: 'Live Monitoring', href: '/dashboard/monitoring', icon: Eye }
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const profile = await getCurrentUserProfile()
+        setUserProfile(profile)
+      } catch (error) {
+        console.error('Error loading user profile for navigation:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadUserProfile()
+  }, [])
+
+  // If loading or no profile, show minimal navigation
+  if (loading || !userProfile) {
+    return (
+      <nav className="w-72 bg-white border-r border-gray-200 h-screen overflow-y-auto">
+        <div className="p-4">
+          <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+            <Package className="h-6 w-6 text-purple-600" />
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">WorkforceOne</h1>
+              <p className="text-xs text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </nav>
+    )
+  }
+
+  // Filter navigation based on role and permissions
+  const getFilteredProducts = (): ProductSection[] => {
+    const products: ProductSection[] = []
+
+    // Guard Management - Only if user has access to guard-management product
+    if (hasProductAccess(userProfile, 'guard-management')) {
+      const guardItems: MenuItem[] = [
+        { name: 'Guard Dashboard', href: '/dashboard/guard', icon: Home }
       ]
-    },
-    {
-      id: 'remote',
-      title: '🌍 Remote Workforce',
-      icon: Globe,
-      color: 'blue',
-      description: 'Remote team management',
-      items: [
-        { name: 'Remote Dashboard', href: '/dashboard/remote', icon: Home },
-        { name: 'Teams', href: '/dashboard/teams', icon: Users },
-        { name: 'Projects', href: '/dashboard/projects', icon: Briefcase },
-        { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare },
-        { name: 'Daily Calls', href: '/dashboard/daily-calls', icon: Video },
+
+      // Add management items based on guards access level
+      const guardsAccess = getGuardsAccess(userProfile)
+      if (guardsAccess === 'manage') {
+        guardItems.push(
+          { name: 'All Guards', href: '/dashboard/guards', icon: Users, badge: 'Real Data', badgeColor: 'green' },
+          { name: 'Onboard Guard', href: '/dashboard/guards/onboard', icon: UserPlus },
+          { name: 'QR Invitations', href: '/dashboard/invitations', icon: QrCode, badge: 'Working', badgeColor: 'blue' }
+        )
+      } else if (guardsAccess === 'view') {
+        guardItems.push(
+          { name: 'View Guards', href: '/dashboard/guards', icon: Users }
+        )
+      }
+
+      // Add incident access based on level
+      const incidentsAccess = getIncidentsAccess(userProfile)
+      if (incidentsAccess !== 'none') {
+        guardItems.push(
+          { name: 'Incidents', href: '/dashboard/incidents', icon: AlertTriangle }
+        )
+        if (incidentsAccess === 'all' && hasWebPortalAccess(userProfile, 'userManagement')) {
+          guardItems.push(
+            { name: 'Report Incident', href: '/dashboard/incidents/create', icon: FileText }
+          )
+        }
+      }
+
+      // Add other guard management items for managers and above
+      if (userProfile.permissions.canViewAllData) {
+        guardItems.push(
+          { name: 'Live Map', href: '/dashboard/security/map', icon: MapPin, badge: 'Live', badgeColor: 'red' },
+          { name: 'Patrol Routes', href: '/dashboard/security/routes', icon: Navigation },
+          { name: 'Sites', href: '/dashboard/sites', icon: Building },
+          { name: 'Checkpoints', href: '/dashboard/checkpoints', icon: QrCode }
+        )
+      }
+
+      // Operations center for supervisors and above
+      if (userProfile.role !== 'guard' && userProfile.role !== 'employee') {
+        guardItems.push(
+          { name: 'Operations Center', href: '/dashboard/operations', icon: Radio },
+          { name: 'Live Monitoring', href: '/dashboard/monitoring', icon: Eye }
+        )
+      }
+
+      products.push({
+        id: 'guard',
+        title: '🛡️ Guard Management',
+        icon: Shield,
+        color: 'purple',
+        description: 'Security workforce management',
+        items: guardItems
+      })
+    }
+
+    // Remote Workforce - Only if user has access to workforce-management product
+    if (hasProductAccess(userProfile, 'workforce-management')) {
+      const remoteItems: MenuItem[] = [
+        { name: 'Remote Dashboard', href: '/dashboard/remote', icon: Home }
+      ]
+
+      // Add management items based on permissions
+      if (hasWebPortalAccess(userProfile, 'userManagement')) {
+        remoteItems.push(
+          { name: 'Teams', href: '/dashboard/teams', icon: Users },
+          { name: 'Projects', href: '/dashboard/projects', icon: Briefcase },
+          { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare }
+        )
+      }
+
+      // Add communication tools for supervisors and above
+      if (userProfile.role !== 'employee') {
+        remoteItems.push(
+          { name: 'Daily Calls', href: '/dashboard/daily-calls', icon: Video }
+        )
+      }
+
+      // Forms access
+      remoteItems.push(
         { name: 'Forms', href: '/dashboard/forms', icon: FileText, badge: 'AI', badgeColor: 'purple' },
-        { name: 'Form Builder', href: '/dashboard/forms/builder/new', icon: Settings },
-        { name: 'Submissions', href: '/dashboard/forms/submissions', icon: FileText },
-        { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-        { name: 'Reports', href: '/dashboard/reports', icon: TrendingUp },
+        { name: 'Submissions', href: '/dashboard/forms/submissions', icon: FileText }
+      )
+
+      if (hasWebPortalAccess(userProfile, 'settings')) {
+        remoteItems.push(
+          { name: 'Form Builder', href: '/dashboard/forms/builder/new', icon: Settings }
+        )
+      }
+
+      // Analytics and reports for managers and above
+      if (hasWebPortalAccess(userProfile, 'analytics')) {
+        remoteItems.push(
+          { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 }
+        )
+      }
+
+      if (hasWebPortalAccess(userProfile, 'reports')) {
+        remoteItems.push(
+          { name: 'Reports', href: '/dashboard/reports', icon: TrendingUp }
+        )
+      }
+
+      // Attendance and leave
+      remoteItems.push(
         { name: 'Attendance', href: '/dashboard/attendance', icon: Calendar },
         { name: 'Leave Requests', href: '/dashboard/leave', icon: Clock }
-      ]
-    },
-    {
-      id: 'time',
-      title: '⏰ Time Tracking',
-      icon: Timer,
-      color: 'green',
-      description: 'Time & productivity tracking',
-      items: [
-        { name: 'Time Dashboard', href: '/dashboard/time', icon: Home },
-        { name: 'Time Tracker', href: '/dashboard/time-tracker', icon: Timer },
-        { name: 'Timesheets', href: '/dashboard/time-tracker', icon: FileText },
-        { name: 'Attendance', href: '/dashboard/attendance', icon: Calendar },
-        { name: 'Leave Management', href: '/dashboard/leave', icon: Clock },
-        { name: 'Payroll', href: '/dashboard/payroll', icon: DollarSign },
-        { name: 'Productivity', href: '/dashboard/analytics/predictive', icon: TrendingUp },
-        { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
-        { name: 'Settings', href: '/dashboard/settings', icon: Settings }
-      ]
+      )
+
+      products.push({
+        id: 'remote',
+        title: '🌍 Remote Workforce',
+        icon: Globe,
+        color: 'blue',
+        description: 'Remote team management',
+        items: remoteItems
+      })
     }
-  ]
+
+    // Time Tracking - Only if user has access to time-tracker product
+    if (hasProductAccess(userProfile, 'time-tracker')) {
+      const timeItems: MenuItem[] = [
+        { name: 'Time Dashboard', href: '/dashboard/time', icon: Home },
+        { name: 'Time Tracker', href: '/dashboard/time-tracker', icon: Timer }
+      ]
+
+      // Basic time tracking items for all users with time-tracker access
+      timeItems.push(
+        { name: 'Timesheets', href: '/dashboard/time/timesheets', icon: FileText },
+        { name: 'Attendance', href: '/dashboard/attendance', icon: Calendar },
+        { name: 'Leave Management', href: '/dashboard/leave', icon: Clock }
+      )
+
+      // Management features for supervisors and above
+      if (userProfile.role !== 'employee' && userProfile.role !== 'guard') {
+        timeItems.push(
+          { name: 'Payroll', href: '/dashboard/payroll', icon: DollarSign }
+        )
+      }
+
+      // Advanced analytics for managers and above
+      if (hasWebPortalAccess(userProfile, 'analytics')) {
+        timeItems.push(
+          { name: 'Productivity', href: '/dashboard/analytics/predictive', icon: TrendingUp }
+        )
+      }
+
+      if (hasWebPortalAccess(userProfile, 'reports')) {
+        timeItems.push(
+          { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 }
+        )
+      }
+
+      if (hasWebPortalAccess(userProfile, 'settings')) {
+        timeItems.push(
+          { name: 'Settings', href: '/dashboard/settings', icon: Settings }
+        )
+      }
+
+      products.push({
+        id: 'time',
+        title: '⏰ Time Tracking',
+        icon: Timer,
+        color: 'green',
+        description: 'Time & productivity tracking',
+        items: timeItems
+      })
+    }
+
+    return products
+  }
+
+  const products = getFilteredProducts()
+
+  // Get filtered system links based on role
+  const getSystemLinks = () => {
+    const links = []
+
+    if (hasWebPortalAccess(userProfile, 'settings')) {
+      links.push({
+        name: 'Settings',
+        href: '/dashboard/settings',
+        icon: Settings
+      })
+    }
+
+    if (hasWebPortalAccess(userProfile, 'billing')) {
+      links.push({
+        name: 'Billing',
+        href: '/dashboard/billing',
+        icon: DollarSign
+      })
+    }
+
+    // Developer tools for super admins only
+    if (userProfile.role === 'super_admin') {
+      links.push({
+        name: 'Developer',
+        href: '/dashboard/dev',
+        icon: Settings,
+        badge: 'Dev'
+      })
+    }
+
+    return links
+  }
+
+  const systemLinks = getSystemLinks()
 
   const getColorClasses = (color: string, isActive: boolean) => {
     const colors: Record<string, any> = {
@@ -137,7 +328,9 @@ export function UnifiedProductNavigation() {
             <Package className="h-6 w-6 text-purple-600" />
             <div>
               <h1 className="text-lg font-bold text-gray-900">WorkforceOne</h1>
-              <p className="text-xs text-gray-600">Unified Management Platform</p>
+              <p className="text-xs text-gray-600">
+                {userProfile.role.replace('_', ' ').toUpperCase()} Portal
+              </p>
             </div>
           </div>
         </Link>
@@ -211,36 +404,32 @@ export function UnifiedProductNavigation() {
           )
         })}
         
-        {/* System Links */}
-        <div className="mt-8 pt-4 border-t border-gray-200">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            System
-          </h3>
-          <div className="space-y-0.5">
-            <Link
-              href="/dashboard/settings"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-gray-900"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="text-sm">Settings</span>
-            </Link>
-            <Link
-              href="/dashboard/billing"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-gray-900"
-            >
-              <DollarSign className="h-4 w-4" />
-              <span className="text-sm">Billing</span>
-            </Link>
-            <Link
-              href="/dashboard/dev"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-gray-900"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="text-sm">Developer</span>
-              <Badge className="bg-gray-100 text-gray-600 text-xs">Dev</Badge>
-            </Link>
+        {/* System Links - Only show if user has appropriate permissions */}
+        {systemLinks.length > 0 && (
+          <div className="mt-8 pt-4 border-t border-gray-200">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              System
+            </h3>
+            <div className="space-y-0.5">
+              {systemLinks.map((link) => {
+                const LinkIcon = link.icon
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-gray-900"
+                  >
+                    <LinkIcon className="h-4 w-4" />
+                    <span className="text-sm flex-1">{link.name}</span>
+                    {link.badge && (
+                      <Badge className="bg-gray-100 text-gray-600 text-xs">{link.badge}</Badge>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
   )

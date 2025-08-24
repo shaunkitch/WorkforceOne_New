@@ -98,7 +98,8 @@ router.post('/scan', upload.single('image'), async (req, res) => {
     }
 
     // Handle Claude API errors
-    if (error.message?.includes('Claude') || error.message?.includes('Anthropic')) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('Claude') || errorMessage.includes('Anthropic')) {
       return res.status(502).json({
         error: 'AI analysis failed',
         message: 'The AI service is temporarily unavailable. Please try again later.',

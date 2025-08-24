@@ -141,14 +141,14 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
               console.log('Auto sign-up attempt with email:', autoEmail);
               
               try {
-                // Attempt actual automatic sign-up with Supabase Auth
-                console.log('Attempting auto sign-up for guard invitation...');
-                const { autoSignUpWithInvitation } = await import('../lib/supabase');
-                const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, autoEmail, userName);
+                // Attempt QR invitation processing with Supabase Auth
+                console.log('Processing QR invitation for guard (handles both signup and login)...');
+                const { processQRInvitation } = await import('../lib/supabase');
+                const authResponse = await processQRInvitation(qrData.invitationCode, autoEmail, userName);
                 
-                if (!authResponse.error && authResponse.data?.auto_signed_in) {
-                  // User was actually created and automatically signed in
-                  console.log('Auto sign-in successful for guard invitation, navigating to dashboard...');
+                if (!authResponse.error && (authResponse.data?.auto_signed_in || authResponse.data?.existing_user_signin || authResponse.data?.already_signed_in)) {
+                  // User was signed in (new account or existing account)
+                  console.log('QR invitation processed successfully, navigating to dashboard...');
                   // Navigate directly to Dashboard without any popup
                   onAuthSuccess();
                   return;
@@ -180,14 +180,14 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
               console.log('Auto sign-up attempt with email:', autoEmail);
               
               try {
-                // Attempt actual automatic sign-up with Supabase Auth
-                console.log('Attempting auto sign-up for product invitation...');
-                const { autoSignUpWithInvitation } = await import('../lib/supabase');
-                const authResponse = await autoSignUpWithInvitation(qrData.invitationCode, autoEmail, userName);
+                // Attempt QR invitation processing with Supabase Auth
+                console.log('Processing QR invitation for product (handles both signup and login)...');
+                const { processQRInvitation } = await import('../lib/supabase');
+                const authResponse = await processQRInvitation(qrData.invitationCode, autoEmail, userName);
                 
-                if (!authResponse.error && authResponse.data?.auto_signed_in) {
-                  // User was actually created and automatically signed in
-                  console.log('Auto sign-in successful for product invitation, navigating to dashboard...');
+                if (!authResponse.error && (authResponse.data?.auto_signed_in || authResponse.data?.existing_user_signin || authResponse.data?.already_signed_in)) {
+                  // User was signed in (new account or existing account)
+                  console.log('QR invitation processed successfully, navigating to dashboard...');
                   // Navigate directly to Dashboard without any popup
                   onAuthSuccess();
                   return;
@@ -261,7 +261,7 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <LinearGradient
         colors={['#1e40af', '#3b82f6', '#6366f1']}
         style={styles.gradient}

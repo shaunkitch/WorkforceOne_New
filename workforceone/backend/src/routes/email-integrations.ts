@@ -360,9 +360,9 @@ router.post('/', async (req: express.Request, res: express.Response) => {
     const { data: integration, error: upsertError } = await freshServiceClientForDB
       .from('email_integrations')
       .upsert(integrationData, { 
-        onConflict: 'organization_id',
-        returning: 'minimal'
+        onConflict: 'organization_id'
       })
+      .select()
 
     if (upsertError) {
       console.error('Upsert error:', upsertError)

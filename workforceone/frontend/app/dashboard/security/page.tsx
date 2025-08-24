@@ -43,10 +43,14 @@ import {
   Copy,
   MessageCircle,
   ExternalLink,
-  Share
+  Share,
+  Eye
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import SecurityMap from '@/components/security/SecurityMap';
+import PatrolRouteManager from '@/components/security/PatrolRouteManager';
+import EmergencyResponsePanel from '@/components/security/EmergencyResponsePanel';
+import SecurityAnalytics from '@/components/security/SecurityAnalytics';
 
 // Interfaces for type safety
 
@@ -227,19 +231,25 @@ export default function SecurityDashboard() {
     })));
   };
 
-  // Load recent incidents
+  // Load recent incidents from API
   const loadRecentIncidents = async () => {
-    const { data, error } = await supabase
-      .from('recent_incidents_summary')
-      .select('*')
-      .limit(50);
-
-    if (error) {
-      console.error('Error loading incidents:', error);
-      return;
+    try {
+      console.log('🔄 Loading incidents from API...');
+      const response = await fetch('/api/incidents');
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        console.log('✅ Loaded', result.count, 'incidents from API');
+        console.log('📊 Sources:', result.sources);
+        setIncidents(result.data);
+      } else {
+        console.error('❌ API error:', result.error);
+        setIncidents([]);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load incidents:', err);
+      setIncidents([]);
     }
-
-    setIncidents(data || []);
   };
 
   // Map event handlers
@@ -566,9 +576,10 @@ Welcome to the team! 🚀`);
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="live-map" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="live-map">Live Map</TabsTrigger>
-          <TabsTrigger value="patrol-management">Patrol Management</TabsTrigger>
+          <TabsTrigger value="patrol-management">Patrols</TabsTrigger>
+          <TabsTrigger value="emergency-response">Emergency</TabsTrigger>
           <TabsTrigger value="incident-management">Incidents</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
@@ -732,41 +743,153 @@ Welcome to the team! 🚀`);
           </div>
         </TabsContent>
 
-        {/* Other tabs would be implemented here */}
+        {/* Patrol Management Tab */}
         <TabsContent value="patrol-management">
-          <Card>
-            <CardHeader>
-              <CardTitle>Patrol Management</CardTitle>
-              <CardDescription>Manage patrol routes, schedules, and assignments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Patrol management interface coming soon...</p>
-            </CardContent>
-          </Card>
+          <PatrolRouteManager />
+        </TabsContent>
+
+        {/* Emergency Response Tab */}
+        <TabsContent value="emergency-response">
+          <EmergencyResponsePanel />
         </TabsContent>
 
         <TabsContent value="incident-management">
-          <Card>
-            <CardHeader>
-              <CardTitle>Incident Management</CardTitle>
-              <CardDescription>Review and manage security incidents</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Incident management interface coming soon...</p>
-            </CardContent>
-          </Card>
+          <div className="grid gap-6">
+            {/* Incident Stats */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{incidents.length}</div>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Critical</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">
+                    {incidents.filter(i => i.severity === 'critical').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Requires immediate attention</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Under Investigation</CardTitle>
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {incidents.filter(i => i.status === 'investigating').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">In progress</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Resolved Today</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {incidents.filter(i => i.status === 'resolved').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Successfully closed</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Incident List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>All Security Incidents</CardTitle>
+                <CardDescription>
+                  Complete list of security incidents with management actions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {incidents.map((incident) => (
+                    <div
+                      key={incident.id}
+                      className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedIncident(incident)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-semibold">{incident.title}</h3>
+                          {getIncidentSeverityBadge(incident.severity)}
+                          <Badge variant={
+                            incident.status === 'resolved' ? 'default' :
+                            incident.status === 'investigating' ? 'secondary' : 'outline'
+                          }>
+                            {incident.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">{incident.category}</p>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span>👤 {incident.guard_name}</span>
+                          <span>📍 Location: {incident.latitude?.toFixed(4) || 'Unknown'}, {incident.longitude?.toFixed(4) || 'Unknown'}</span>
+                          <span>🕒 {getTimeSinceUpdate(incident.created_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant={incident.status === 'investigating' ? 'default' : 'outline'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Handle status change
+                            console.log('Update incident status:', incident.id);
+                          }}
+                        >
+                          {incident.status === 'submitted' ? 'Investigate' : 
+                           incident.status === 'investigating' ? 'Resolve' : 'Reopen'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (mapRef.current) {
+                              mapRef.current.panTo({ 
+                                lat: incident.latitude, 
+                                lng: incident.longitude 
+                              });
+                              mapRef.current.setZoom(16);
+                            }
+                          }}
+                        >
+                          📍 View on Map
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {incidents.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <CheckCircle className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                      <h3 className="text-lg font-medium mb-2">No Incidents Reported</h3>
+                      <p>All security operations are running smoothly</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="analytics">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Analytics</CardTitle>
-              <CardDescription>Performance metrics and insights</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Analytics dashboard coming soon...</p>
-            </CardContent>
-          </Card>
+          <SecurityAnalytics />
         </TabsContent>
       </Tabs>
 

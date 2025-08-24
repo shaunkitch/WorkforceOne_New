@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,63 +11,98 @@ import {
   AlertCircle, ExternalLink
 } from 'lucide-react'
 
+interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  category: string;
+  severity: string;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  guard_id?: string;
+  guard_name?: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: any;
+  source?: string;
+}
+
 export default function IncidentsPage() {
-  // Mock incidents data - in real app would come from API
-  const [incidents] = useState([
-    {
-      id: 'INC-001',
-      title: 'Suspicious Activity Reported',
-      description: 'Unidentified person attempting to access restricted area',
-      status: 'open',
-      priority: 'high',
-      location: 'Main Entrance',
-      reportedBy: 'Guard Johnson',
-      timestamp: new Date('2025-08-20T10:30:00'),
-      hasEvidence: true,
-      coordinates: { lat: 40.7128, lng: -74.0060 }
-    },
-    {
-      id: 'INC-002', 
-      title: 'Equipment Malfunction',
-      description: 'Security camera in Sector B is offline',
-      status: 'in_progress',
-      priority: 'medium',
-      location: 'Parking Lot B',
-      reportedBy: 'Guard Smith',
-      timestamp: new Date('2025-08-20T09:15:00'),
-      hasEvidence: false,
-      coordinates: { lat: 40.7130, lng: -74.0058 }
-    },
-    {
-      id: 'INC-003',
-      title: 'Unauthorized Vehicle',
-      description: 'Vehicle parked in restricted area without permit',
-      status: 'resolved',
-      priority: 'low',
-      location: 'Executive Parking',
-      reportedBy: 'Guard Wilson',
-      timestamp: new Date('2025-08-20T08:45:00'),
-      hasEvidence: true,
-      coordinates: { lat: 40.7125, lng: -74.0062 }
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    open: 0,
+    inProgress: 0,
+    resolved: 0,
+    total: 0
+  });
+
+  useEffect(() => {
+    loadIncidents();
+  }, []);
+
+  const loadIncidents = async () => {
+    try {
+      console.log('🔄 Loading incidents from API...');
+      const response = await fetch('/api/incidents');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        const incidentsData = result.data || [];
+        setIncidents(incidentsData);
+        
+        // Calculate stats
+        const open = incidentsData.filter((i: Incident) => i.status === 'submitted' || i.status === 'open').length;
+        const inProgress = incidentsData.filter((i: Incident) => i.status === 'investigating' || i.status === 'in_progress').length;
+        const resolved = incidentsData.filter((i: Incident) => i.status === 'resolved').length;
+        
+        setStats({
+          open,
+          inProgress,
+          resolved,
+          total: incidentsData.length
+        });
+        
+        console.log('✅ Loaded', incidentsData.length, 'incidents');
+      } else {
+        console.error('❌ API returned error:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load incidents:', error);
+    } finally {
+      setLoading(false);
     }
-  ])
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'submitted':
       case 'open': return 'bg-red-100 text-red-800'
+      case 'investigating':
       case 'in_progress': return 'bg-yellow-100 text-yellow-800'
       case 'resolved': return 'bg-green-100 text-green-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
+  const getPriorityColor = (severity: string) => {
+    switch (severity) {
       case 'high': return 'bg-red-600'
       case 'medium': return 'bg-yellow-600'
       case 'low': return 'bg-green-600'
       default: return 'bg-gray-600'
     }
+  }
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString();
   }
 
   return (
@@ -95,7 +130,7 @@ export default function IncidentsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Open Incidents</p>
-                  <p className="text-2xl font-bold text-red-600">3</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.open}</p>
                 </div>
                 <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
                   <AlertCircle className="h-6 w-6 text-red-600" />
@@ -109,7 +144,7 @@ export default function IncidentsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">In Progress</p>
-                  <p className="text-2xl font-bold text-yellow-600">5</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
                 </div>
                 <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                   <Clock className="h-6 w-6 text-yellow-600" />
@@ -122,8 +157,8 @@ export default function IncidentsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Resolved Today</p>
-                  <p className="text-2xl font-bold text-green-600">12</p>
+                  <p className="text-sm font-medium text-gray-600">Resolved</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.resolved}</p>
                 </div>
                 <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="h-6 w-6 text-green-600" />
@@ -136,8 +171,8 @@ export default function IncidentsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Response Time</p>
-                  <p className="text-2xl font-bold text-purple-600">3.2 min</p>
+                  <p className="text-sm font-medium text-gray-600">Total Incidents</p>
+                  <p className="text-2xl font-bold text-purple-600">{stats.total}</p>
                 </div>
                 <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Clock className="h-6 w-6 text-purple-600" />
@@ -165,58 +200,93 @@ export default function IncidentsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {incidents.map((incident) => (
-                <div key={incident.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className={`h-3 w-3 rounded-full ${getPriorityColor(incident.priority)}`}></div>
-                        <h3 className="font-semibold text-gray-900">{incident.title}</h3>
-                        <Badge className={getStatusColor(incident.status)}>
-                          {incident.status.replace('_', ' ')}
-                        </Badge>
-                        <span className="text-sm text-gray-500">#{incident.id}</span>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">Loading incidents...</div>
+              </div>
+            ) : incidents.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No incidents found
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {incidents.map((incident) => (
+                  <div key={incident.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className={`h-3 w-3 rounded-full ${getPriorityColor(incident.severity)}`}></div>
+                          <h3 className="font-semibold text-gray-900">{incident.title}</h3>
+                          <Badge className={getStatusColor(incident.status)}>
+                            {incident.status.replace('_', ' ')}
+                          </Badge>
+                          <span className="text-sm text-gray-500">#{incident.id}</span>
+                          {incident.source && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              {incident.source}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-gray-600 mb-3">{incident.description}</p>
+                        
+                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                          {incident.address && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-4 w-4" />
+                              {incident.address}
+                            </div>
+                          )}
+                          {incident.guard_name && (
+                            <div className="flex items-center gap-1">
+                              <User className="h-4 w-4" />
+                              {incident.guard_name}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            {formatTimestamp(incident.created_at)}
+                          </div>
+                          {incident.metadata?.photos && (
+                            <div className="flex items-center gap-1 text-blue-600">
+                              <Camera className="h-4 w-4" />
+                              {incident.metadata.photos} photo{incident.metadata.photos > 1 ? 's' : ''}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs bg-gray-100 px-2 py-1 rounded capitalize">
+                              {incident.category}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                       
-                      <p className="text-gray-600 mb-3">{incident.description}</p>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {incident.location}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          {incident.reportedBy}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {incident.timestamp.toLocaleTimeString()}
-                        </div>
-                        {incident.hasEvidence && (
-                          <div className="flex items-center gap-1 text-blue-600">
-                            <Camera className="h-4 w-4" />
-                            Evidence
-                          </div>
+                      <div className="flex gap-2 ml-4">
+                        <Link href={`/dashboard/incidents/${incident.id}`}>
+                          <Button variant="outline" size="sm">
+                            <FileText className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                        </Link>
+                        {incident.latitude && incident.longitude && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              const mapUrl = `https://www.google.com/maps?q=${incident.latitude},${incident.longitude}&z=16`;
+                              window.open(mapUrl, '_blank', 'noopener,noreferrer');
+                            }}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Map
+                          </Button>
                         )}
                       </div>
                     </div>
-                    
-                    <div className="flex gap-2 ml-4">
-                      <Button variant="outline" size="sm">
-                        <FileText className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Map
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -86,7 +86,7 @@ router.post('/send-email',
           invited_by_profile:profiles!company_invitations_invited_by_fkey(full_name)
         `)
         .eq('id', invitationId)
-        .eq('organization_id', userProfile.organization_id)
+        .eq('organization_id', userProfile?.organization_id)
         .single()
 
       if (invitationError || !invitation) {
@@ -106,6 +106,7 @@ router.post('/send-email',
       // Prepare email data
       const emailData = {
         email: invitation.email,
+        organizationId: userProfile?.organization_id || '',
         organizationName: invitation.organizations.name,
         inviterName: invitation.invited_by_profile?.full_name || 'WorkforceOne Admin',
         role: invitation.role,
@@ -175,7 +176,7 @@ router.post('/resend-email',
           invited_by_profile:profiles!company_invitations_invited_by_fkey(full_name)
         `)
         .eq('id', invitationId)
-        .eq('organization_id', userProfile.organization_id)
+        .eq('organization_id', userProfile?.organization_id)
         .single()
 
       if (invitationError || !invitation) {
@@ -206,6 +207,7 @@ router.post('/resend-email',
       // Prepare email data
       const emailData = {
         email: invitation.email,
+        organizationId: userProfile?.organization_id || '',
         organizationName: invitation.organizations.name,
         inviterName: invitation.invited_by_profile?.full_name || 'WorkforceOne Admin',
         role: invitation.role,
@@ -229,11 +231,11 @@ router.post('/resend-email',
         newExpiryDate: newExpiryDate.toISOString()
       })
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error resending invitation email:', error)
       res.status(500).json({ 
         error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
       })
     }
   }

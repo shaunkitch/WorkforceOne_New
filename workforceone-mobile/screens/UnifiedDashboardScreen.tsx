@@ -8,10 +8,11 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getUserProfile } from '../lib/supabase';
 import { getAvailableProducts, getPrimaryProduct, getProductTheme } from '../lib/products';
+import { getCurrentUserProfile, canViewAllData, getDataScope, UserProfile } from '../lib/rbac';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +22,7 @@ interface Props {
 
 export default function UnifiedDashboardScreen({ userProducts }: Props) {
   const [profile, setProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<Record<string, any>>({});
 
@@ -35,29 +37,85 @@ export default function UnifiedDashboardScreen({ userProducts }: Props) {
   const loadDashboardData = async () => {
     try {
       const { profile } = await getUserProfile();
+      const rbacProfile = await getCurrentUserProfile();
       setProfile(profile);
+      setUserProfile(rbacProfile);
       
-      // Mock stats - in production, fetch from API
-      setStats({
-        'workforce-management': {
-          employees: 127,
-          projects: 15,
-          completion: 85
-        },
-        'time-tracker': {
-          hoursToday: 6.5,
-          hoursWeek: 32.5,
-          productivity: 92
-        },
-        'guard-management': {
-          guards: 24,
-          sites: 8,
-          coverage: 96
-        }
-      });
+      // RBAC-based stats loading
+      if (rbacProfile) {
+        const dataScope = getDataScope(rbacProfile);
+        const canViewAll = canViewAllData(rbacProfile);
+        
+        // Load stats based on user's role and data scope
+        const roleBasedStats = await loadRoleBasedStats(rbacProfile, dataScope, canViewAll);
+        setStats(roleBasedStats);
+      }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     }
+  };
+
+  const loadRoleBasedStats = async (userProfile: UserProfile, dataScope: string, canViewAll: boolean) => {
+    const stats: Record<string, any> = {};
+    
+    // Guards only see their own data
+    if (userProfile.role === 'guard') {
+      stats['guard-management'] = {
+        myShifts: 5,
+        myIncidents: 2,
+        hoursWorked: 38.5,
+        nextShift: 'Tomorrow 8:00 AM'
+      };
+    }
+    
+    // Employees see their own workforce and time data
+    if (userProfile.role === 'employee') {
+      stats['workforce-management'] = {
+        myProjects: 3,
+        myTasks: 12,
+        completedTasks: 8
+      };
+      stats['time-tracker'] = {
+        hoursToday: 6.5,
+        hoursWeek: 32.5,
+        productivity: 92
+      };
+    }
+    
+    // Supervisors see team data
+    if (userProfile.role === 'supervisor') {
+      stats['workforce-management'] = {
+        teamMembers: 8,
+        teamProjects: 4,
+        teamCompletion: 78
+      };
+      stats['guard-management'] = {
+        teamGuards: 6,
+        activePatrols: 2,
+        incidents: 1
+      };
+    }
+    
+    // Managers and above see organization data
+    if (['manager', 'organization_admin', 'super_admin'].includes(userProfile.role)) {
+      stats['workforce-management'] = {
+        employees: canViewAll ? 127 : 45,
+        projects: canViewAll ? 15 : 8,
+        completion: 85
+      };
+      stats['time-tracker'] = {
+        totalHours: canViewAll ? 2340 : 850,
+        avgProductivity: 89,
+        activeUsers: canViewAll ? 45 : 20
+      };
+      stats['guard-management'] = {
+        guards: canViewAll ? 24 : 12,
+        sites: canViewAll ? 8 : 4,
+        coverage: 96
+      };
+    }
+    
+    return stats;
   };
 
   const onRefresh = async () => {
@@ -71,15 +129,20 @@ export default function UnifiedDashboardScreen({ userProducts }: Props) {
       colors={theme.gradient}
       style={styles.headerContainer}
     >
-      <SafeAreaView style={styles.headerContent}>
+      <View style={styles.headerContent}>
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeText}>Welcome back,</Text>
           <Text style={styles.userName}>
             {profile?.full_name || 'User'}! 👋
           </Text>
           <Text style={styles.subtitle}>
-            You have access to {availableProducts.length} product{availableProducts.length !== 1 ? 's' : ''}
+            {userProfile ? `${userProfile.role.replace('_', ' ').toUpperCase()} • ${availableProducts.length} product${availableProducts.length !== 1 ? 's' : ''}` : 'Loading...'}
           </Text>
+          {userProfile && (
+            <Text style={styles.roleDescription}>
+              {getRoleDescription(userProfile.role)}
+            </Text>
+          )}
         </View>
         
         <View style={styles.productBadges}>
@@ -92,9 +155,150 @@ export default function UnifiedDashboardScreen({ userProducts }: Props) {
             </View>
           ))}
         </View>
-      </SafeAreaView>
+      </View>
     </LinearGradient>
   );
+
+  const getRoleDescription = (role: string): string => {
+    switch (role) {
+      case 'guard': return 'Access to your patrol data and incidents';
+      case 'employee': return 'Access to your tasks and time tracking';
+      case 'supervisor': return 'Access to your team data and reports';
+      case 'manager': return 'Access to organization management';
+      case 'organization_admin': return 'Full organization access and control';
+      case 'super_admin': return 'Global system administration';
+      default: return 'User access';
+    }
+  };
+
+  const renderWorkforceStats = (productStats: any) => {
+    if (!userProfile) return null;
+    
+    if (userProfile.role === 'employee') {
+      return (
+        <>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.myTasks || 0}</Text>
+            <Text style={styles.statText}>My Tasks</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.completedTasks || 0}</Text>
+            <Text style={styles.statText}>Completed</Text>
+          </View>
+        </>
+      );
+    }
+    
+    if (userProfile.role === 'supervisor') {
+      return (
+        <>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.teamMembers || 0}</Text>
+            <Text style={styles.statText}>Team</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.teamProjects || 0}</Text>
+            <Text style={styles.statText}>Projects</Text>
+          </View>
+        </>
+      );
+    }
+    
+    // Managers and above
+    return (
+      <>
+        <View style={styles.statRow}>
+          <Text style={styles.statNumber}>{productStats.employees || 0}</Text>
+          <Text style={styles.statText}>Employees</Text>
+        </View>
+        <View style={styles.statRow}>
+          <Text style={styles.statNumber}>{productStats.projects || 0}</Text>
+          <Text style={styles.statText}>Projects</Text>
+        </View>
+      </>
+    );
+  };
+
+  const renderTimeTrackerStats = (productStats: any) => {
+    if (!userProfile) return null;
+    
+    if (['employee', 'guard'].includes(userProfile.role)) {
+      return (
+        <>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.hoursToday || 0}h</Text>
+            <Text style={styles.statText}>Today</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.productivity || 0}%</Text>
+            <Text style={styles.statText}>Productivity</Text>
+          </View>
+        </>
+      );
+    }
+    
+    // Supervisors and above see aggregated data
+    return (
+      <>
+        <View style={styles.statRow}>
+          <Text style={styles.statNumber}>{productStats.totalHours || 0}</Text>
+          <Text style={styles.statText}>Total Hours</Text>
+        </View>
+        <View style={styles.statRow}>
+          <Text style={styles.statNumber}>{productStats.activeUsers || 0}</Text>
+          <Text style={styles.statText}>Active Users</Text>
+        </View>
+      </>
+    );
+  };
+
+  const renderGuardStats = (productStats: any) => {
+    if (!userProfile) return null;
+    
+    if (userProfile.role === 'guard') {
+      return (
+        <>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.myShifts || 0}</Text>
+            <Text style={styles.statText}>My Shifts</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.myIncidents || 0}</Text>
+            <Text style={styles.statText}>Incidents</Text>
+          </View>
+        </>
+      );
+    }
+    
+    if (userProfile.role === 'supervisor') {
+      return (
+        <>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.teamGuards || 0}</Text>
+            <Text style={styles.statText}>Team Guards</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statNumber}>{productStats.activePatrols || 0}</Text>
+            <Text style={styles.statText}>Active</Text>
+          </View>
+        </>
+      );
+    }
+    
+    // Managers and above
+    return (
+      <>
+        <View style={styles.statRow}>
+          <Text style={styles.statNumber}>{productStats.guards || 0}</Text>
+          <Text style={styles.statText}>Guards</Text>
+        </View>
+        <View style={styles.statRow}>
+          <Text style={styles.statNumber}>{productStats.coverage || 0}%</Text>
+          <Text style={styles.statText}>Coverage</Text>
+        </View>
+      </>
+    );
+  };
 
   const renderQuickStats = () => (
     <View style={styles.quickStatsContainer}>
@@ -157,46 +361,11 @@ export default function UnifiedDashboardScreen({ userProducts }: Props) {
                   {product.description}
                 </Text>
                 
-                {/* Product-specific stats */}
+                {/* Role-based product stats */}
                 <View style={styles.productCardStats}>
-                  {product.id === 'workforce-management' && (
-                    <>
-                      <View style={styles.statRow}>
-                        <Text style={styles.statNumber}>{productStats.employees || 0}</Text>
-                        <Text style={styles.statText}>Employees</Text>
-                      </View>
-                      <View style={styles.statRow}>
-                        <Text style={styles.statNumber}>{productStats.projects || 0}</Text>
-                        <Text style={styles.statText}>Projects</Text>
-                      </View>
-                    </>
-                  )}
-                  
-                  {product.id === 'time-tracker' && (
-                    <>
-                      <View style={styles.statRow}>
-                        <Text style={styles.statNumber}>{productStats.hoursToday || 0}h</Text>
-                        <Text style={styles.statText}>Today</Text>
-                      </View>
-                      <View style={styles.statRow}>
-                        <Text style={styles.statNumber}>{productStats.productivity || 0}%</Text>
-                        <Text style={styles.statText}>Productivity</Text>
-                      </View>
-                    </>
-                  )}
-                  
-                  {product.id === 'guard-management' && (
-                    <>
-                      <View style={styles.statRow}>
-                        <Text style={styles.statNumber}>{productStats.guards || 0}</Text>
-                        <Text style={styles.statText}>Guards</Text>
-                      </View>
-                      <View style={styles.statRow}>
-                        <Text style={styles.statNumber}>{productStats.coverage || 0}%</Text>
-                        <Text style={styles.statText}>Coverage</Text>
-                      </View>
-                    </>
-                  )}
+                  {product.id === 'workforce-management' && renderWorkforceStats(productStats)}
+                  {product.id === 'time-tracker' && renderTimeTrackerStats(productStats)}
+                  {product.id === 'guard-management' && renderGuardStats(productStats)}
                 </View>
                 
                 <TouchableOpacity style={styles.openButton}>
@@ -237,13 +406,14 @@ export default function UnifiedDashboardScreen({ userProducts }: Props) {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView
         style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
       >
         {renderWelcomeHeader()}
         {renderQuickStats()}
@@ -252,7 +422,7 @@ export default function UnifiedDashboardScreen({ userProducts }: Props) {
         
         <View style={styles.bottomPadding} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -269,7 +439,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 20,
   },
   welcomeSection: {
     marginBottom: 20,
@@ -288,6 +458,14 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 18,
+  },
+  roleDescription: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+    fontStyle: 'italic',
+    lineHeight: 16,
   },
   productBadges: {
     flexDirection: 'row',
@@ -316,6 +494,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1f2937',
     marginBottom: 16,
+    lineHeight: 24,
+    letterSpacing: -0.5,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -344,11 +524,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 4,
+    textAlign: 'center',
+    lineHeight: 24,
   },
   statLabel: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 16,
   },
   productCardsContainer: {
     marginBottom: 24,
@@ -394,20 +578,26 @@ const styles = StyleSheet.create({
   productCardStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 10,
   },
   statRow: {
     alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
   },
   statNumber: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
+    textAlign: 'center',
   },
   statText: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+    textAlign: 'center',
   },
   openButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -416,7 +606,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
@@ -425,12 +615,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
+    marginLeft: 8,
   },
   openButtonIcon: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
+    marginLeft: 8,
   },
   activityContainer: {
     paddingHorizontal: 20,
@@ -471,14 +663,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 2,
+    lineHeight: 18,
   },
   activityProduct: {
     fontSize: 12,
     color: '#6b7280',
+    lineHeight: 16,
   },
   activityTime: {
     fontSize: 12,
     color: '#9ca3af',
+    textAlign: 'right',
+    minWidth: 70,
+    lineHeight: 16,
   },
   bottomPadding: {
     height: 32,

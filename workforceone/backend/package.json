@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.35.0",
     "@supabase/supabase-js": "^2.55.0",
     "@types/nodemailer": "^6.4.17",
+    "axios": "^1.11.0",
     "bcryptjs": "^3.0.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",

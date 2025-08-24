@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 
@@ -105,15 +106,15 @@ export default function QRScannerScreen({ route }: Props) {
 
   if (!permission) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <Text style={styles.message}>Requesting camera permission...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!permission.granted) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <Text style={styles.message}>No access to camera</Text>
         <TouchableOpacity
           style={styles.button}
@@ -127,12 +128,12 @@ export default function QRScannerScreen({ route }: Props) {
         >
           <Text style={styles.buttonText}>Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <CameraView
         style={styles.scanner}
         barcodeScannerSettings={{
@@ -173,7 +174,7 @@ export default function QRScannerScreen({ route }: Props) {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

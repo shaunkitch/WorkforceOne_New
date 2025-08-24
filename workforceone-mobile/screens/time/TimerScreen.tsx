@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function TimerScreen() {
   const [isRunning, setIsRunning] = useState(false);
@@ -10,7 +11,7 @@ export default function TimerScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.timerContainer}>
         <Text style={styles.timerDisplay}>{time}</Text>
         <Text style={styles.projectName}>Website Redesign</Text>
@@ -30,7 +31,7 @@ export default function TimerScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

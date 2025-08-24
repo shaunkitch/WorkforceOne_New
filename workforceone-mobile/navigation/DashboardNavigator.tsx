@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text } from 'react-native';
+import { Text, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAvailableProducts, getPrimaryProduct } from '../lib/products';
 import UnifiedDashboardScreen from '../screens/UnifiedDashboardScreen';
 import WorkforceDashboardScreen from '../screens/workforce/WorkforceDashboardScreen';
@@ -13,7 +14,9 @@ import GuardDashboardScreen from '../screens/guard/GuardDashboardScreen';
 import SitesScreen from '../screens/guard/SitesScreen';
 import CheckInScreen from '../screens/guard/CheckInScreen';
 import GuardCheckInScreen from '../screens/guard/GuardCheckInScreen';
+import PatrolSessionScreen from '../screens/guard/PatrolSessionScreen';
 import IncidentReportScreen from '../screens/guard/IncidentReportScreen';
+import GuardKPIScreen from '../screens/guard/GuardKPIScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 export type DashboardTabParamList = {
@@ -46,8 +49,10 @@ export type GuardStackParamList = {
   Guards: undefined;
   CheckIn: undefined;
   GuardCheckIn: undefined;
+  PatrolSession: undefined;
   Incidents: undefined;
-  IncidentReport: undefined;
+  IncidentReport: { fromPatrol?: boolean };
+  GuardKPI: undefined;
 };
 
 const Tab = createBottomTabNavigator<DashboardTabParamList>();
@@ -65,20 +70,16 @@ function WorkforceNavigator() {
   return (
     <WorkforceStack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#059669' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' }
+        headerShown: false
       }}
     >
       <WorkforceStack.Screen 
         name="WorkforceDashboard" 
         component={WorkforceDashboardScreen}
-        options={{ headerTitle: 'Workforce Management' }}
       />
       <WorkforceStack.Screen 
         name="Projects" 
         component={ProjectsScreen}
-        options={{ headerTitle: 'Projects' }}
       />
     </WorkforceStack.Navigator>
   );
@@ -88,25 +89,20 @@ function TimeNavigator() {
   return (
     <TimeStack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#3b82f6' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' }
+        headerShown: false
       }}
     >
       <TimeStack.Screen 
         name="TimeDashboard" 
         component={TimeDashboardScreen}
-        options={{ headerTitle: 'Time Tracker' }}
       />
       <TimeStack.Screen 
         name="Timer" 
         component={TimerScreen}
-        options={{ headerTitle: 'Timer' }}
       />
       <TimeStack.Screen 
         name="Timesheet" 
         component={TimesheetScreen}
-        options={{ headerTitle: 'Timesheet' }}
       />
     </TimeStack.Navigator>
   );
@@ -116,35 +112,36 @@ function GuardNavigator() {
   return (
     <GuardStack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#7c3aed' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' }
+        headerShown: false
       }}
     >
       <GuardStack.Screen 
         name="GuardDashboard" 
         component={GuardDashboardScreen}
-        options={{ headerTitle: 'Guard Management' }}
       />
       <GuardStack.Screen 
         name="Sites" 
         component={SitesScreen}
-        options={{ headerTitle: 'Sites' }}
       />
       <GuardStack.Screen 
         name="CheckIn" 
         component={CheckInScreen}
-        options={{ headerTitle: 'Check In' }}
       />
       <GuardStack.Screen 
         name="GuardCheckIn" 
         component={GuardCheckInScreen}
-        options={{ headerTitle: 'Guard Check-In System' }}
+      />
+      <GuardStack.Screen 
+        name="PatrolSession" 
+        component={PatrolSessionScreen}
       />
       <GuardStack.Screen 
         name="IncidentReport" 
         component={IncidentReportScreen}
-        options={{ headerTitle: 'Report Incident' }}
+      />
+      <GuardStack.Screen 
+        name="GuardKPI" 
+        component={GuardKPIScreen}
       />
     </GuardStack.Navigator>
   );
@@ -153,6 +150,10 @@ function GuardNavigator() {
 export default function DashboardNavigator({ userProducts, onSignOut }: Props) {
   const availableProducts = getAvailableProducts(userProducts);
   const primaryProduct = getPrimaryProduct(userProducts);
+  const insets = useSafeAreaInsets();
+  
+  console.log('DashboardNavigator - userProducts:', userProducts);
+  console.log('DashboardNavigator - availableProducts:', availableProducts.map(p => p.id));
   
   const tabBarOptions = {
     activeTintColor: primaryProduct?.color.primary || '#3b82f6',
@@ -160,12 +161,20 @@ export default function DashboardNavigator({ userProducts, onSignOut }: Props) {
     style: {
       backgroundColor: '#fff',
       borderTopColor: '#e5e7eb',
-      paddingBottom: 5,
-      height: 60,
+      borderTopWidth: 1,
+      paddingBottom: Math.max(insets.bottom, 5),
+      paddingTop: 8,
+      height: 60 + Math.max(insets.bottom, 5),
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
     },
     labelStyle: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600' as const,
+      marginBottom: 2,
     },
   };
 

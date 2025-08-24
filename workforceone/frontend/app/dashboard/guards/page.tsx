@@ -13,7 +13,8 @@ import {
   Users, Plus, Shield, MapPin, Clock, Phone, Mail, Camera,
   Fingerprint, Brain, Radar, Wifi, Battery, CheckCircle,
   AlertTriangle, Eye, UserCheck, Calendar, Star, Award,
-  Activity, Zap, Globe, Smartphone, QrCode, UserPlus
+  Activity, Zap, Globe, Smartphone, QrCode, UserPlus,
+  BarChart3, Target
 } from 'lucide-react'
 
 interface Guard {
@@ -37,16 +38,21 @@ interface Guard {
 
 export default function GuardsPage() {
   const [guards, setGuards] = useState<Guard[]>([])
+  const [pendingInvitations, setPendingInvitations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     loadRealGuards()
+    loadPendingInvitations()
   }, [])
 
   const loadRealGuards = async () => {
     try {
-      // Get real guards from user_products table
+      console.log('🔍 Loading guards from database...')
+      
+      // Try multiple approaches to find guards
+      // Approach 1: Get guards from user_products table
       const { data: guardUsers, error: guardError } = await supabase
         .from('user_products')
         .select(`
@@ -57,41 +63,128 @@ export default function GuardsPage() {
             id,
             email,
             full_name,
-            created_at
+            created_at,
+            role,
+            organization_id
           )
         `)
         .eq('product_id', 'guard-management')
         .eq('is_active', true)
 
-      if (guardError) {
-        console.error('Error loading guards:', guardError)
-        return
+      console.log('📊 user_products query result:', { guardUsers, error: guardError })
+
+      // Approach 2: If no results, try profiles table directly
+      let allGuards: any[] = guardUsers || []
+      
+      if (!guardUsers || guardUsers.length === 0) {
+        console.log('🔍 No guards found in user_products, checking profiles table...')
+        
+        const { data: profileGuards, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'guard')
+          .eq('is_active', true)
+
+        console.log('📊 profiles query result:', { profileGuards, error: profileError })
+        
+        if (profileGuards && profileGuards.length > 0) {
+          // Transform profiles to match user_products structure
+          allGuards = profileGuards.map(profile => ({
+            user_id: profile.id,
+            granted_at: profile.created_at,
+            is_active: true,
+            profiles: profile
+          }))
+        }
       }
 
-      // Transform real data to expected format
-      const realGuards: Guard[] = (guardUsers || []).map((guardUser, index) => ({
-        id: guardUser.user_id,
-        name: guardUser.profiles?.full_name || guardUser.profiles?.email || 'Unknown Guard',
-        email: guardUser.profiles?.email || 'no-email@example.com',
-        phone: '+1 (555) 000-0000', // Default phone
-        status: 'active' as const,
-        location: 'General Patrol Area',
-        shift: 'Flexible Schedule',
-        rating: 4.5 + Math.random() * 0.5, // Random rating between 4.5-5.0
-        completedPatrols: Math.floor(Math.random() * 50) + 10,
-        lastCheckIn: `${Math.floor(Math.random() * 60)} mins ago`,
-        certifications: ['Security Guard License'],
-        biometricAuth: Math.random() > 0.5,
-        aiScore: Math.floor(Math.random() * 20) + 80, // 80-100
-        deviceConnected: Math.random() > 0.3,
-        batteryLevel: Math.floor(Math.random() * 40) + 60, // 60-100%
-        granted_at: guardUser.granted_at
-      }))
+      if (guardError && !allGuards.length) {
+        console.error('Error loading guards:', guardError)
+      }
 
+      // Transform data to expected format
+      const realGuards: Guard[] = allGuards.map((guardUser, index) => {
+        const profile = Array.isArray(guardUser.profiles) ? guardUser.profiles[0] : guardUser.profiles;
+        return {
+          id: guardUser.user_id,
+          name: profile?.full_name || profile?.email || 'Unknown Guard',
+          email: profile?.email || 'no-email@example.com',
+          phone: '+1 (555) 000-0000', // Default phone
+          status: 'active' as const,
+          location: 'General Patrol Area',
+          shift: 'Flexible Schedule',
+          rating: 4.5 + Math.random() * 0.5, // Random rating between 4.5-5.0
+          completedPatrols: Math.floor(Math.random() * 50) + 10,
+          lastCheckIn: `${Math.floor(Math.random() * 60)} mins ago`,
+          certifications: ['Security Guard License'],
+          biometricAuth: Math.random() > 0.5,
+          aiScore: Math.floor(Math.random() * 20) + 80, // 80-100
+          deviceConnected: Math.random() > 0.3,
+          batteryLevel: Math.floor(Math.random() * 40) + 60, // 60-100%
+          granted_at: guardUser.granted_at
+        }
+      })
+
+      console.log('✅ Loaded', realGuards.length, 'guards from database')
       setGuards(realGuards)
 
     } catch (error) {
       console.error('Error loading guards:', error)
+    }
+  }
+
+  const loadPendingInvitations = async () => {
+    try {
+      console.log('🔍 Loading pending guard invitations...')
+      
+      // Get current user's organization
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id) return
+
+      // Load pending product invitations that include guard-management
+      const { data: productInvites, error: productError } = await supabase
+        .from('product_invitations')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'pending')
+        .contains('products', ['guard-management'])
+
+      if (productError) {
+        console.error('Product invitations error:', productError)
+      } else {
+        console.log('📊 Product invitations with guard access:', productInvites?.length || 0)
+        if (productInvites && productInvites.length > 0) {
+          setPendingInvitations(productInvites)
+        }
+      }
+
+      // Also check company_invitations for guard role invitations
+      const { data: companyInvites, error: companyError } = await supabase
+        .from('company_invitations')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'pending')
+        .eq('role', 'guard')
+
+      if (companyError) {
+        console.error('Company invitations error:', companyError)
+      } else {
+        console.log('📊 Company invitations for guards:', companyInvites?.length || 0)
+        if (companyInvites && companyInvites.length > 0) {
+          setPendingInvitations(prev => [...prev, ...companyInvites])
+        }
+      }
+
+    } catch (error) {
+      console.error('Error loading pending invitations:', error)
     } finally {
       setLoading(false)
     }
@@ -161,11 +254,15 @@ export default function GuardsPage() {
             <p className="text-gray-600 mt-1">Real-time security workforce management (Real Data)</p>
           </div>
           <div className="flex space-x-3">
-            <Button variant="outline">
-              <Brain className="h-4 w-4 mr-2" />
-              AI Analytics
+            <Button variant="outline" onClick={() => window.location.href = '/dashboard/guards/performance'}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Performance
             </Button>
-            <Button onClick={() => window.location.href = '/dashboard/settings/invitations'} className="bg-purple-600 hover:bg-purple-700">
+            <Button variant="outline" onClick={() => window.location.href = '/dashboard/settings/kpi-targets'}>
+              <Target className="h-4 w-4 mr-2" />
+              KPI Targets
+            </Button>
+            <Button onClick={() => window.location.href = '/dashboard/invitations'} className="bg-purple-600 hover:bg-purple-700">
               <QrCode className="h-4 w-4 mr-2" />
               Invite Guards
             </Button>
@@ -243,7 +340,9 @@ export default function GuardsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Active Guards</p>
                   <p className="text-2xl font-bold text-gray-900">{guards.filter(g => g.status !== 'off_duty').length}</p>
-                  <p className="text-xs text-green-500">AI Optimized</p>
+                  <p className="text-xs text-green-500">
+                    {pendingInvitations.length > 0 ? `+${pendingInvitations.length} pending` : 'All systems online'}
+                  </p>
                 </div>
                 <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Users className="h-6 w-6 text-purple-600" />
@@ -299,8 +398,30 @@ export default function GuardsPage() {
         </div>
 
         {/* Guards Grid with Modern Features */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {guards.map((guard) => (
+        {guards.length === 0 ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <Shield className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-medium text-gray-900 mb-2">No Guards Found</h3>
+              <p className="text-gray-600 mb-6">
+                No security guards are currently registered in the system. 
+                Invite guards using the QR code system or manual invitation.
+              </p>
+              <div className="flex justify-center space-x-3">
+                <Button onClick={() => window.location.href = '/dashboard/invitations'} className="bg-purple-600 hover:bg-purple-700">
+                  <QrCode className="h-4 w-4 mr-2" />
+                  Create QR Invitation
+                </Button>
+                <Button variant="outline" onClick={() => window.location.href = '/dashboard/guards/onboard'}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Manual Onboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {guards.map((guard) => (
             <Card key={guard.id} className="hover:shadow-lg transition-all duration-200 border-l-4 border-purple-500">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -412,7 +533,61 @@ export default function GuardsPage() {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
+
+        {/* Pending Guard Invitations */}
+        {pendingInvitations.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="h-5 w-5 mr-2 text-orange-500" />
+                Pending Guard Invitations ({pendingInvitations.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingInvitations.map((invitation, index) => (
+                  <div key={invitation.id || index} className="border rounded-lg p-4 bg-orange-50 border-orange-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        {invitation.invitation_code ? (
+                          <div>
+                            <div className="font-medium text-orange-900">QR Code Invitation</div>
+                            <div className="text-sm text-orange-700">Code: {invitation.invitation_code}</div>
+                            <div className="text-xs text-orange-600">
+                              Products: {invitation.products?.join(', ') || 'guard-management'}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-medium text-orange-900">{invitation.email}</div>
+                            <div className="text-sm text-orange-700">Role: {invitation.role}</div>
+                          </div>
+                        )}
+                        <div className="text-xs text-orange-500 mt-1">
+                          Created: {new Date(invitation.created_at).toLocaleDateString()}
+                          {invitation.expires_at && (
+                            <span> • Expires: {new Date(invitation.expires_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-orange-600 border-orange-300">
+                        Pending
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
+                <p className="font-medium text-blue-800 mb-1">📋 Invitation Status:</p>
+                <p className="text-blue-700">
+                  These invitations have been sent but not yet accepted. Once accepted, guards will appear in the Active Guards section above.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Advanced Features Panel */}
         <Card className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white">

@@ -12,10 +12,20 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { GuardStackParamList } from '../../navigation/DashboardNavigator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, getUser } from '../../lib/supabase';
+import syncManager from '../../lib/syncManager';
+import { getCurrentUserProfile, UserProfile, logRoleBasedAccess } from '../../lib/rbac';
+
+type IncidentReportRouteProp = RouteProp<GuardStackParamList, 'IncidentReport'>;
+type IncidentReportNavigationProp = StackNavigationProp<GuardStackParamList, 'IncidentReport'>;
 
 interface IncidentReport {
   id: string;
@@ -48,6 +58,9 @@ const INCIDENT_TYPES = [
 ];
 
 export default function IncidentReportScreen() {
+  const route = useRoute<IncidentReportRouteProp>();
+  const navigation = useNavigation<IncidentReportNavigationProp>();
+  const fromPatrol = route.params?.fromPatrol || false;
   const [incidentType, setIncidentType] = useState('');
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
   const [title, setTitle] = useState('');
@@ -119,6 +132,23 @@ export default function IncidentReportScreen() {
     }
   };
 
+  // Helper function to convert image URI to base64
+  const convertImageToBase64 = async (uri: string): Promise<string> => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Failed to convert image to base64:', error);
+      return uri; // Fallback to original URI
+    }
+  };
+
   const handleSubmit = async () => {
     if (!incidentType || !title || !description) {
       Alert.alert('Incomplete Report', 'Please fill in all required fields');
@@ -129,51 +159,146 @@ export default function IncidentReportScreen() {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-      const report: IncidentReport = {
-        id: `INC-${Date.now()}`,
-        type: incidentType,
-        severity,
+      // Convert photos to base64 for web compatibility
+      const convertedPhotos = await Promise.all(
+        photos.map(async (photo) => {
+          console.log('📸 Converting photo to base64:', photo);
+          const base64Photo = await convertImageToBase64(photo);
+          console.log('✅ Photo converted, size:', base64Photo.length, 'chars');
+          return base64Photo;
+        })
+      );
+      
+      // Get current user
+      const { user } = await getUser();
+      const guardId = user?.id || 'anonymous';
+      const guardName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Unknown Guard';
+
+      const reportId = `INC-${Date.now()}`;
+      
+      // Prepare incident data for database
+      const incidentData = {
+        id: reportId,
         title,
         description,
-        location: location || {
-          address: 'Unknown',
-          coordinates: { latitude: 0, longitude: 0 },
-        },
-        photos,
-        timestamp: new Date().toISOString(),
-        guardId: 'guard-001',
+        category: incidentType,
+        severity,
+        latitude: location?.coordinates?.latitude || 0,
+        longitude: location?.coordinates?.longitude || 0,
+        address: location?.address || 'Unknown location',
+        guard_id: guardId,
+        guard_name: guardName,
         status: 'submitted',
+        metadata: {
+          photos: photos.length,
+          photo_urls: convertedPhotos, // Use base64 converted photos
+          timestamp: new Date().toISOString(),
+          device_info: Platform.OS
+        }
       };
 
-      // Save to local storage (in production, send to API)
-      const existingReports = await AsyncStorage.getItem('incidentReports');
-      const reports = existingReports ? JSON.parse(existingReports) : [];
-      reports.unshift(report);
-      await AsyncStorage.setItem('incidentReports', JSON.stringify(reports));
+      // Use sync manager for reliable incident submission
+      await syncManager.log('INCIDENT_SUBMIT', 'info', 'Starting incident submission', { 
+        title: incidentData.title, 
+        severity: incidentData.severity 
+      });
 
-      Alert.alert(
-        'Report Submitted',
-        `Incident report ${report.id} has been submitted successfully`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setIncidentType('');
-              setSeverity('medium');
-              setTitle('');
-              setDescription('');
-              setPhotos([]);
-              setLocation(null);
-            },
+      try {
+        // Add incident to outbox - this will automatically try to sync
+        const outboxId = await syncManager.addToOutbox('incident', incidentData);
+        
+        await syncManager.log('INCIDENT_SUBMIT', 'success', 'Incident added to sync queue', { 
+          outboxId,
+          reportId 
+        });
+
+        // Also save to local storage for immediate access
+        const report: IncidentReport = {
+          id: reportId,
+          type: incidentType,
+          severity,
+          title,
+          description,
+          location: location || {
+            address: 'Unknown',
+            coordinates: { latitude: 0, longitude: 0 },
           },
-        ]
-      );
+          photos: convertedPhotos,
+          timestamp: new Date().toISOString(),
+          guardId,
+          status: 'submitted',
+        };
+
+        const existingReports = await AsyncStorage.getItem('incidentReports');
+        const reports = existingReports ? JSON.parse(existingReports) : [];
+        reports.unshift(report);
+        await AsyncStorage.setItem('incidentReports', JSON.stringify(reports));
+
+        // If this incident was reported during patrol, update patrol stats
+        if (fromPatrol) {
+          try {
+            const activePatrolData = await AsyncStorage.getItem('activePatrol');
+            if (activePatrolData) {
+              const patrol = JSON.parse(activePatrolData);
+              patrol.incidents_reported = (patrol.incidents_reported || 0) + 1;
+              await AsyncStorage.setItem('activePatrol', JSON.stringify(patrol));
+            }
+          } catch (error) {
+            console.error('Failed to update patrol stats:', error);
+          }
+        }
+
+        Alert.alert(
+          'Incident Reported',
+          `Incident "${title}" has been queued for submission. Check the sync status in the debug screen to monitor progress.`,
+          [
+            { 
+              text: 'OK', 
+              onPress: () => {
+                resetForm();
+                if (fromPatrol) {
+                  navigation.goBack(); // Return to patrol screen
+                }
+              }
+            },
+            { 
+              text: 'View Sync Status', 
+              onPress: () => {
+                resetForm();
+                if (fromPatrol) {
+                  navigation.goBack(); // Return to patrol screen
+                } else {
+                  // Navigation to sync debug screen would go here
+                }
+              }
+            }
+          ]
+        );
+
+      } catch (error) {
+        await syncManager.log('INCIDENT_SUBMIT', 'error', 'Failed to queue incident', error);
+        
+        Alert.alert(
+          'Submission Error',
+          'Failed to queue incident for submission. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
+      console.error('Submit error:', error);
       Alert.alert('Error', 'Failed to submit report');
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setIncidentType('');
+    setSeverity('medium');
+    setTitle('');
+    setDescription('');
+    setPhotos([]);
+    setLocation(null);
   };
 
   const removePhoto = (index: number) => {

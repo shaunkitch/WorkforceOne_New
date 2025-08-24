@@ -35,25 +35,24 @@ export default function WorkforceDashboardScreen() {
   ];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
       >
         <LinearGradient
           colors={['#059669', '#10b981']}
           style={styles.header}
         >
-          <SafeAreaView>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Workforce Management</Text>
-              <Text style={styles.headerSubtitle}>
-                Manage your team and projects efficiently
-              </Text>
-            </View>
-          </SafeAreaView>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Workforce Management</Text>
+            <Text style={styles.headerSubtitle}>
+              Manage your team and projects efficiently
+            </Text>
+          </View>
         </LinearGradient>
 
         {/* Quick Actions Grid */}
@@ -146,7 +145,7 @@ export default function WorkforceDashboardScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

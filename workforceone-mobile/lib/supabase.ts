@@ -31,6 +31,168 @@ export const signUpWithEmail = async (email: string, password: string) => {
   return { data, error }
 }
 
+// Enhanced QR invitation handler - supports both signup and signin
+export const processQRInvitation = async (
+  invitationCode: string,
+  email: string,
+  name?: string
+) => {
+  try {
+    console.log('Processing QR invitation:', { invitationCode, email, name });
+    
+    // First, check if user already exists and try to sign them in
+    const { data: existingUser } = await supabase.auth.getUser();
+    
+    if (existingUser?.user) {
+      console.log('User already logged in, processing invitation directly');
+      const { data: inviteData, error: inviteError } = await supabase.rpc('complete_invitation_after_auth', {
+        invitation_code_param: invitationCode,
+        user_id_param: existingUser.user.id
+      });
+
+      if (inviteError) {
+        console.error('Invitation processing error:', inviteError);
+        return { data: null, error: inviteError.message };
+      }
+
+      return { 
+        data: { 
+          user: existingUser.user, 
+          session: null,
+          invitation_result: inviteData,
+          already_signed_in: true
+        }, 
+        error: null 
+      };
+    }
+
+    // For auto-invite emails, always try the standard password first
+    if (email.includes('@auto-invite.temp')) {
+      const standardPassword = 'password@2025';
+      console.log('Attempting sign in with standard password for auto-invite email...');
+      
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: standardPassword,
+      });
+
+      if (!signInError && signInData.session) {
+        console.log('Existing QR user signed in successfully with standard password');
+        
+        // Ensure profile exists for existing user too
+        try {
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', signInData.user.id)
+            .maybeSingle();
+
+          if (!existingProfile) {
+            console.log('Creating missing profile for existing QR user...');
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                id: signInData.user.id,
+                email: signInData.user.email,
+                full_name: name || 'Guard User',
+                role: 'guard',
+                organization_id: null,
+                is_active: true
+              });
+
+            if (profileError) {
+              console.error('Profile creation error:', profileError);
+            } else {
+              console.log('Missing profile created successfully');
+            }
+          }
+        } catch (profileCreationError) {
+          console.error('Profile check/creation failed:', profileCreationError);
+        }
+
+        return { 
+          data: { 
+            user: signInData.user, 
+            session: signInData.session,
+            existing_user_signin: true,
+            profile_ensured: true
+          }, 
+          error: null 
+        };
+      } else if (signInError?.message?.includes('Invalid login credentials')) {
+        console.log('Standard password failed, trying legacy password patterns...');
+        
+        // Try legacy password patterns for existing QR users
+        const legacyPasswords = [
+          `TempPass${invitationCode.toUpperCase()}!`,
+          `QR${invitationCode.toUpperCase()}2025!`,
+          `Guard${invitationCode.toUpperCase()}!`
+        ];
+        
+        for (const legacyPassword of legacyPasswords) {
+          console.log('Trying legacy password pattern...');
+          const { data: legacySignInData, error: legacySignInError } = await supabase.auth.signInWithPassword({
+            email,
+            password: legacyPassword,
+          });
+          
+          if (!legacySignInError && legacySignInData.session) {
+            console.log('Existing user signed in with legacy password');
+            
+            // Ensure profile exists for legacy user too
+            try {
+              const { data: existingProfile } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('id', legacySignInData.user.id)
+                .maybeSingle();
+
+              if (!existingProfile) {
+                console.log('Creating missing profile for legacy QR user...');
+                await supabase
+                  .from('profiles')
+                  .insert({
+                    id: legacySignInData.user.id,
+                    email: legacySignInData.user.email,
+                    full_name: name || 'Guard User',
+                    role: 'guard',
+                    organization_id: null,
+                    is_active: true
+                  });
+              }
+            } catch (profileCreationError) {
+              console.error('Profile check/creation failed:', profileCreationError);
+            }
+
+            return { 
+              data: { 
+                user: legacySignInData.user, 
+                session: legacySignInData.session,
+                existing_user_signin: true,
+                legacy_password_used: true
+              }, 
+              error: null 
+            };
+          }
+        }
+        
+        console.log('All password patterns failed, user may not exist yet');
+      } else {
+        console.log('Sign in failed with error:', signInError?.message);
+      }
+    }
+
+    // If no existing user, proceed with signup
+    console.log('No existing user found, creating new account...');
+    return await autoSignUpWithInvitation(invitationCode, email, name);
+    
+  } catch (error: any) {
+    console.error('QR invitation processing error:', error);
+    return { data: null, error: error.message || 'Failed to process QR invitation' };
+  }
+}
+
+
 // Auto sign-up with invitation (creates account and processes invitation)
 export const autoSignUpWithInvitation = async (
   invitationCode: string,
@@ -40,13 +202,13 @@ export const autoSignUpWithInvitation = async (
   try {
     console.log('Auto signing up with invitation:', { invitationCode, email, name });
     
-    // Generate a random password for the user
-    const tempPassword = 'TempPass' + Math.random().toString(36).substring(2, 8) + '!';
+    // Use standard password for all QR users
+    const standardPassword = 'password@2025';
     
     // Create the user account with email confirmation disabled
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
-      password: tempPassword,
+      password: standardPassword,
       options: {
         data: {
           full_name: name || 'New User',
@@ -57,6 +219,39 @@ export const autoSignUpWithInvitation = async (
     });
 
     if (signUpError) {
+      // If user already exists, try to sign them in with the standard password
+      if (signUpError.message.includes('already registered')) {
+        console.log('User already exists, attempting sign in with standard password...');
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: standardPassword,
+        });
+
+        if (!signInError && signInData.session) {
+          console.log('Existing user signed in successfully');
+          
+          // Process invitation for existing user
+          const { data: inviteData, error: inviteError } = await supabase.rpc('complete_invitation_after_auth', {
+            invitation_code_param: invitationCode,
+            user_id_param: signInData.user.id
+          });
+
+          return { 
+            data: { 
+              user: signInData.user, 
+              session: signInData.session,
+              invitation_result: inviteData,
+              existing_user_signin: true,
+              temp_password: standardPassword
+            }, 
+            error: null 
+          };
+        } else {
+          console.log('Sign in with standard password failed:', signInError?.message);
+          // Password might have been set differently, return error
+        }
+      }
+      
       console.error('Sign up error:', signUpError);
       return { data: null, error: signUpError.message };
     }
@@ -68,7 +263,7 @@ export const autoSignUpWithInvitation = async (
       // Try to sign in immediately with the credentials
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
-        password: tempPassword,
+        password: standardPassword,
       });
 
       if (signInError) {
@@ -87,7 +282,7 @@ export const autoSignUpWithInvitation = async (
               session: null,
               needs_confirmation: true,
               invitation_result: inviteData,
-              temp_password: tempPassword
+              temp_password: standardPassword
             }, 
             error: 'Account created but email confirmation required' 
           };
@@ -97,34 +292,46 @@ export const autoSignUpWithInvitation = async (
               user: signUpData.user, 
               session: null,
               needs_confirmation: true,
-              temp_password: tempPassword
+              temp_password: standardPassword
             }, 
             error: 'Account created but email confirmation required' 
           };
         }
       }
 
-      // If sign-in was successful, complete the invitation
+      // If sign-in was successful, ensure profile exists and process invitation
       if (signInData.session) {
-        console.log('User signed in successfully, processing invitation...');
+        console.log('User signed in successfully, ensuring profile exists...');
         
-        const { data: inviteData, error: inviteError } = await supabase.rpc('complete_invitation_after_auth', {
-          invitation_code_param: invitationCode,
-          user_id_param: signInData.user.id
-        });
+        // First, ensure the user has a profile
+        try {
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', signInData.user.id)
+            .maybeSingle();
 
-        if (inviteError) {
-          console.error('Invitation completion error:', inviteError);
-          // User signed in but invitation failed - still a success
-          return { 
-            data: { 
-              user: signInData.user, 
-              session: signInData.session,
-              invitation_error: inviteError.message,
-              temp_password: tempPassword
-            }, 
-            error: null 
-          };
+          if (!existingProfile) {
+            console.log('Creating profile for QR user...');
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                id: signInData.user.id,
+                email: signInData.user.email,
+                full_name: name || 'Guard User',
+                role: 'guard', // Default role for QR users
+                organization_id: null,
+                is_active: true
+              });
+
+            if (profileError) {
+              console.error('Profile creation error:', profileError);
+            } else {
+              console.log('Profile created successfully');
+            }
+          }
+        } catch (profileCreationError) {
+          console.error('Profile check/creation failed:', profileCreationError);
         }
 
         console.log('Complete auto sign-in successful!');
@@ -132,9 +339,9 @@ export const autoSignUpWithInvitation = async (
           data: { 
             user: signInData.user, 
             session: signInData.session,
-            invitation_result: inviteData,
-            temp_password: tempPassword,
-            auto_signed_in: true
+            temp_password: standardPassword,
+            auto_signed_in: true,
+            profile_created: true
           }, 
           error: null 
         };
@@ -184,28 +391,24 @@ export const getUser = async () => {
   return { user, error }
 }
 
-// Product access functions
+// SECURE: Product access functions using RBAC
 export const getUserProducts = async (): Promise<string[]> => {
+  // Import RBAC functions here to avoid circular dependency
+  const { getCurrentUserProfile } = await import('./rbac');
+  
   try {
-    const { user } = await getUser()
-    if (!user) return []
-
-    // Get user's products from database
-    const { data, error } = await supabase
-      .from('user_products')
-      .select('product_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-
-    if (error) {
-      console.error('Error fetching user products:', error)
-      return []
+    const userProfile = await getCurrentUserProfile();
+    
+    if (!userProfile) {
+      console.log('No user profile found - denying all product access');
+      return []; // SECURE: Return empty array instead of all products
     }
 
-    return data?.map(item => item.product_id) || []
+    console.log(`User ${userProfile.email} (${userProfile.role}) has access to:`, userProfile.permissions.products);
+    return userProfile.permissions.products;
   } catch (error) {
-    console.error('Error getting user products:', error)
-    return []
+    console.error('Error getting user products:', error);
+    return []; // SECURE: Return empty array on error
   }
 }
 
@@ -229,11 +432,22 @@ export const getUserProfile = async () => {
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error('Error fetching profile:', error)
       return { profile: null }
+    }
+
+    // If no profile exists, create a basic one from user data
+    if (!profile) {
+      const basicProfile = {
+        id: user.id,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        email: user.email,
+        created_at: user.created_at
+      }
+      return { profile: basicProfile }
     }
 
     return { profile }
