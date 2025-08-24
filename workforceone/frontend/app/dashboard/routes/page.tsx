@@ -337,12 +337,12 @@ export default function RoutesPage() {
 
       if (error) throw error
       
-      console.log('Fetched outlets from database:', data?.length || 0, data)
+      devLog('Fetched outlets from database:', data?.length || 0, data);
       setOutlets(data || [])
 
       // Set map center to first outlet with coordinates
       const outletWithLocation = data?.find(o => o.latitude && o.longitude)
-      // console.log('Outlet with location:', outletWithLocation)
+      // devLog('Outlet with location:', outletWithLocation);
       if (outletWithLocation) {
         setMapCenter({ lat: outletWithLocation.latitude!, lng: outletWithLocation.longitude! })
       }
@@ -415,7 +415,7 @@ export default function RoutesPage() {
         role: p.role || 'employee'
       }))
       
-      console.log('Fetched users:', mappedUsers)
+      devLog('Fetched users:', mappedUsers);
       setUsers(mappedUsers)
     } catch (error) {
       console.error('Error fetching users:', error)
@@ -658,26 +658,26 @@ This will calculate the best order for visiting all outlets.`)
       if (error) {
         // If no optimization data exists, this is not an error - just means route hasn't been optimized yet
         if (error.code === 'PGRST116') {
-          console.log('No saved optimization found for route:', routeId)
+          devLog('No saved optimization found for route:', routeId);
           return false
         }
         throw error
       }
 
       if (routeData?.optimized_route_data && routeData?.optimization_timestamp) {
-        console.log('Loading saved optimization data for route:', routeId)
+        devLog('Loading saved optimization data for route:', routeId);
         const optimizedRoute = routeData.optimized_route_data as OptimizedRoute
         setOptimizedRoutes(prev => new Map(prev.set(routeId, optimizedRoute)))
         
         const optimizedDate = new Date(routeData.optimization_timestamp)
-        console.log(`Loaded optimization from ${optimizedDate.toLocaleString()}`)
+        devLog(`Loaded optimization from ${optimizedDate.toLocaleString();}`)
         return true
       }
       
-      console.log('Route exists but has no optimization data yet')
+      devLog('Route exists but has no optimization data yet');
       return false
     } catch (error) {
-      console.log('Could not load saved optimization:', error)
+      devLog('Could not load saved optimization:', error);
       return false
     }
   }
@@ -857,13 +857,13 @@ This will calculate the best order for visiting all outlets.`)
         const newDate = new Date(routeForm.route_date)
         const newDayOfWeek = newDate.getDay() === 0 ? 7 : newDate.getDay() // Convert Sunday (0) to 7
         
-        console.log('Updating route assignment for date change:', {
+        devLog('Updating route assignment for date change:', {
           oldDate: selectedRoute.route_date,
           newDate: routeForm.route_date,
           newDayOfWeek,
           assignmentId: selectedRoute.route_assignments[0].id,
           wasRecurring: selectedRoute.route_assignments[0].is_recurring
-        })
+        });
 
         // Update the route assignment - convert to one-time assignment with specific date
         const { error: assignmentError } = await supabase
@@ -880,7 +880,7 @@ This will calculate the best order for visiting all outlets.`)
           console.error('Error updating route assignment:', assignmentError)
           // Don't throw here - route was already updated successfully
         } else {
-          console.log('Successfully updated route assignment to one-time assignment for', routeForm.route_date)
+          devLog('Successfully updated route assignment to one-time assignment for', routeForm.route_date);
           // Force another refresh since we updated the assignment
           setRoutesLastUpdated(Date.now())
         }
@@ -992,7 +992,7 @@ This will calculate the best order for visiting all outlets.`)
 
   const optimizeRoute = async (routeId: string) => {
     try {
-      console.log('Starting route optimization for route:', routeId)
+      devLog('Starting route optimization for route:', routeId);
       
       // Find the route
       const route = routes.find(r => r.id === routeId)
@@ -1029,14 +1029,14 @@ This will calculate the best order for visiting all outlets.`)
       }
 
       // Show loading indicator
-      console.log('About to start route optimization...')
+      devLog('About to start route optimization...');
       alert('Optimizing route... This may take a few moments.')
       
       // Optimize the route
-      console.log('Calling routeOptimizationService.optimizeRoute with:', {
+      devLog('Calling routeOptimizationService.optimizeRoute with:', {
         routeStops,
         optimizationSettings
-      })
+      });
       
       const optimizedRoute: OptimizedRoute = await routeOptimizationService.optimizeRoute(
         routeStops,
@@ -1045,7 +1045,7 @@ This will calculate the best order for visiting all outlets.`)
         optimizationSettings
       )
       
-      console.log('Route optimization completed successfully:', optimizedRoute)
+      devLog('Route optimization completed successfully:', optimizedRoute);
 
       // Update the route in the database with optimized data
       const { error: updateError } = await supabase
@@ -1170,14 +1170,14 @@ This will calculate the best order for visiting all outlets.`)
         </div>
         <div className="flex space-x-3">
           <Button variant="outline" onClick={() => {
-            console.log('Settings button clicked')
+            devLog('Settings button clicked');
             setShowSettings(true)
           }}>
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
           <Button onClick={() => {
-            console.log('Create Route button clicked')
+            devLog('Create Route button clicked');
             setShowCreateRoute(true)
           }} className="bg-gradient-to-r from-blue-600 to-blue-700">
             <Plus className="h-4 w-4 mr-2" />
@@ -1457,12 +1457,12 @@ This will calculate the best order for visiting all outlets.`)
                       size="sm"
                       onClick={async () => {
                         const newRouteId = showRouteOnMap === route.id ? null : route.id
-                        console.log('Show/Hide route clicked:', { 
+                        devLog('Show/Hide route clicked:', { 
                           routeId: route.id, 
                           routeName: route.name,
                           currentlyShowing: showRouteOnMap, 
                           newSelection: newRouteId,
-                          hasOptimizedRoute: optimizedRoutes.has(route.id),
+                          hasOptimizedRoute: optimizedRoutes.has(route.id);,
                           optimizedRoute: optimizedRoutes.get(route.id)
                         })
                         
@@ -1470,9 +1470,9 @@ This will calculate the best order for visiting all outlets.`)
                         if (newRouteId && !optimizedRoutes.has(route.id)) {
                           const loaded = await loadSavedOptimization(newRouteId)
                           if (loaded) {
-                            console.log('Successfully loaded saved optimization for route')
+                            devLog('Successfully loaded saved optimization for route');
                           } else {
-                            console.log('No saved optimization found for route')
+                            devLog('No saved optimization found for route');
                           }
                         }
                         
@@ -1557,7 +1557,7 @@ This will calculate the best order for visiting all outlets.`)
       </Tabs>
 
       {/* Create Route Modal - Enhanced with outlet selection */}
-      {/* {console.log('Create Route Modal isOpen:', showCreateRoute)} */}
+      {/* {devLog('Create Route Modal isOpen:', showCreateRoute);} */}
       {showCreateRoute && (
         <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -1625,7 +1625,7 @@ This will calculate the best order for visiting all outlets.`)
 
               <div>
                 <Label>Select Outlets for Route</Label>
-                {/* {console.log('Outlets in modal:', outlets.length, outlets.map(o => o.name))} */}
+                {/* {devLog('Outlets in modal:', outlets.length, outlets.map(o => o.name);)} */}
                 <div className="mt-2 space-y-2">
                   {/* Search box */}
                   <div className="relative">
@@ -1804,7 +1804,7 @@ This will calculate the best order for visiting all outlets.`)
                 <Select 
                   value={assignmentForm.assignee_type} 
                   onValueChange={(value: any) => {
-                    console.log('Assignment type selected:', value)
+                    devLog('Assignment type selected:', value);
                     setAssignmentForm({ ...assignmentForm, assignee_type: value, assignee_id: '' })
                   }}
                 >
@@ -1823,7 +1823,7 @@ This will calculate the best order for visiting all outlets.`)
                 <Select 
                   value={assignmentForm.assignee_id} 
                   onValueChange={(value) => {
-                    console.log('User/Team selected:', value)
+                    devLog('User/Team selected:', value);
                     setAssignmentForm({ ...assignmentForm, assignee_id: value })
                   }}
                 >
@@ -1833,7 +1833,7 @@ This will calculate the best order for visiting all outlets.`)
                   <SelectContent className="z-[10001]">
                     {assignmentForm.assignee_type === 'user' 
                       ? users.map(user => {
-                          console.log('Rendering user option:', user)
+                          devLog('Rendering user option:', user);
                           return (
                             <SelectItem key={user.id} value={user.id} textValue={`${user.full_name} (${user.role})`}>
                               <div className="flex items-center space-x-2">

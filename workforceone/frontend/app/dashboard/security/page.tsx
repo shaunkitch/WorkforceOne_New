@@ -52,6 +52,7 @@ import PatrolRouteManager from '@/components/security/PatrolRouteManager';
 import EmergencyResponsePanel from '@/components/security/EmergencyResponsePanel';
 import SecurityAnalytics from '@/components/security/SecurityAnalytics';
 
+import { devLog } from '@/lib/utils/logger';
 // Interfaces for type safety
 
 interface GuardLocation {
@@ -234,13 +235,13 @@ export default function SecurityDashboard() {
   // Load recent incidents from API
   const loadRecentIncidents = async () => {
     try {
-      console.log('🔄 Loading incidents from API...');
+      devLog('🔄 Loading incidents from API...');
       const response = await fetch('/api/incidents');
       const result = await response.json();
       
       if (result.success && result.data) {
-        console.log('✅ Loaded', result.count, 'incidents from API');
-        console.log('📊 Sources:', result.sources);
+        devLog('✅ Loaded', result.count, 'incidents from API');
+        devLog('📊 Sources:', result.sources);
         setIncidents(result.data);
       } else {
         console.error('❌ API error:', result.error);
@@ -317,11 +318,11 @@ export default function SecurityDashboard() {
 
   // Handle guard and incident clicks
   const handleGuardClick = (guard: GuardLocation) => {
-    console.log('Guard clicked:', guard);
+    devLog('Guard clicked:', guard);
   };
 
   const handleIncidentClick = (incident: SecurityIncident) => {
-    console.log('Incident clicked:', incident);
+    devLog('Incident clicked:', incident);
   };
 
   // Guard invitation functions
@@ -380,7 +381,7 @@ export default function SecurityDashboard() {
       const registrationLink = `${baseUrl}/signup?type=security&code=${code}&email=${encodeURIComponent(inviteEmail.trim())}`;
       setInviteLink(registrationLink);
       
-      console.log('🛡️ Guard invitation created successfully:', { id: invitation.id, code, email: inviteEmail.trim() });
+      devLog('🛡️ Guard invitation created successfully:', { id: invitation.id, code, email: inviteEmail.trim(); });
 
     } catch (error: any) {
       console.error('Error generating invitation:', error);
@@ -849,7 +850,7 @@ Welcome to the team! 🚀`);
                           onClick={(e) => {
                             e.stopPropagation();
                             // Handle status change
-                            console.log('Update incident status:', incident.id);
+                            devLog('Update incident status:', incident.id);
                           }}
                         >
                           {incident.status === 'submitted' ? 'Investigate' : 

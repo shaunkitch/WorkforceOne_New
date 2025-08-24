@@ -215,7 +215,7 @@ export default function TimeTrackingPage() {
         status: 'active'
       }
 
-      console.log('Creating time entry:', timeEntryData)
+      devLog('Creating time entry:', timeEntryData);
 
       const { data, error } = await supabase
         .from('time_entries')
@@ -225,7 +225,7 @@ export default function TimeTrackingPage() {
 
       if (error) throw error
 
-      console.log('Time entry created:', data)
+      devLog('Time entry created:', data);
       setActiveEntryId(data.id)
       setStartTime(now)
       setIsRunning(true)
@@ -274,7 +274,7 @@ export default function TimeTrackingPage() {
         status: 'completed'
       }
 
-      console.log('Updating time entry to completed:', { activeEntryId, updateData })
+      devLog('Updating time entry to completed:', { activeEntryId, updateData });
 
       const { data, error } = await supabase
         .from('time_entries')
@@ -285,7 +285,7 @@ export default function TimeTrackingPage() {
 
       if (error) throw error
 
-      console.log('Time entry completed:', data)
+      devLog('Time entry completed:', data);
 
       setIsRunning(false)
       setActiveEntryId(null)
@@ -347,7 +347,7 @@ export default function TimeTrackingPage() {
         status: 'completed'
       }
 
-      console.log('Creating manual time entry:', manualEntryData)
+      devLog('Creating manual time entry:', manualEntryData);
 
       const { data, error } = await supabase
         .from('time_entries')
@@ -357,7 +357,7 @@ export default function TimeTrackingPage() {
 
       if (error) throw error
 
-      console.log('Manual time entry created:', data)
+      devLog('Manual time entry created:', data);
 
       // Reset form
       setManualStartTime('')

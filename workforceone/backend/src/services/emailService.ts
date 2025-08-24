@@ -1,10 +1,12 @@
 import dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
+import { createLogger } from '../utils/logger'
 
 // Load environment variables
 dotenv.config()
 
 const nodemailer = require('nodemailer')
+const logger = createLogger('email-service')
 
 interface InvitationEmailData {
   email: string
@@ -76,13 +78,13 @@ class EmailService {
         .single()
 
       if (error || !data) {
-        console.log('No active email integration found for organization:', organizationId)
+        logger.debug('No active email integration found', { organizationId })
         return null
       }
 
       return data
-    } catch (error) {
-      console.error('Error fetching email integration:', error)
+    } catch (error: unknown) {
+      logger.error('Error fetching email integration', { error: error instanceof Error ? error.message : String(error) })
       return null
     }
   }
@@ -97,8 +99,8 @@ class EmailService {
       }
 
       return data
-    } catch (error) {
-      console.error('Error decrypting credential:', error)
+    } catch (error: unknown) {
+      logger.error('Error decrypting credential', { error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -212,8 +214,8 @@ class EmailService {
         default:
           throw new Error(`Unsupported email provider: ${integration.provider}`)
       }
-    } catch (error) {
-      console.error(`Error creating transporter for ${integration.provider}:`, error)
+    } catch (error: unknown) {
+      logger.error('Error creating transporter', { provider: integration.provider, error: error instanceof Error ? error.message : String(error) })
       // Fallback to default transporter
       return this.createDefaultTransporter()
     }
@@ -275,7 +277,7 @@ class EmailService {
       const info = await transporter.sendMail(mailOptions)
       
       // Log successful email send to the new email_logs table
-      await this.logEmailToDatabase(data.organizationId, integration?.id, {
+      await this.logEmailToDatabase(data.organizationId, integration?.id || null, {
         to_email: data.email,
         from_email: fromEmail,
         subject: mailOptions.subject,
@@ -285,16 +287,16 @@ class EmailService {
         related_invitation_token: data.invitationToken
       })
 
-      console.log('Invitation email sent:', info.messageId)
+      logger.info('Invitation email sent', { messageId: info.messageId })
       
       // In development, log the preview URL
       if (process.env.NODE_ENV !== 'production') {
-        console.log('Preview URL:', nodemailer.getTestMessageUrl(info))
+        logger.debug('Email preview URL', { previewUrl: nodemailer.getTestMessageUrl(info) })
       }
 
       return true
-    } catch (error) {
-      console.error('Failed to send invitation email:', error)
+    } catch (error: unknown) {
+      logger.error('Failed to send invitation email', { error: error instanceof Error ? error.message : String(error) })
       
       // Log failed email send
       await this.logEmailToDatabase(data.organizationId, null, {
@@ -471,8 +473,8 @@ This email was sent by WorkforceOne on behalf of ${data.organizationName}.
           sent_at: new Date().toISOString(),
           created_at: new Date().toISOString()
         })
-    } catch (error) {
-      console.error('Failed to log email to database:', error)
+    } catch (error: unknown) {
+      logger.error('Failed to log email to database', { error: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -486,25 +488,25 @@ This email was sent by WorkforceOne on behalf of ${data.organizationName}.
           metadata: metadata,
           created_at: new Date().toISOString()
         })
-    } catch (error) {
-      console.error('Failed to log email send:', error)
+    } catch (error: unknown) {
+      logger.error('Failed to log email send', { error: error instanceof Error ? error.message : String(error) })
     }
   }
 
   async testConnectionForOrganization(organizationId: string): Promise<{ success: boolean; error?: string; details?: any }> {
     try {
-      console.log('🔍 Testing email connection for organization:', organizationId)
+      logger.info('Testing email connection for organization', { organizationId })
       
       const integration = await this.getOrganizationEmailIntegration(organizationId)
       if (!integration) {
-        console.log('⚠️ No email integration found, using default transporter')
+        logger.debug('No email integration found, using default transporter')
         const transporter = this.createDefaultTransporter()
         await transporter.verify()
-        console.log('✅ Default email service connection verified')
+        logger.info('Default email service connection verified')
         return { success: true }
       }
       
-      console.log('📧 Email integration found:', {
+      logger.info('Email integration found', {
         provider: integration.provider,
         host: integration.smtp_host,
         port: integration.smtp_port,
@@ -514,17 +516,17 @@ This email was sent by WorkforceOne on behalf of ${data.organizationName}.
       
       const transporter = await this.createTransporterForOrganization(organizationId)
       
-      console.log('🔧 Testing transporter connection...')
+      logger.debug('Testing transporter connection')
       await transporter.verify()
-      console.log('✅ Email service connection verified for organization:', organizationId)
+      logger.info('Email service connection verified', { organizationId })
       return { success: true }
-    } catch (error) {
-      console.error('❌ Email service connection failed for organization:', organizationId)
-      console.error('Error details:', error)
+    } catch (error: unknown) {
+      logger.error('Email service connection failed', { organizationId })
+      logger.error('Email service connection error details', { error: error instanceof Error ? error.message : String(error) })
       
       let errorMessage = 'Unknown error'
       if (error instanceof Error) {
-        errorMessage = error.message
+        errorMessage = error instanceof Error ? error.message : String(error)
       }
       
       return { 
@@ -543,10 +545,10 @@ This email was sent by WorkforceOne on behalf of ${data.organizationName}.
     try {
       const transporter = this.createDefaultTransporter()
       await transporter.verify()
-      console.log('Email service connection verified (default)')
+      logger.info('Email service connection verified (default)')
       return true
-    } catch (error) {
-      console.error('Email service connection failed (default):', error)
+    } catch (error: unknown) {
+      logger.error('Email service connection failed (default)', { error: error instanceof Error ? error.message : String(error) })
       return false
     }
   }

@@ -2040,7 +2040,7 @@ function GroupFormsModal({ isOpen, onClose, onSuccess }: GroupFormsModalProps) {
       if (formsError) {
         console.error('Error fetching forms:', formsError)
       } else {
-        console.log('Fetched forms:', formsData)
+        devLog('Fetched forms:', formsData);
       }
 
       setForms(formsData || [])

@@ -1,12 +1,14 @@
 import dotenv from 'dotenv'
 import express from 'express'
 import cors from 'cors'
+import { createLogger } from './utils/logger'
 
 // Load environment variables
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5000
+const logger = createLogger('test-server')
 
 // Basic middleware
 app.use(cors())
@@ -28,7 +30,7 @@ app.get('/test-email', async (req, res) => {
     
     // Create test account
     const testAccount = await nodemailer.createTestAccount()
-    console.log('Test account created:', testAccount.user)
+    logger.info('Test account created', { user: testAccount.user })
     
     // Create transporter
     const transporter = nodemailer.createTransport({
@@ -46,18 +48,17 @@ app.get('/test-email', async (req, res) => {
       message: 'Email service test passed',
       testAccount: testAccount.user
     })
-  } catch (error) {
-    console.error('Email test failed:', error)
+  } catch (error: unknown) {
+    logger.error('Email test failed', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ 
       success: false,
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     })
   }
 })
 
 app.listen(PORT, () => {
-  console.log(`🚀 Test server running on port ${PORT}`)
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
+  logger.info('Test server started', { port: PORT, environment: process.env.NODE_ENV || 'development' })
 })
 
 export default app

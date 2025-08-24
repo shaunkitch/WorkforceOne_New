@@ -1020,7 +1020,7 @@ export default function TeamsPage() {
       }
 
       // Log the invitation (in production, save this to a database table)
-      console.log('User invitation created:', invitationData)
+      devLog('User invitation created:', invitationData);
 
       // Show the invitation instructions
       alert(inviteMessage)

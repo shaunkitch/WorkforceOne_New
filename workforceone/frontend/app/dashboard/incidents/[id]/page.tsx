@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { devLog, apiLog } from '@/lib/utils/logger'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,7 +49,7 @@ export default function IncidentDetailPage() {
 
   const loadIncident = async (incidentId: string) => {
     try {
-      console.log('🔄 Loading incident details for:', incidentId)
+      devLog('Loading incident details', { incidentId });
       const response = await fetch('/api/incidents')
       
       if (!response.ok) {
@@ -61,10 +62,12 @@ export default function IncidentDetailPage() {
         const foundIncident = result.data.find((inc: Incident) => inc.id === incidentId)
         if (foundIncident) {
           setIncident(foundIncident)
-          console.log('✅ Loaded incident:', foundIncident.title)
-          console.log('📸 Incident metadata:', foundIncident.metadata)
-          console.log('📸 Photo count:', foundIncident.metadata?.photos)
-          console.log('📸 Photo URLs:', foundIncident.metadata?.photo_urls)
+          devLog('Loaded incident', { 
+            title: foundIncident.title, 
+            metadata: foundIncident.metadata,
+            photoCount: foundIncident.metadata?.photos,
+            photoUrls: foundIncident.metadata?.photo_urls 
+          });
         } else {
           console.error('❌ Incident not found:', incidentId)
         }
@@ -335,11 +338,11 @@ export default function IncidentDetailPage() {
   }
 
   const handlePhotoClick = (photoUrl: string) => {
-    console.log('🖼️ Photo clicked:', photoUrl.substring(0, 50) + '...')
-    console.log('🔧 Setting modal state...')
+    devLog('Photo clicked', { photoUrl: photoUrl.substring(0, 50) + '...' });
+    devLog('Setting modal state...');
     setSelectedPhoto(photoUrl)
     setPhotoModalOpen(true)
-    console.log('✅ Modal should now be open')
+    devLog('Modal should now be open');
   }
 
   const closePhotoModal = () => {
@@ -382,7 +385,7 @@ export default function IncidentDetailPage() {
   const resolvedDateTime = incident.resolved_at ? formatDateTime(incident.resolved_at) : null
 
   // Debug modal state
-  console.log('🔍 Modal Debug - photoModalOpen:', photoModalOpen, 'selectedPhoto:', selectedPhoto ? 'has photo' : 'null')
+  devLog('Modal Debug', { photoModalOpen, hasSelectedPhoto: selectedPhoto ? 'has photo' : 'null' });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
@@ -506,10 +509,11 @@ export default function IncidentDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {console.log('🖼️ DEBUG: Photos section rendering')}
-                  {console.log('🖼️ Photo count:', incident.metadata.photos)}
-                  {console.log('🖼️ Has photo_urls:', incident.metadata?.photo_urls ? 'YES' : 'NO')}
-                  {console.log('🖼️ Photo URLs:', incident.metadata?.photo_urls)}
+                  {devLog('Photos section rendering', {
+                    photoCount: incident.metadata.photos,
+                    hasPhotoUrls: incident.metadata?.photo_urls ? 'YES' : 'NO',
+                    photoUrls: incident.metadata?.photo_urls
+                  }) && null}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {incident.metadata?.photo_urls ? (
                       // Display actual photos if available
@@ -518,7 +522,7 @@ export default function IncidentDetailPage() {
                           key={index} 
                           className="relative group cursor-pointer"
                           onClick={() => {
-                            console.log('📱 DIV clicked for photo', index + 1)
+                            devLog('DIV clicked for photo', { photoIndex: index + 1 });
                             handlePhotoClick(photoUrl)
                           }}
                         >
@@ -527,13 +531,13 @@ export default function IncidentDetailPage() {
                             alt={`Evidence photo ${index + 1}`}
                             className="w-full h-48 object-cover rounded-lg border shadow-sm hover:shadow-md transition-shadow"
                             onClick={(e) => {
-                              console.log('🖼️ IMG clicked for photo', index + 1)
+                              devLog('IMG clicked for photo', { photoIndex: index + 1 });
                               e.stopPropagation()
                               handlePhotoClick(photoUrl)
                             }}
-                            onLoad={() => console.log('✅ Photo loaded:', index + 1)}
+                            onLoad={() => devLog('Photo loaded', { photoIndex: index + 1 })}
                             onError={(e) => {
-                              console.log('❌ Photo failed to load:', index + 1)
+                              devLog('Photo failed to load', { photoIndex: index + 1 });
                               // Fallback to placeholder if image fails to load
                               e.currentTarget.src = `data:image/svg+xml;base64,${btoa(`
                                 <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">

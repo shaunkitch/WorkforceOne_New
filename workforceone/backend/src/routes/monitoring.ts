@@ -1,8 +1,10 @@
 import { Router } from 'express'
 import { monitoringService } from '../services/monitoring'
 import { authenticateUser, requireGlobalAdmin } from '../middleware/auth'
+import { createLogger } from '../utils/logger'
 
 const router = Router()
+const logger = createLogger('monitoring-routes')
 
 // Get current system status
 router.get('/status', authenticateUser, requireGlobalAdmin, async (req, res) => {
@@ -12,8 +14,8 @@ router.get('/status', authenticateUser, requireGlobalAdmin, async (req, res) => 
       success: true,
       data: status
     })
-  } catch (error) {
-    console.error('Error getting system status:', error)
+  } catch (error: unknown) {
+    logger.error('Error getting system status', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to get system status'
@@ -29,8 +31,8 @@ router.get('/alerts', authenticateUser, requireGlobalAdmin, async (req, res) => 
       success: true,
       data: alerts
     })
-  } catch (error) {
-    console.error('Error getting alerts:', error)
+  } catch (error: unknown) {
+    logger.error('Error getting alerts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to get alerts'
@@ -57,8 +59,8 @@ router.post('/alerts/:alertId/acknowledge', authenticateUser, requireGlobalAdmin
         error: 'Failed to acknowledge alert'
       })
     }
-  } catch (error) {
-    console.error('Error acknowledging alert:', error)
+  } catch (error: unknown) {
+    logger.error('Error acknowledging alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to acknowledge alert'
@@ -84,8 +86,8 @@ router.post('/alerts/:alertId/resolve', authenticateUser, requireGlobalAdmin, as
         error: 'Failed to resolve alert'
       })
     }
-  } catch (error) {
-    console.error('Error resolving alert:', error)
+  } catch (error: unknown) {
+    logger.error('Error resolving alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to resolve alert'
@@ -101,8 +103,8 @@ router.get('/health', authenticateUser, requireGlobalAdmin, async (req, res) => 
       success: true,
       data: healthScore
     })
-  } catch (error) {
-    console.error('Error getting health score:', error)
+  } catch (error: unknown) {
+    logger.error('Error getting health score', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to get health score'
@@ -125,8 +127,8 @@ router.get('/metrics', authenticateUser, requireGlobalAdmin, async (req, res) =>
       success: true,
       data: metrics
     })
-  } catch (error) {
-    console.error('Error getting metrics history:', error)
+  } catch (error: unknown) {
+    logger.error('Error getting metrics history', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to get metrics history'
@@ -166,8 +168,8 @@ router.post('/metrics', authenticateUser, requireGlobalAdmin, async (req, res) =
         error: 'Failed to record metric'
       })
     }
-  } catch (error) {
-    console.error('Error recording metric:', error)
+  } catch (error: unknown) {
+    logger.error('Error recording metric', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to record metric'
@@ -183,8 +185,8 @@ router.post('/collect', authenticateUser, requireGlobalAdmin, async (req, res) =
       success: true,
       message: 'Metrics collection triggered successfully'
     })
-  } catch (error) {
-    console.error('Error collecting metrics:', error)
+  } catch (error: unknown) {
+    logger.error('Error collecting metrics', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to collect metrics'
@@ -201,8 +203,8 @@ router.post('/start', authenticateUser, requireGlobalAdmin, async (req, res) => 
       success: true,
       message: 'Monitoring started successfully'
     })
-  } catch (error) {
-    console.error('Error starting monitoring:', error)
+  } catch (error: unknown) {
+    logger.error('Error starting monitoring', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to start monitoring'
@@ -218,8 +220,8 @@ router.post('/stop', authenticateUser, requireGlobalAdmin, async (req, res) => {
       success: true,
       message: 'Monitoring stopped successfully'
     })
-  } catch (error) {
-    console.error('Error stopping monitoring:', error)
+  } catch (error: unknown) {
+    logger.error('Error stopping monitoring', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to stop monitoring'

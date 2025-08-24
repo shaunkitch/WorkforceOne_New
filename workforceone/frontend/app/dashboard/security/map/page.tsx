@@ -38,6 +38,7 @@ import { createClient } from '@/lib/supabase/client';
 import SecurityMap from '@/components/security/SecurityMap';
 import RouteManagementMap from '@/components/security/RouteManagementMap';
 
+import { devLog } from '@/lib/utils/logger';
 // Interfaces for type safety
 interface GuardLocation {
   guard_id: string;
@@ -203,31 +204,31 @@ export default function SecurityMapPage() {
 
   // Handle guard and incident clicks
   const handleGuardClick = (guard: GuardLocation) => {
-    console.log('Guard clicked:', guard);
+    devLog('Guard clicked:', guard);
   };
 
   const handleIncidentClick = (incident: SecurityIncident) => {
-    console.log('Incident clicked:', incident);
+    devLog('Incident clicked:', incident);
   };
 
   // Handle route update for planning mode
   const handleRouteUpdate = async (routeId: string, updates: any) => {
-    console.log('Route update:', routeId, updates);
+    devLog('Route update:', routeId, updates);
     // Implementation for route updates
   };
 
   const handleCheckpointAdd = async (routeId: string, checkpoint: any) => {
-    console.log('Checkpoint add:', routeId, checkpoint);
+    devLog('Checkpoint add:', routeId, checkpoint);
     // Implementation for adding checkpoints
   };
 
   const handleCheckpointUpdate = async (checkpointId: string, updates: any) => {
-    console.log('Checkpoint update:', checkpointId, updates);
+    devLog('Checkpoint update:', checkpointId, updates);
     // Implementation for checkpoint updates
   };
 
   const handleCheckpointDelete = async (checkpointId: string) => {
-    console.log('Checkpoint delete:', checkpointId);
+    devLog('Checkpoint delete:', checkpointId);
     // Implementation for checkpoint deletion
   };
 

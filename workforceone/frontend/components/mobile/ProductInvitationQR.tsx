@@ -17,6 +17,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { devLog } from '@/lib/utils/logger';
 
 interface ProductInvitationQRProps {
   organizationId: string;
@@ -86,7 +87,7 @@ export default function ProductInvitationQR({
         throw new Error('User not authenticated');
       }
 
-      console.log('Creating invitation with data:', {
+      devLog('Creating invitation with data', {
         invitation_code: code,
         products: selectedProducts,
         organization_id: organizationId,
@@ -94,7 +95,7 @@ export default function ProductInvitationQR({
         status: 'pending'
       });
 
-      console.log('QR Data that will be generated:', JSON.stringify({
+      devLog('QR Data that will be generated', JSON.stringify({
         type: 'product_invitation',
         invitationCode: code,
         products: selectedProducts,
@@ -118,7 +119,7 @@ export default function ProductInvitationQR({
         throw error;
       }
 
-      console.log('Invitation created successfully:', data);
+      devLog('Invitation created successfully', data);
       return true;
     } catch (error) {
       console.error('Error creating invitation:', error);

@@ -2,11 +2,13 @@ import dotenv from 'dotenv'
 import express from 'express'
 import { createClient } from '@supabase/supabase-js'
 import EmailService from '../services/emailService'
+import { createLogger } from '../utils/logger'
 
 // Load environment variables
 dotenv.config()
 
 const router = express.Router()
+const logger = createLogger('simple-invitations')
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
@@ -83,8 +85,8 @@ router.post('/send-email', async (req: express.Request, res: express.Response) =
       invitationId 
     })
 
-  } catch (error) {
-    console.error('Error sending invitation email:', error)
+  } catch (error: unknown) {
+    logger.error('Error sending invitation email', { error: (error as Error).message })
     res.status(500).json({ 
       error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
@@ -180,8 +182,8 @@ router.post('/resend-email', async (req: express.Request, res: express.Response)
       newExpiryDate: newExpiryDate.toISOString()
     })
 
-  } catch (error) {
-    console.error('Error resending invitation email:', error)
+  } catch (error: unknown) {
+    logger.error('Error resending invitation email', { error: (error as Error).message })
     res.status(500).json({ 
       error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined

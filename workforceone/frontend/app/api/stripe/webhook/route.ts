@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
+import { logger, apiLog } from '@/lib/utils/logger'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20',
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Log successful payment
-          console.log('Subscription activated for organization:', metadata.organizationId)
+          apiLog('POST /api/stripe/webhook', `Subscription activated for organization: ${metadata.organizationId}`);
         }
         break
       }
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+        logger.info(`Unhandled Stripe event type: ${event.type}`, null, 'STRIPE');
     }
 
     return NextResponse.json({ received: true })

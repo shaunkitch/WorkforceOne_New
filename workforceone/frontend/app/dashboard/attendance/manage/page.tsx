@@ -318,9 +318,9 @@ export default function AttendanceManagePage() {
       .filter(emp => emp.status === 'not_checked_in' || emp.status === 'absent')
       .map(emp => emp.id)
     
-    console.log('Employees:', employees)
-    console.log('Not checked in employees:', notCheckedInEmployees)
-    console.log('Stats:', stats)
+    devLog('Employees:', employees);
+    devLog('Not checked in employees:', notCheckedInEmployees);
+    devLog('Stats:', stats);
     
     if (notCheckedInEmployees.length === 0) {
       alert('All employees have already checked in!')

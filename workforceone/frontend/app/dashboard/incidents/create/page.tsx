@@ -59,7 +59,7 @@ export default function CreateIncidentPage() {
 
   const handleSubmit = (isDraft: boolean = false) => {
     // In real app, this would submit to API
-    console.log('Submitting incident:', { ...formData, isDraft, timestamp: new Date() })
+    devLog('Submitting incident:', { ...formData, isDraft, timestamp: new Date(); })
     alert(isDraft ? 'Incident saved as draft!' : 'Incident reported successfully!')
   }
 

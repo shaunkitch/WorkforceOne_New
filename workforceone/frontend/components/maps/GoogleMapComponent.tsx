@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import simpleGoogleMapsService from '@/lib/google-maps-simple'
 import { OptimizedRoute } from '@/lib/routeOptimization'
+import { logger, devLog } from '@/lib/utils/logger'
 
 interface MapMarker {
   id: string
@@ -93,11 +94,11 @@ export default function GoogleMapComponent({
       })
 
       mapInstanceRef.current = map
-      console.log('Map instance set, ready for markers')
+      devLog('Map instance set, ready for markers');
       
       const infoWindow = await simpleGoogleMapsService.createInfoWindow()
       infoWindowRef.current = infoWindow
-      console.log('InfoWindow created, map fully ready')
+      devLog('InfoWindow created, map fully ready');
 
       onMapLoad?.(map)
       setIsLoading(false)
@@ -105,10 +106,10 @@ export default function GoogleMapComponent({
       // Trigger marker update now that map is ready
       setTimeout(() => {
         if (markers.length > 0) {
-          console.log('Map ready, updating markers with', markers.length, 'markers')
+          devLog('Map ready, updating markers', { markerCount: markers.length });
           // Call updateMarkers directly without depending on the callback
           if (mapInstanceRef.current && infoWindowRef.current) {
-            console.log('Updating markers directly after map initialization')
+            devLog('Updating markers directly after map initialization');
             // Clear existing markers
             markersRef.current.forEach(marker => marker.setMap(null))
             markersRef.current = []
@@ -164,15 +165,15 @@ export default function GoogleMapComponent({
 
   const updateMarkers = useCallback(async () => {
     if (!mapInstanceRef.current || !infoWindowRef.current) {
-      console.log('Map not ready for markers:', { 
+      devLog('Map not ready for markers', { 
         mapReady: !!mapInstanceRef.current, 
         infoWindowReady: !!infoWindowRef.current 
-      })
+      });
       return
     }
 
     try {
-      console.log('Updating markers, received', markers.length, 'markers')
+      devLog('Updating markers', { markerCount: markers.length });
       
       // Clear existing markers
       markersRef.current.forEach(marker => marker.setMap(null))
@@ -228,28 +229,28 @@ export default function GoogleMapComponent({
 
   // Function to display route polyline on map
   const displayRoute = useCallback(async () => {
-    console.log('displayRoute called with:', {
+    devLog('displayRoute called', {
       mapReady: !!mapInstanceRef.current,
       optimizedRoute: !!optimizedRoute,
       showRoutePolyline,
       routeStops: optimizedRoute?.stops?.length || 0
-    })
+    });
     
     if (!mapInstanceRef.current || !optimizedRoute || !showRoutePolyline) {
-      console.log('Route display conditions not met - skipping display')
+      devLog('Route display conditions not met - skipping display');
       return
     }
 
-    console.log('=== ROUTE VISUALIZATION DEBUG ===')
-    console.log('Displaying route on map:', optimizedRoute)
-    console.log('Route stops:', optimizedRoute.stops)
-    console.log('Number of stops:', optimizedRoute.stops.length)
-    console.log('Google Maps available:', typeof google !== 'undefined')
-    console.log('Maps API key:', process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing')
+    devLog('=== ROUTE VISUALIZATION DEBUG ===');
+    devLog('Displaying route on map', optimizedRoute);
+    devLog('Route stops', optimizedRoute.stops);
+    devLog('Number of stops', { count: optimizedRoute.stops.length });
+    devLog('Google Maps available', { available: typeof google !== 'undefined' });
+    devLog('Maps API key', { present: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing' });
 
     // If we have less than 2 stops, just center on the stops
     if (optimizedRoute.stops.length < 2) {
-      console.log('Not enough stops for route display')
+      devLog('Not enough stops for route display');
       return
     }
 
@@ -283,11 +284,11 @@ export default function GoogleMapComponent({
       const destination = optimizedRoute.stops[optimizedRoute.stops.length - 1]
 
       // Get directions from Google Maps
-      console.log('Making directions request:', {
+      devLog('Making directions request', {
         origin: `${origin.latitude}, ${origin.longitude}`,
         destination: `${destination.latitude}, ${destination.longitude}`,
         waypointsCount: waypoints.length
-      })
+      });
       
       const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
         directionsService.route({
@@ -298,7 +299,7 @@ export default function GoogleMapComponent({
           travelMode: google.maps.TravelMode.DRIVING,
           unitSystem: google.maps.UnitSystem.METRIC
         }, (result, status) => {
-          console.log('Directions API response:', status, result)
+          devLog('Directions API response', { status, result });
           if (status === google.maps.DirectionsStatus.OK && result) {
             resolve(result)
           } else {
@@ -341,19 +342,19 @@ export default function GoogleMapComponent({
       })
       mapInstanceRef.current.fitBounds(bounds)
 
-      console.log('Route displayed successfully with Directions API')
+      devLog('Route displayed successfully with Directions API');
     } catch (err) {
       console.error('Failed to display route using Directions API:', err)
-      console.log('Attempting fallback simple polyline...')
+      devLog('Attempting fallback simple polyline...');
       
       // Fallback: Create simple polyline connecting stops
       try {
-        console.log('Creating fallback polyline with stops:', optimizedRoute.stops)
+        devLog('Creating fallback polyline with stops', optimizedRoute.stops);
         const path = optimizedRoute.stops.map(stop => 
           new google.maps.LatLng(stop.latitude, stop.longitude)
         )
         
-        console.log('Polyline path created with', path.length, 'points')
+        devLog('Polyline path created', { pointCount: path.length });
         
         const polyline = new google.maps.Polyline({
           path: path,
@@ -366,14 +367,14 @@ export default function GoogleMapComponent({
         polyline.setMap(mapInstanceRef.current)
         polylineRef.current = polyline
         
-        console.log('Fallback polyline set on map')
+        devLog('Fallback polyline set on map');
         
         // Fit map to show all points
         const bounds = new google.maps.LatLngBounds()
         path.forEach(point => bounds.extend(point))
         mapInstanceRef.current.fitBounds(bounds)
         
-        console.log('Fallback polyline displayed successfully')
+        devLog('Fallback polyline displayed successfully');
       } catch (fallbackErr) {
         console.error('Failed to display fallback polyline:', fallbackErr)
       }
@@ -383,10 +384,10 @@ export default function GoogleMapComponent({
   // Separate effect to trigger route display when map becomes ready (after displayRoute is defined)
   useEffect(() => {
     if (mapInstanceRef.current && !isLoading && optimizedRoute && showRoutePolyline) {
-      console.log('Map is ready and we have route data - triggering route display')
+      devLog('Map is ready and we have route data - triggering route display');
       setTimeout(() => {
         if (mapInstanceRef.current && optimizedRoute && showRoutePolyline) {
-          console.log('Delayed route display call')
+          devLog('Delayed route display call');
           displayRoute()
         }
       }, 300)
@@ -395,12 +396,12 @@ export default function GoogleMapComponent({
 
   // Update markers, center, and zoom
   useEffect(() => {
-    console.log('GoogleMapComponent useEffect triggered', { 
+    devLog('GoogleMapComponent useEffect triggered', { 
       mapReady: !!mapInstanceRef.current, 
       markersCount: markers.length,
       center,
       zoom 
-    })
+    });
     if (mapInstanceRef.current) {
       updateMarkers()
       mapInstanceRef.current.setCenter(center)
@@ -410,18 +411,18 @@ export default function GoogleMapComponent({
 
   // Update route display when route changes
   useEffect(() => {
-    console.log('Route display useEffect triggered:', {
+    devLog('Route display useEffect triggered', {
       mapReady: !!mapInstanceRef.current,
       showRoutePolyline,
       hasOptimizedRoute: !!optimizedRoute,
       routeStopsCount: optimizedRoute?.stops?.length || 0
-    })
+    });
     
     if (mapInstanceRef.current && showRoutePolyline && optimizedRoute) {
-      console.log('Calling displayRoute function...')
+      devLog('Calling displayRoute function...');
       displayRoute()
     } else {
-      console.log('Clearing route display')
+      devLog('Clearing route display');
       // Clear route display when not showing
       if (directionsRendererRef.current) {
         directionsRendererRef.current.setMap(null)

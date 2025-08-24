@@ -49,7 +49,7 @@ export default function GuardsPage() {
 
   const loadRealGuards = async () => {
     try {
-      console.log('🔍 Loading guards from database...')
+      devLog('🔍 Loading guards from database...');
       
       // Try multiple approaches to find guards
       // Approach 1: Get guards from user_products table
@@ -71,13 +71,13 @@ export default function GuardsPage() {
         .eq('product_id', 'guard-management')
         .eq('is_active', true)
 
-      console.log('📊 user_products query result:', { guardUsers, error: guardError })
+      devLog('📊 user_products query result:', { guardUsers, error: guardError });
 
       // Approach 2: If no results, try profiles table directly
       let allGuards: any[] = guardUsers || []
       
       if (!guardUsers || guardUsers.length === 0) {
-        console.log('🔍 No guards found in user_products, checking profiles table...')
+        devLog('🔍 No guards found in user_products, checking profiles table...');
         
         const { data: profileGuards, error: profileError } = await supabase
           .from('profiles')
@@ -85,7 +85,7 @@ export default function GuardsPage() {
           .eq('role', 'guard')
           .eq('is_active', true)
 
-        console.log('📊 profiles query result:', { profileGuards, error: profileError })
+        devLog('📊 profiles query result:', { profileGuards, error: profileError });
         
         if (profileGuards && profileGuards.length > 0) {
           // Transform profiles to match user_products structure
@@ -105,6 +105,7 @@ export default function GuardsPage() {
       // Transform data to expected format
       const realGuards: Guard[] = allGuards.map((guardUser, index) => {
         const profile = Array.isArray(guardUser.profiles) ? guardUser.profiles[0] : guardUser.profiles;
+import { devLog } from '@/lib/utils/logger';
         return {
           id: guardUser.user_id,
           name: profile?.full_name || profile?.email || 'Unknown Guard',
@@ -125,7 +126,7 @@ export default function GuardsPage() {
         }
       })
 
-      console.log('✅ Loaded', realGuards.length, 'guards from database')
+      devLog('✅ Loaded', realGuards.length, 'guards from database');
       setGuards(realGuards)
 
     } catch (error) {
@@ -135,7 +136,7 @@ export default function GuardsPage() {
 
   const loadPendingInvitations = async () => {
     try {
-      console.log('🔍 Loading pending guard invitations...')
+      devLog('🔍 Loading pending guard invitations...');
       
       // Get current user's organization
       const { data: { user } } = await supabase.auth.getUser()
@@ -160,7 +161,7 @@ export default function GuardsPage() {
       if (productError) {
         console.error('Product invitations error:', productError)
       } else {
-        console.log('📊 Product invitations with guard access:', productInvites?.length || 0)
+        devLog('📊 Product invitations with guard access:', productInvites?.length || 0);
         if (productInvites && productInvites.length > 0) {
           setPendingInvitations(productInvites)
         }
@@ -177,7 +178,7 @@ export default function GuardsPage() {
       if (companyError) {
         console.error('Company invitations error:', companyError)
       } else {
-        console.log('📊 Company invitations for guards:', companyInvites?.length || 0)
+        devLog('📊 Company invitations for guards:', companyInvites?.length || 0);
         if (companyInvites && companyInvites.length > 0) {
           setPendingInvitations(prev => [...prev, ...companyInvites])
         }
@@ -221,7 +222,7 @@ export default function GuardsPage() {
 
   const handleInviteGuard = () => {
     // In real implementation, this would send an invitation
-    console.log('Inviting guard:', newGuard)
+    devLog('Inviting guard:', newGuard);
     setIsInviteModalOpen(false)
     setNewGuard({ name: '', email: '', phone: '', shift: '', certifications: [] })
   }

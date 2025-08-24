@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { devLog } from '@/lib/utils/logger'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -77,7 +78,7 @@ const MemberRoutes: React.FC = () => {
   const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
     const today = new Date()
     const weekStart = startOfWeek(today, { weekStartsOn: 1 })
-    console.log('Week calculation - today:', today.toISOString(), 'weekStart:', weekStart.toISOString())
+    devLog('Week calculation', { today: today.toISOString(), weekStart: weekStart.toISOString() });
     return weekStart
   })
   const [members, setMembers] = useState<Array<{ id: string; full_name: string; email: string }>>([])
@@ -99,7 +100,7 @@ const MemberRoutes: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number>(() => {
     const today = new Date().getDay()
     const converted = today === 0 ? 7 : today // Convert Sunday (0) to 7, keep others 1-6
-    console.log('Today init - JS getDay():', today, 'converted:', converted, 'date:', new Date().toISOString())
+    devLog('Today init', { jsGetDay: today, converted, date: new Date().toISOString() });
     return converted
   })
 
@@ -170,7 +171,7 @@ const MemberRoutes: React.FC = () => {
       const weekStart = selectedWeek
       const weekEnd = addDays(weekStart, 6)
 
-      console.log('Fetching routes for member:', selectedMember, 'Week:', weekStart.toISOString(), 'to', weekEnd.toISOString())
+      devLog('Fetching routes for member', { member: selectedMember, weekStart: weekStart.toISOString(), weekEnd: weekEnd.toISOString() });
       
       const { data: assignedRoutes, error } = await supabase
         .from('route_assignments')
@@ -207,7 +208,7 @@ const MemberRoutes: React.FC = () => {
         `)
         .eq('assignee_id', selectedMember)
       
-      console.log('Route assignments query result:', { assignedRoutes, error })
+      devLog('Route assignments query result', { assignedRoutes, error });
 
       if (assignedRoutes) {
         // Filter assignments that are relevant for this week
@@ -232,7 +233,7 @@ const MemberRoutes: React.FC = () => {
           return true // Include assignments without specific dates
         })
         
-        console.log('Relevant assignments after filtering:', relevantAssignments)
+        devLog('Relevant assignments after filtering', relevantAssignments);
 
         const formattedRoutes = relevantAssignments
           .map(a => ({
@@ -252,11 +253,11 @@ const MemberRoutes: React.FC = () => {
         const dayRoutes = formattedRoutes.filter(route => {
           const assignment = route.route_assignments[0]
           
-          console.log('Filtering route for selectedDay:', selectedDay, 'Route:', route.name, 'Assignment:', assignment)
+          devLog('Filtering route for selectedDay', { selectedDay, routeName: route.name, assignment });
           
           // For recurring assignments, check day of week
           if (assignment.is_recurring && assignment.day_of_week) {
-            console.log('Recurring assignment, day_of_week:', assignment.day_of_week, 'matches selectedDay:', assignment.day_of_week === selectedDay)
+            devLog('Recurring assignment', { dayOfWeek: assignment.day_of_week, selectedDay, matches: assignment.day_of_week === selectedDay });
             return assignment.day_of_week === selectedDay
           }
           
@@ -264,7 +265,7 @@ const MemberRoutes: React.FC = () => {
           if (assignment.assigned_date) {
             const assignedDate = new Date(assignment.assigned_date)
             const assignedDay = jsDateToDayNumber(assignedDate.getDay())
-            console.log('Dated assignment:', assignment.assigned_date, 'assignedDate:', assignedDate, 'assignedDay:', assignedDay, 'selectedDay:', selectedDay, 'matches:', assignedDay === selectedDay)
+            devLog('Dated assignment', { assignedDate: assignment.assigned_date, assignedDay, selectedDay, matches: assignedDay === selectedDay });
             return assignedDay === selectedDay
           }
           
@@ -272,14 +273,14 @@ const MemberRoutes: React.FC = () => {
           if (route.route_date) {
             const routeDate = new Date(route.route_date)
             const routeDay = jsDateToDayNumber(routeDate.getDay())
-            console.log('Route date:', route.route_date, 'routeDate:', routeDate, 'routeDay:', routeDay, 'selectedDay:', selectedDay, 'matches:', routeDay === selectedDay)
+            devLog('Route date', { routeDate: route.route_date, routeDay, selectedDay, matches: routeDay === selectedDay });
             return routeDay === selectedDay
           }
           
           return false
         })
         
-        console.log('Day routes for day', selectedDay, ':', dayRoutes)
+        devLog('Day routes', { day: selectedDay, routes: dayRoutes });
         setSelectedDayRoutes(dayRoutes)
       }
     } finally {
@@ -352,7 +353,7 @@ const MemberRoutes: React.FC = () => {
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(selectedWeek, i)
     const dayNum = jsDateToDayNumber(date.getDay())
-    console.log('Week day', i, '- date:', date.toISOString(), 'dayNum:', dayNum, 'dayName:', getDayName(dayNum))
+    devLog('Week day', { index: i, date: date.toISOString(), dayNum, dayName: getDayName(dayNum) });
     const dayRoutes = routes.filter(route => {
       const assignment = route.route_assignments[0]
       

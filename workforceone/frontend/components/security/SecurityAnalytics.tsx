@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { devLog } from '@/lib/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -160,7 +161,7 @@ export default function SecurityAnalytics() {
 
   const exportReport = () => {
     // Generate and download report
-    console.log('Exporting analytics report...');
+    devLog('Exporting analytics report...');
     alert('Analytics report will be downloaded');
   };
 

@@ -150,7 +150,7 @@ export default function FormAnalyticsPage() {
       .single()
 
     if (error) {
-      console.log('No analytics found, will calculate')
+      devLog('No analytics found, will calculate');
       return
     }
     setAnalytics(data)

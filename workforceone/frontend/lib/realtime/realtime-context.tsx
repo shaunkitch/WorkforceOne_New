@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { devLog } from '../utils/logger'
 
 interface RealtimeContextType {
   isConnected: boolean
@@ -26,12 +27,12 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
   useEffect(() => {
     // Listen for connection status changes
     supabase.realtime.onOpen(() => {
-      console.log('Realtime connected')
+      devLog('Realtime connected');
       setIsConnected(true)
     })
 
     supabase.realtime.onClose(() => {
-      console.log('Realtime disconnected')
+      devLog('Realtime disconnected');
       setIsConnected(false)
     })
 
@@ -65,7 +66,7 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log(`Subscribed to ${table} changes`)
+          devLog(`Subscribed to ${table} changes`);
         }
       })
 

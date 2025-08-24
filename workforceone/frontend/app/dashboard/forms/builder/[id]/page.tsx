@@ -154,7 +154,7 @@ export default function FormBuilderPage() {
         setFieldTypes(mergedTypes)
       }
     } catch (error) {
-      console.log('Using default field types')
+      devLog('Using default field types');
     }
   }
 

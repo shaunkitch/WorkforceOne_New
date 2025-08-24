@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { devLog } from '@/lib/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -122,7 +123,7 @@ export default function EmergencyResponsePanel() {
   };
 
   const handleEmergencyUpdate = (payload: any) => {
-    console.log('Emergency update received:', payload);
+    devLog('Emergency update received', payload);
     // Handle real-time updates
     if (payload.eventType === 'INSERT' && payload.new) {
       setActiveEmergency(payload.new);

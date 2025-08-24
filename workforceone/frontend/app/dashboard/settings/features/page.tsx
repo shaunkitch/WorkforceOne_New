@@ -140,7 +140,7 @@ export default function FeaturesPage() {
       if (error) throw error
 
       setUsers(orgUsers || [])
-      console.log('Fetched users:', orgUsers)
+      devLog('Fetched users:', orgUsers);
     } catch (error) {
       console.error('Error fetching users:', error)
       toast.error('Failed to load users')

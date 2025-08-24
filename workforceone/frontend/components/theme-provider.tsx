@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { devLog } from '@/lib/utils/logger'
 
 interface BrandingConfig {
   id: string
@@ -116,7 +117,7 @@ export function ThemeProvider({ children, organizationId }: ThemeProviderProps) 
       setLoading(true)
       
       // Temporarily skip branding fetch to fix 406 error
-      console.log('🎨 Skipping branding fetch for org:', orgId)
+      devLog('🎨 Skipping branding fetch for org', { orgId });
       setBranding(null)
       setLoading(false)
       return
@@ -203,7 +204,7 @@ export function ThemeProvider({ children, organizationId }: ThemeProviderProps) 
           filter: `organization_id=eq.${organizationId}`
         },
         (payload) => {
-          console.log('Branding updated:', payload)
+          devLog('Branding updated', payload);
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             const updatedBranding = payload.new as BrandingConfig
             applyBranding(updatedBranding)

@@ -3,11 +3,13 @@ import express from 'express'
 import { createClient } from '@supabase/supabase-js'
 import EmailService from '../services/emailService'
 import { body, validationResult } from 'express-validator'
+import { createLogger } from '../utils/logger'
 
 // Load environment variables
 dotenv.config()
 
 const router = express.Router()
+const logger = createLogger('invitations')
 const emailService = new EmailService()
 
 // Initialize Supabase client
@@ -52,8 +54,8 @@ const authenticateUser = async (req: express.Request, res: express.Response, nex
     req.user = user
     req.userProfile = profile
     next()
-  } catch (error) {
-    console.error('Authentication error:', error)
+  } catch (error: unknown) {
+    logger.error('Authentication error', { error: error instanceof Error ? error.message : String(error) })
     return res.status(401).json({ error: 'Authentication failed' })
   }
 }
@@ -138,11 +140,11 @@ router.post('/send-email',
         invitationId 
       })
 
-    } catch (error) {
-      console.error('Error sending invitation email:', error)
+    } catch (error: unknown) {
+      logger.error('Error sending invitation email', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ 
         error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
       })
     }
   }
@@ -232,7 +234,7 @@ router.post('/resend-email',
       })
 
     } catch (error: unknown) {
-      console.error('Error resending invitation email:', error)
+      logger.error('Error resending invitation email', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ 
         error: 'Internal server error',
         message: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
@@ -249,7 +251,7 @@ router.get('/test-email',
       const userProfile = req.userProfile
 
       // Only allow admins to test email service
-      if (userProfile.role !== 'admin') {
+      if (!userProfile || userProfile.role !== 'admin') {
         return res.status(403).json({ error: 'Only administrators can test email service' })
       }
 
@@ -260,11 +262,11 @@ router.get('/test-email',
         message: connectionStatus ? 'Email service is working' : 'Email service connection failed'
       })
 
-    } catch (error) {
-      console.error('Error testing email service:', error)
+    } catch (error: unknown) {
+      logger.error('Error testing email service', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ 
         error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
       })
     }
   }

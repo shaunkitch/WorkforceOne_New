@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { logger, devLog } from '../utils/logger'
 
 export interface CreateNotificationParams {
   userId: string
@@ -213,7 +214,7 @@ class NotificationService {
         .lt('expires_at', new Date().toISOString())
 
       if (error) throw error
-      console.log('Expired notifications cleaned up')
+      devLog('Expired notifications cleaned up');
     } catch (error) {
       console.error('Error cleaning up expired notifications:', error)
     }

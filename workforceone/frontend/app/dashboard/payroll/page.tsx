@@ -203,7 +203,7 @@ export default function PayrollPage() {
         .select('*')
         .eq('organization_id', profile.organization_id)
 
-      console.log('Employees query:', {
+      devLog('Employees query:', {
         organizationId: profile.organization_id,
         employeesCount: employees?.length || 0,
         employeesError,
@@ -213,7 +213,7 @@ export default function PayrollPage() {
           email: emp.email,
           role: emp.role,
           is_active: emp.is_active
-        }))
+        });)
       })
 
       if (!employees) return
@@ -236,9 +236,9 @@ export default function PayrollPage() {
         .in('user_id', employees.map(emp => emp.id))
         .order('date')
 
-      console.log('Attendance data query:', {
+      devLog('Attendance data query:', {
         dateRange,
-        employeeIds: employees.map(emp => emp.id),
+        employeeIds: employees.map(emp => emp.id);,
         employeeNames: employees.map(emp => ({ id: emp.id, name: emp.full_name })),
         attendanceCount: attendanceData?.length || 0,
         attendanceError,
@@ -286,11 +286,9 @@ export default function PayrollPage() {
           const empData = employeeHours.get(record.user_id)
           if (!empData) return
 
-          console.log(`Processing attendance for ${empData.employee_name} on ${record.date}:`, {
-            work_hours: record.work_hours,
-            overtime_hours: record.overtime_hours,
-            status: record.status
-          })
+          devLog(`Processing attendance for ${empData.employee_name} on ${record.date}:`, { data: {
+            work_hours: record.work_hours, overtime_hours: record.overtime_hours, status: record.status
+          } });
 
           // Add work hours (already calculated in attendance table)
           const workHours = parseFloat(record.work_hours) || 0
@@ -327,9 +325,9 @@ export default function PayrollPage() {
       }
 
       // Add debug logging for final employee hours data
-      console.log('Final employee hours data:', {
+      devLog('Final employee hours data:', {
         totalEmployees: employeeHours.size,
-        employeesWithHours: Array.from(employeeHours.values()).filter(emp => emp.total_hours > 0).length,
+        employeesWithHours: Array.from(employeeHours.values();).filter(emp => emp.total_hours > 0).length,
         sampleEmployeeData: Array.from(employeeHours.values())[0]
       })
 

@@ -1,4 +1,5 @@
 import { Loader } from '@googlemaps/js-api-loader'
+import { logger, devLog } from './utils/logger'
 
 class GoogleMapsService {
   private static instance: GoogleMapsService
@@ -28,19 +29,19 @@ class GoogleMapsService {
   }
 
   public async loadGoogleMaps(): Promise<typeof google> {
-    console.log('Loading Google Maps...')
+    devLog('Loading Google Maps...');
     
     if (this.isLoaded && window.google) {
-      console.log('Google Maps already loaded')
+      devLog('Google Maps already loaded');
       return Promise.resolve(window.google)
     }
 
     if (this.loadPromise) {
-      console.log('Google Maps loading in progress, waiting...')
+      devLog('Google Maps loading in progress, waiting...');
       return this.loadPromise
     }
 
-    console.log('Starting Google Maps API load...')
+    devLog('Starting Google Maps API load...');
     
     // Add timeout to the loading
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -53,7 +54,7 @@ class GoogleMapsService {
       this.loader.load(),
       timeoutPromise
     ]).then((google) => {
-      console.log('Google Maps loaded successfully')
+      devLog('Google Maps loaded successfully');
       this.isLoaded = true
       return google
     }).catch((error) => {

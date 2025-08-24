@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRealtime } from './realtime-context'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { devLog } from '../utils/logger'
 
 // Hook for real-time time entries
 export function useRealtimeTimeEntries(onUpdate?: (payload: RealtimePostgresChangesPayload<any>) => void) {
@@ -10,7 +11,7 @@ export function useRealtimeTimeEntries(onUpdate?: (payload: RealtimePostgresChan
   
   useEffect(() => {
     const unsubscribe = subscribe('time_entries', (payload) => {
-      console.log('Time entry change:', payload)
+      devLog('Time entry change:', payload);
       if (onUpdate) {
         onUpdate(payload)
       }
@@ -27,7 +28,7 @@ export function useTeamPresence() {
 
   useEffect(() => {
     const unsubscribe = subscribeToPresence('team_presence', (payload) => {
-      console.log('Presence update:', payload)
+      devLog('Presence update:', payload);
       // Handle presence updates
       if (payload.event === 'sync') {
         const users = Object.values(payload.state || {})
@@ -55,7 +56,7 @@ export function useRealtimeNotifications() {
 
   useEffect(() => {
     const unsubscribe = subscribe('notifications', (payload) => {
-      console.log('Notification:', payload)
+      devLog('Notification:', payload);
       
       if (payload.eventType === 'INSERT') {
         setNotifications(prev => [payload.new, ...prev])
@@ -86,7 +87,7 @@ export function useRealtimeProjects(onUpdate?: (payload: RealtimePostgresChanges
   
   useEffect(() => {
     const unsubscribe = subscribe('projects', (payload) => {
-      console.log('Project change:', payload)
+      devLog('Project change:', payload);
       if (onUpdate) {
         onUpdate(payload)
       }
@@ -102,7 +103,7 @@ export function useRealtimeTasks(onUpdate?: (payload: RealtimePostgresChangesPay
   
   useEffect(() => {
     const unsubscribe = subscribe('tasks', (payload) => {
-      console.log('Task change:', payload)
+      devLog('Task change:', payload);
       if (onUpdate) {
         onUpdate(payload)
       }
@@ -118,7 +119,7 @@ export function useRealtimeAttendance(onUpdate?: (payload: RealtimePostgresChang
   
   useEffect(() => {
     const unsubscribe = subscribe('attendance', (payload) => {
-      console.log('Attendance change:', payload)
+      devLog('Attendance change:', payload);
       if (onUpdate) {
         onUpdate(payload)
       }

@@ -100,7 +100,7 @@ function SignupForm() {
       
       // Handle security guard invitation
       if (typeParam === 'security' && codeParam) {
-        console.log('🛡️ Security Guard invitation detected');
+        devLog('🛡️ Security Guard invitation detected');
         setInvitationData({
           type: 'security',
           code: codeParam,
@@ -117,7 +117,7 @@ function SignupForm() {
         setSelectedProducts([productParam])
       }
 
-      console.log('Product selection detected:', { productParam, productsParam, onboardingCompleteParam })
+      devLog('Product selection detected:', { productParam, productsParam, onboardingCompleteParam });
     }
   }, [searchParams])
 
@@ -426,7 +426,7 @@ function SignupForm() {
               throw new Error('Failed to accept security guard invitation: ' + (acceptError?.message || 'Unknown error'));
             }
 
-            console.log('🛡️ Security guard invitation accepted successfully');
+            devLog('🛡️ Security guard invitation accepted successfully');
           } else {
             // Regular profile creation
             let workType = 'field'; // default

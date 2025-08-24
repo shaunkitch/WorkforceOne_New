@@ -432,7 +432,7 @@ export default function AutomationPage() {
             category="attendance"
             triggerType="Event"
             icon={<Clock className="h-5 w-5" />}
-            onUse={() => console.log('Use template')}
+            onUse={() => devLog('Use template');}
           />
           
           <TemplateCard
@@ -441,7 +441,7 @@ export default function AutomationPage() {
             category="leave"
             triggerType="Event"
             icon={<Target className="h-5 w-5" />}
-            onUse={() => console.log('Use template')}
+            onUse={() => devLog('Use template');}
           />
           
           <TemplateCard
@@ -450,7 +450,7 @@ export default function AutomationPage() {
             category="tasks"
             triggerType="Schedule"
             icon={<Activity className="h-5 w-5" />}
-            onUse={() => console.log('Use template')}
+            onUse={() => devLog('Use template');}
           />
         </div>
       </div>

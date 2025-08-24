@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase'
 import axios from 'axios'
+import { createLogger } from '../utils/logger'
 
 export interface SystemMetric {
   metricType: string
@@ -28,6 +29,7 @@ export class MonitoringService {
   private metricsInterval: NodeJS.Timeout | null = null
   private vercelApiKey: string | null = null
   private vercelTeamId: string | null = null
+  private logger = createLogger('monitoring-service')
 
   constructor() {
     this.vercelApiKey = process.env.VERCEL_API_KEY || null
@@ -50,14 +52,14 @@ export class MonitoringService {
     this.metricsInterval = setInterval(async () => {
       try {
         await this.collectAllMetrics()
-      } catch (error) {
-        console.error('Error collecting metrics:', error)
+      } catch (error: unknown) {
+        this.logger.error('Error collecting metrics', { error: error instanceof Error ? error.message : String(error) })
         await this.recordMetric({
           metricType: 'application_errors',
           value: 1,
           unit: 'count',
           source: 'monitoring_service',
-          metadata: { error: error.message, timestamp: new Date().toISOString() }
+          metadata: { error: error instanceof Error ? error.message : String(error), timestamp: new Date().toISOString() }
         })
       }
     }, intervalMinutes * 60 * 1000)
@@ -132,8 +134,8 @@ export class MonitoringService {
             source: 'database',
             metadata: { table, metric: 'record_count' }
           })
-        } catch (error) {
-          console.warn(`Failed to get count for table ${table}:`, error)
+        } catch (error: unknown) {
+          this.logger.warn(`Failed to get count for table ${table}`, { error: error instanceof Error ? error.message : String(error) })
         }
       }
 
@@ -149,14 +151,14 @@ export class MonitoringService {
         source: 'supabase'
       })
 
-    } catch (error) {
-      console.error('Error collecting database metrics:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error collecting database metrics', { error: error instanceof Error ? error.message : String(error) })
       await this.recordMetric({
         metricType: 'application_errors',
         value: 1,
         unit: 'count',
         source: 'database_monitoring',
-        metadata: { error: error.message }
+        metadata: { error: error instanceof Error ? error.message : String(error) }
       })
     }
   }
@@ -198,8 +200,8 @@ export class MonitoringService {
         metadata: { metric: 'uptime' }
       })
 
-    } catch (error) {
-      console.error('Error collecting application metrics:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error collecting application metrics', { error: error instanceof Error ? error.message : String(error) })
     }
   }
 
@@ -223,7 +225,7 @@ export class MonitoringService {
       const { data: deployments } = await axios.get(deploymentsUrl, { headers })
 
       if (deployments && deployments.deployments) {
-        const activeDeployments = deployments.deployments.filter(d => d.state === 'READY')
+        const activeDeployments = deployments.deployments.filter((d: any) => d.state === 'READY')
         
         await this.recordMetric({
           metricType: 'vercel_requests',
@@ -251,16 +253,16 @@ export class MonitoringService {
         })
       }
 
-    } catch (error) {
-      console.error('Error collecting Vercel metrics:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error collecting Vercel metrics', { error: error instanceof Error ? error.message : String(error) })
       // Don't record as error if it's just missing API key
-      if (error.response?.status !== 401) {
+      if ((error as any)?.response?.status !== 401) {
         await this.recordMetric({
           metricType: 'application_errors',
           value: 1,
           unit: 'count',
           source: 'vercel_monitoring',
-          metadata: { error: error.message }
+          metadata: { error: error instanceof Error ? error.message : String(error) }
         })
       }
     }
@@ -278,13 +280,13 @@ export class MonitoringService {
       })
 
       if (error) {
-        console.error('Error recording metric:', error)
+        this.logger.error('Error recording metric', { error })
         return null
       }
 
       return data
-    } catch (error) {
-      console.error('Error recording metric:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error recording metric', { error: error instanceof Error ? error.message : String(error) })
       return null
     }
   }
@@ -299,8 +301,8 @@ export class MonitoringService {
       }
 
       return data
-    } catch (error) {
-      console.error('Error getting system status:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error getting system status', { error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -320,8 +322,8 @@ export class MonitoringService {
       }
 
       return data || []
-    } catch (error) {
-      console.error('Error getting active alerts:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error getting active alerts', { error: error instanceof Error ? error.message : String(error) })
       return []
     }
   }
@@ -340,8 +342,8 @@ export class MonitoringService {
         .eq('id', alertId)
 
       return !error
-    } catch (error) {
-      console.error('Error acknowledging alert:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error acknowledging alert', { error: error instanceof Error ? error.message : String(error) })
       return false
     }
   }
@@ -359,8 +361,8 @@ export class MonitoringService {
         .eq('id', alertId)
 
       return !error
-    } catch (error) {
-      console.error('Error resolving alert:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error resolving alert', { error: error instanceof Error ? error.message : String(error) })
       return false
     }
   }
@@ -375,8 +377,8 @@ export class MonitoringService {
       }
 
       return data
-    } catch (error) {
-      console.error('Error calculating health score:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error calculating health score', { error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -409,8 +411,8 @@ export class MonitoringService {
       }
 
       return data || []
-    } catch (error) {
-      console.error('Error getting metrics history:', error)
+    } catch (error: unknown) {
+      this.logger.error('Error getting metrics history', { error: error instanceof Error ? error.message : String(error) })
       return []
     }
   }

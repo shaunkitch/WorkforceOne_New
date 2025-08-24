@@ -2,17 +2,20 @@ import dotenv from 'dotenv'
 import express from 'express'
 import { createClient } from '@supabase/supabase-js'
 import EmailService from '../services/emailService'
+import { createLogger } from '../utils/logger'
 
 // Load environment variables
 dotenv.config()
 
 const router = express.Router()
+const logger = createLogger('email-integrations')
 
 // Debug environment variables
-console.log('🔧 Environment check:')
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'Present' : 'Missing')
-console.log('SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? `Present (${process.env.SUPABASE_SERVICE_KEY.substring(0, 20)}...)` : 'Missing')
-console.log('ANON_KEY:', process.env.SUPABASE_ANON_KEY ? `Present (${process.env.SUPABASE_ANON_KEY.substring(0, 20)}...)` : 'Missing')
+logger.debug('Environment check', {
+  supabaseUrl: !!process.env.SUPABASE_URL,
+  serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
+  anonKey: !!process.env.SUPABASE_ANON_KEY
+})
 
 // Create a Supabase client for user authentication (using anon key)
 const supabaseAuth = createClient(
@@ -32,48 +35,44 @@ const supabase = createClient(
   }
 )
 
-console.log('✅ Supabase clients initialized')
+logger.debug('Supabase clients initialized')
 
 // Get organization email integration
 router.get('/', async (req: express.Request, res: express.Response) => {
   try {
-    console.log('🔍 GET /api/email-integrations called')
-    console.log('Request headers:', Object.keys(req.headers))
-    console.log('User Agent:', req.headers['user-agent'])
+    logger.info('GET /api/email-integrations called', { 
+      userAgent: req.headers['user-agent'],
+      hasAuth: !!req.headers.authorization
+    })
     
     const authHeader = req.headers.authorization
     
-    console.log('Auth header:', authHeader ? 'Present' : 'Missing')
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('Invalid auth header format')
+      logger.warn('Invalid auth header format')
       return res.status(401).json({ error: 'No valid authorization token provided' })
     }
 
     const token = authHeader.substring(7)
-    console.log('Token length:', token.length)
-    console.log('Token prefix:', token.substring(0, 20) + '...')
+    logger.debug('Token received', { tokenLength: token.length })
     
     // Verify user using the auth client
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
-    console.log('Auth error:', authError)
-    console.log('User found:', user ? user.id : 'None')
+    logger.debug('User auth check', { hasError: !!authError, hasUser: !!user })
     
     if (authError || !user) {
-      console.log('Token validation failed:', authError?.message)
+      logger.warn('Token validation failed', { error: authError?.message })
       return res.status(401).json({ error: 'Invalid token', details: authError?.message })
     }
 
     // Get user profile - try by email first as a workaround
-    console.log('GET Profile lookup for user:', user.id)
-    console.log('GET User email from token:', user.email)
+    logger.debug('Profile lookup started', { userId: user.id, hasEmail: !!user.email })
     
     let profile = null
     let profileError = null
 
     // Try lookup by email first (more reliable)
     if (user.email) {
-      console.log('GET Looking up profile by email:', user.email)
+      logger.debug('Looking up profile by email')
       
       // Create a fresh service client to test
       const freshServiceClient = createClient(
@@ -84,7 +83,7 @@ router.get('/', async (req: express.Request, res: express.Response) => {
         }
       )
       
-      console.log('GET Testing fresh service client...')
+      logger.debug('Testing fresh service client')
       const { data: profileByEmail, error: emailError } = await freshServiceClient
         .from('profiles')
         .select('*')
@@ -93,14 +92,14 @@ router.get('/', async (req: express.Request, res: express.Response) => {
       
       if (!emailError && profileByEmail) {
         profile = profileByEmail
-        console.log('GET ✅ Profile found by email:', profile.email, profile.role)
+        logger.info('Profile found by email', { email: profile.email, role: profile.role })
         
         if (profile.id !== user.id) {
-          console.log('GET ⚠️ ID mismatch - Token ID:', user.id, 'Profile ID:', profile.id)
+          logger.warn('ID mismatch between token and profile', { tokenId: user.id, profileId: profile.id })
           // Continue anyway since we found the user
         }
       } else {
-        console.log('GET Profile by email error:', emailError?.message)
+        logger.debug('Profile by email lookup failed', { error: emailError?.message })
         
         // Fallback to ID lookup
         const { data: profileById, error: idError } = await freshServiceClient
@@ -111,22 +110,22 @@ router.get('/', async (req: express.Request, res: express.Response) => {
         
         profile = profileById
         profileError = idError
-        console.log('GET Fallback to ID lookup:', profile ? 'Found' : 'Not found')
-        if (idError) console.log('GET ID lookup error:', idError.message)
+        logger.debug('Fallback to ID lookup', { found: !!profile })
+        if (idError) logger.debug('ID lookup error', { error: idError.message })
       }
     }
 
     if (!profile) {
-      console.log('GET No profile found for user')
+      logger.warn('No profile found for user')
       return res.status(403).json({ error: 'User profile not found' })
     }
 
     if (profile.role !== 'admin') {
-      console.log(`GET User role '${profile.role}' is not admin`)
+      logger.warn('User role is not admin', { role: profile.role })
       return res.status(403).json({ error: 'Admin access required' })
     }
 
-    console.log('GET ✅ Admin access verified for:', profile.email)
+    logger.info('Admin access verified', { email: profile.email })
 
     // Create fresh service client for database operations
     const freshServiceClientForDB = createClient(
@@ -153,8 +152,8 @@ router.get('/', async (req: express.Request, res: express.Response) => {
       integration: integration || null
     })
 
-  } catch (error) {
-    console.error('Error fetching email integration:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching email integration', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ 
       error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
@@ -165,8 +164,7 @@ router.get('/', async (req: express.Request, res: express.Response) => {
 // Save/update organization email integration
 router.post('/', async (req: express.Request, res: express.Response) => {
   try {
-    console.log('💾 POST /api/email-integrations called')
-    console.log('Request headers:', Object.keys(req.headers))
+    logger.info('POST /api/email-integrations called')
     
     const {
       provider,
@@ -194,36 +192,34 @@ router.post('/', async (req: express.Request, res: express.Response) => {
 
     const authHeader = req.headers.authorization
     
-    console.log('POST Auth header:', authHeader ? 'Present' : 'Missing')
+    logger.debug('POST auth check', { hasAuthHeader: !!authHeader })
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('POST Invalid auth header format')
+      logger.warn('POST Invalid auth header format')
       return res.status(401).json({ error: 'No valid authorization token provided' })
     }
 
     const token = authHeader.substring(7)
-    console.log('POST Token length:', token.length)
+    logger.debug('POST Token received', { tokenLength: token.length })
     
     // Verify user using the auth client
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
-    console.log('POST Auth error:', authError)
-    console.log('POST User found:', user ? user.id : 'None')
+    logger.debug('POST User auth check', { hasError: !!authError, hasUser: !!user })
     
     if (authError || !user) {
-      console.log('POST Token validation failed:', authError?.message)
+      logger.warn('POST Token validation failed', { error: authError?.message })
       return res.status(401).json({ error: 'Invalid token', details: authError?.message })
     }
 
     // Get user profile - try by email first as a workaround  
-    console.log('POST Profile lookup for user:', user.id)
-    console.log('POST User email from token:', user.email)
+    logger.debug('POST Profile lookup started', { userId: user.id, hasEmail: !!user.email })
     
     let profile = null
     let profileError = null
 
     // Try lookup by email first (more reliable)
     if (user.email) {
-      console.log('POST Looking up profile by email:', user.email)
+      logger.debug('POST Looking up profile by email')
       
       // Create a fresh service client to test
       const freshServiceClient = createClient(
@@ -234,7 +230,7 @@ router.post('/', async (req: express.Request, res: express.Response) => {
         }
       )
       
-      console.log('POST Testing fresh service client...')
+      logger.debug('POST Testing fresh service client')
       const { data: profileByEmail, error: emailError } = await freshServiceClient
         .from('profiles')
         .select('*')
@@ -243,14 +239,14 @@ router.post('/', async (req: express.Request, res: express.Response) => {
       
       if (!emailError && profileByEmail) {
         profile = profileByEmail
-        console.log('POST ✅ Profile found by email:', profile.email, profile.role)
+        logger.info('POST Profile found by email', { email: profile.email, role: profile.role })
         
         if (profile.id !== user.id) {
-          console.log('POST ⚠️ ID mismatch - Token ID:', user.id, 'Profile ID:', profile.id)
+          logger.warn('POST ID mismatch between token and profile', { tokenId: user.id, profileId: profile.id })
           // Continue anyway since we found the user
         }
       } else {
-        console.log('POST Profile by email error:', emailError?.message)
+        logger.debug('POST Profile by email lookup failed', { error: emailError?.message })
         
         // Fallback to ID lookup
         const { data: profileById, error: idError } = await freshServiceClient
@@ -261,22 +257,22 @@ router.post('/', async (req: express.Request, res: express.Response) => {
         
         profile = profileById
         profileError = idError
-        console.log('POST Fallback to ID lookup:', profile ? 'Found' : 'Not found')
-        if (idError) console.log('POST ID lookup error:', idError.message)
+        logger.debug('POST Fallback to ID lookup', { found: !!profile })
+        if (idError) logger.debug('POST ID lookup error', { error: idError.message })
       }
     }
 
     if (!profile) {
-      console.log('POST No profile found for user')
+      logger.warn('POST No profile found for user')
       return res.status(403).json({ error: 'User profile not found' })
     }
 
     if (profile.role !== 'admin') {
-      console.log(`POST User role '${profile.role}' is not admin`)
+      logger.warn('POST User role is not admin', { role: profile.role })
       return res.status(403).json({ error: 'Admin access required' })
     }
 
-    console.log('POST ✅ Admin access verified for:', profile.email)
+    logger.info('POST Admin access verified', { email: profile.email })
 
     // Create fresh service client for database operations
     const freshServiceClientForDB = createClient(
@@ -365,7 +361,7 @@ router.post('/', async (req: express.Request, res: express.Response) => {
       .select()
 
     if (upsertError) {
-      console.error('Upsert error:', upsertError)
+      logger.error('Upsert error', { error: upsertError })
       return res.status(500).json({ error: 'Failed to save email integration' })
     }
 
@@ -374,8 +370,8 @@ router.post('/', async (req: express.Request, res: express.Response) => {
       message: 'Email integration saved successfully'
     })
 
-  } catch (error) {
-    console.error('Error saving email integration:', error)
+  } catch (error: unknown) {
+    logger.error('Error saving email integration', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ 
       error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
@@ -425,7 +421,7 @@ router.post('/test', async (req: express.Request, res: express.Response) => {
     const emailService = new EmailService()
     const connectionResult = await emailService.testConnectionForOrganization(profile.organization_id)
 
-    console.log('📊 Connection test result:', connectionResult)
+    logger.info('Connection test completed', { success: connectionResult.success })
 
     if (connectionResult.success) {
       // Send test email if connection is successful and testEmail is provided
@@ -469,8 +465,8 @@ router.post('/test', async (req: express.Request, res: express.Response) => {
       })
     }
 
-  } catch (error) {
-    console.error('Error testing email integration:', error)
+  } catch (error: unknown) {
+    logger.error('Error testing email integration', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ 
       error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined

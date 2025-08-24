@@ -143,7 +143,7 @@ export default function FormFillPage() {
       }
     } catch (error) {
       // No existing response is fine
-      console.log('No existing response found')
+      devLog('No existing response found');
     }
   }
 

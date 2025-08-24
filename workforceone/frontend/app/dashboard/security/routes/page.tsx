@@ -55,6 +55,7 @@ import { createClient } from '@/lib/supabase/client';
 import QRCodeGenerator from '@/components/security/QRCodeGenerator';
 import AdhocRouteGenerator from '@/components/security/AdhocRouteGenerator';
 
+import { devLog } from '@/lib/utils/logger';
 interface PatrolRoute {
   id: string;
   name: string;
@@ -129,11 +130,11 @@ export default function PatrolRoutesPage() {
       }
       
       if (user) {
-        console.log('User found:', user.id);
+        devLog('User found:', user.id);
         
         // Try to get organization from user metadata first
         if (user.user_metadata?.organization_id) {
-          console.log('Organization ID from metadata:', user.user_metadata.organization_id);
+          devLog('Organization ID from metadata:', user.user_metadata.organization_id);
           setOrganizationId(user.user_metadata.organization_id);
           return;
         }
@@ -148,13 +149,13 @@ export default function PatrolRoutesPage() {
         if (profileError) {
           console.error('Error loading profile:', profileError);
           // Try with a hardcoded organization ID for testing
-          console.log('Using fallback organization ID from theme provider');
+          devLog('Using fallback organization ID from theme provider');
           setOrganizationId('6b37111b-8cbb-4c9a-9e35-6384f9885b90');
           return;
         }
         
         if (profile && profile.organization_id) {
-          console.log('Organization ID loaded from profile:', profile.organization_id);
+          devLog('Organization ID loaded from profile:', profile.organization_id);
           setOrganizationId(profile.organization_id);
         } else {
           console.error('No organization_id found in profile');
@@ -211,7 +212,7 @@ export default function PatrolRoutesPage() {
         alert('Organization not loaded. Please refresh and try again.');
         return;
       }
-      console.log('Creating route with organizationId:', organizationId);
+      devLog('Creating route with organizationId:', organizationId);
 
       // Ensure estimated_duration has a default value if empty
       const routeData = {

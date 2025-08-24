@@ -1,5 +1,6 @@
 // Route Optimization Service
 // Integrates with Google Maps APIs for real route optimization
+import { logger, devLog } from './utils/logger';
 
 interface RouteStop {
   id: string
@@ -68,9 +69,9 @@ class RouteOptimizationService {
       travelMode: 'DRIVING'
     }
   ): Promise<OptimizedRoute> {
-    console.log('=== ROUTE OPTIMIZATION START ===')
-    console.log('Google Maps available:', typeof google !== 'undefined')
-    console.log('Services initialized:', !!this.directionsService, !!this.distanceMatrixService)
+    devLog('=== ROUTE OPTIMIZATION START ===');
+    devLog('Google Maps available:', typeof google !== 'undefined');
+    devLog('Services initialized:', !!this.directionsService, !!this.distanceMatrixService);
     
     // Check if Google Maps is loaded
     if (typeof google === 'undefined' || !google.maps) {
@@ -78,7 +79,7 @@ class RouteOptimizationService {
     }
     
     if (!this.directionsService || !this.distanceMatrixService) {
-      console.log('Reinitializing Google Maps services...')
+      devLog('Reinitializing Google Maps services...');
       this.initializeServices()
       if (!this.directionsService || !this.distanceMatrixService) {
         throw new Error('Failed to initialize Google Maps services')
@@ -86,9 +87,9 @@ class RouteOptimizationService {
     }
 
     try {
-      console.log('Optimizing route for', stops.length, 'stops with settings:', settings)
-      console.log('Google Maps API Key available:', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)
-      console.log('Google Maps services initialized:', !!this.directionsService && !!this.distanceMatrixService)
+      devLog('Optimizing route for', { stopCount: stops.length, settings });
+      devLog('Google Maps API Key available:', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+      devLog('Google Maps services initialized:', !!this.directionsService && !!this.distanceMatrixService);
 
       // Step 1: Calculate distance matrix between all points
       const distanceMatrix = await this.calculateDistanceMatrix(stops, settings)
@@ -134,7 +135,7 @@ class RouteOptimizationService {
     const locations = stops.map(stop => new google.maps.LatLng(stop.latitude, stop.longitude))
     
     return new Promise((resolve, reject) => {
-      console.log('Requesting distance matrix for', locations.length, 'locations')
+      devLog('Requesting distance matrix for', { locationCount: locations.length });
       this.distanceMatrixService!.getDistanceMatrix({
         origins: locations,
         destinations: locations,
@@ -143,7 +144,7 @@ class RouteOptimizationService {
         avoidTolls: settings.avoidTolls,
         unitSystem: google.maps.UnitSystem.METRIC
       }, (response, status) => {
-        console.log('Distance Matrix API response:', status, response)
+        devLog('Distance Matrix API response:', { status, response });
         if (status === google.maps.DistanceMatrixStatus.OK && response) {
           const matrix: number[][] = []
           
@@ -162,7 +163,7 @@ class RouteOptimizationService {
             })
           })
           
-          console.log('Distance matrix calculated:', matrix)
+          devLog('Distance matrix calculated:', matrix);
           resolve(matrix)
         } else {
           reject(new Error(`Distance Matrix request failed: ${status}`))
@@ -356,9 +357,9 @@ class RouteOptimizationService {
             estimatedCost: this.calculateRouteCost(totalDistance, totalDuration)
           }
 
-          console.log('Optimized route generated:', optimizedRoute)
-          console.log('Polyline available:', !!route.overview_polyline?.points)
-          console.log('Waypoints count:', route.overview_path?.length || 0)
+          devLog('Optimized route generated:', optimizedRoute);
+          devLog('Polyline available:', !!route.overview_polyline?.points);
+          devLog('Waypoints count:', route.overview_path?.length || 0);
           resolve(optimizedRoute)
         } else {
           reject(new Error(`Directions request failed: ${status}`))

@@ -150,7 +150,7 @@ export default function OutletVisitsPage() {
         console.error('Error fetching outlets for dropdown:', error)
         console.error('Details:', { organization_id: profile.organization_id })
       } else {
-        console.log('Fetched outlets for dropdown:', data)
+        devLog('Fetched outlets for dropdown:', data);
         setOutlets(data || [])
       }
     } catch (error) {
@@ -240,9 +240,9 @@ export default function OutletVisitsPage() {
             startDate = new Date(0)
         }
 
-        console.log('Date filter applied:', {
+        devLog('Date filter applied:', {
           range: filters.date_range,
-          startDate: startDate.toISOString(),
+          startDate: startDate.toISOString();,
           now: now.toISOString()
         })
         query = query.gte('check_in_time', startDate.toISOString())
@@ -267,7 +267,7 @@ export default function OutletVisitsPage() {
         throw error
       }
 
-      console.log('Raw outlet visits data:', data)
+      devLog('Raw outlet visits data:', data);
       let processedData = data || []
 
       // Fetch related outlet and user data
@@ -275,8 +275,8 @@ export default function OutletVisitsPage() {
         const outletIds = [...new Set(processedData.map(v => v.outlet_id).filter(Boolean))]
         const userIds = [...new Set(processedData.map(v => v.user_id).filter(Boolean))]
 
-        console.log('Fetching data for outlet IDs:', outletIds)
-        console.log('Fetching data for user IDs:', userIds)
+        devLog('Fetching data for outlet IDs:', outletIds);
+        devLog('Fetching data for user IDs:', userIds);
 
         // Fetch outlets - ensure we get all outlet data
         if (outletIds.length > 0) {
@@ -296,8 +296,8 @@ export default function OutletVisitsPage() {
               error_details: outletError.details
             })
           } else {
-            console.log('Fetched outlets:', outletData)
-            console.log('Outlet mapping:', outletData?.map(o => ({ id: o.id, name: o.name })))
+            devLog('Fetched outlets:', outletData);
+            devLog('Outlet mapping:', outletData?.map(o => ({ id: o.id, name: o.name });))
           }
 
           // Fetch users
@@ -388,12 +388,12 @@ export default function OutletVisitsPage() {
     const weekVisits = visitsData.filter(v => new Date(v.check_in_time) >= weekAgo).length
     const monthVisits = visitsData.filter(v => new Date(v.check_in_time) >= monthStart).length
 
-    console.log('Stats calculation:', {
+    devLog('Stats calculation:', {
       totalVisits,
       todayVisits,
       weekVisits,
       monthVisits,
-      today: today.toISOString(),
+      today: today.toISOString();,
       visitsWithDates: visitsData.map(v => v.check_in_time)
     })
 

@@ -302,7 +302,7 @@ export default function PowerBIIntegrationPage() {
       }))
 
       // In a real implementation, this would send data to Power BI API
-      console.log('Data ready for Power BI:', exportData)
+      devLog('Data ready for Power BI:', exportData);
       
       setConfig(prev => ({
         ...prev,

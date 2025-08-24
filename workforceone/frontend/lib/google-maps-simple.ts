@@ -1,4 +1,6 @@
 // Simple Google Maps loader without external dependencies
+import { devLog } from './utils/logger';
+
 class SimpleGoogleMapsService {
   private static instance: SimpleGoogleMapsService
   private isLoaded: boolean = false
@@ -39,7 +41,7 @@ class SimpleGoogleMapsService {
       // Create callback function
       const callbackName = `googleMapsCallback_${Date.now()}`
       ;(window as any)[callbackName] = () => {
-        console.log('Google Maps loaded via callback')
+        devLog('Google Maps loaded via callback');
         this.isLoaded = true
         delete (window as any)[callbackName]
         resolve(window.google)
@@ -74,7 +76,7 @@ class SimpleGoogleMapsService {
         ;(window as any)[callbackName + '_original']()
       }
 
-      console.log('Loading Google Maps script:', script.src)
+      devLog('Loading Google Maps script', { src: script.src });
       document.head.appendChild(script)
     })
 

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { createLogger } from '../utils/logger';
 
 interface DetectedField {
   id: string;
@@ -27,6 +28,7 @@ interface FormAnalysisResult {
 
 export class ClaudeFormAnalysisService {
   private client: Anthropic;
+  private logger = createLogger('claude-form-analysis');
 
   constructor() {
     this.client = new Anthropic({
@@ -81,8 +83,8 @@ export class ClaudeFormAnalysisService {
       }
 
       return this.parseClaudeResponse(content.text);
-    } catch (error) {
-      console.error('Error analyzing form with Claude:', error);
+    } catch (error: unknown) {
+      this.logger.error('Error analyzing form with Claude', { error: error instanceof Error ? error.message : String(error) });
       throw new Error('Failed to analyze form image');
     }
   }
@@ -211,8 +213,8 @@ Focus on accuracy over quantity - only include fields you can clearly identify.`
       };
 
       return result;
-    } catch (error) {
-      console.error('Error parsing Claude response:', error);
+    } catch (error: unknown) {
+      this.logger.error('Error parsing Claude response', { error: error instanceof Error ? error.message : String(error) });
       
       // Return a fallback result if parsing fails
       return {

@@ -1,8 +1,10 @@
 import express from 'express';
 import multer from 'multer';
 import { ClaudeFormAnalysisService } from '../services/claudeFormAnalysis.js';
+import { createLogger } from '../utils/logger';
 
 const router = express.Router();
+const logger = createLogger('formScan');
 
 // Configure multer for file uploads
 const upload = multer({
@@ -41,7 +43,7 @@ router.post('/scan', upload.single('image'), async (req, res) => {
     // Validate Claude service configuration
     const configValidation = claudeService.validateConfiguration();
     if (!configValidation.isValid) {
-      console.error('Claude service configuration error:', configValidation.error);
+      logger.error('Claude service configuration error', { error: configValidation.error });
       return res.status(500).json({
         error: 'Service configuration error',
         message: 'AI analysis service is not properly configured',
@@ -65,7 +67,7 @@ router.post('/scan', upload.single('image'), async (req, res) => {
       });
     }
 
-    console.log(`Processing form scan for file: ${req.file.originalname} (${req.file.size} bytes)`);
+    logger.info('Processing form scan', { filename: req.file.originalname, size: req.file.size });
 
     // Analyze the form image with Claude
     const analysisResult = await claudeService.analyzeFormImage(
@@ -73,13 +75,16 @@ router.post('/scan', upload.single('image'), async (req, res) => {
       req.file.mimetype
     );
 
-    console.log(`Form analysis completed. Found ${analysisResult.detected_fields.length} fields with ${analysisResult.confidence_score}% confidence`);
+    logger.info('Form analysis completed', { 
+      fieldsFound: analysisResult.detected_fields.length, 
+      confidence: analysisResult.confidence_score 
+    });
 
     // Return the analysis results
     res.json(analysisResult);
 
-  } catch (error) {
-    console.error('Form scan error:', error);
+  } catch (error: unknown) {
+    logger.error('Form scan error', { error: error instanceof Error ? error.message : String(error) });
 
     // Handle specific error types
     if (error instanceof multer.MulterError) {
@@ -100,6 +105,7 @@ router.post('/scan', upload.single('image'), async (req, res) => {
     // Handle Claude API errors
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorMessage.includes('Claude') || errorMessage.includes('Anthropic')) {
+      logger.warn('Claude API service unavailable', { errorMessage });
       return res.status(502).json({
         error: 'AI analysis failed',
         message: 'The AI service is temporarily unavailable. Please try again later.',
@@ -128,7 +134,7 @@ router.get('/scan/health', (req, res) => {
       error: configValidation.error || undefined,
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(500).json({
       status: 'unhealthy',
       error: 'Service check failed',

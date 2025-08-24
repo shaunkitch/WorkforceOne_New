@@ -1,10 +1,12 @@
 import express from 'express'
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
+import { createLogger } from '../utils/logger'
 
 dotenv.config()
 
 const router = express.Router()
+const logger = createLogger('security-routes')
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -28,7 +30,7 @@ const verifyAuth = async (req: express.Request, res: express.Response, next: exp
 
     req.user = user
     next()
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(500).json({ error: 'Authentication error' })
   }
 }
@@ -41,7 +43,10 @@ const verifyAuth = async (req: express.Request, res: express.Response, next: exp
 router.post('/patrol/start', verifyAuth, async (req, res) => {
   try {
     const { route_id, assignment_id, current_latitude, current_longitude, device_battery_level } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Get user's organization
     const { data: profile } = await supabase
@@ -90,7 +95,7 @@ router.post('/patrol/start', verifyAuth, async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Error creating patrol session:', error)
+      logger.error('Error creating patrol session', { error })
       return res.status(500).json({ error: 'Failed to create patrol session' })
     }
 
@@ -126,8 +131,8 @@ router.post('/patrol/start', verifyAuth, async (req, res) => {
       }
     })
 
-  } catch (error) {
-    console.error('Error starting patrol:', error)
+  } catch (error: unknown) {
+    logger.error('Error starting patrol', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -135,7 +140,10 @@ router.post('/patrol/start', verifyAuth, async (req, res) => {
 // Get current patrol session
 router.get('/patrol/current', verifyAuth, async (req, res) => {
   try {
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     const { data: session, error } = await supabase
       .from('patrol_sessions')
@@ -151,7 +159,7 @@ router.get('/patrol/current', verifyAuth, async (req, res) => {
       .single()
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching current session:', error)
+      logger.error('Error fetching current session', { error })
       return res.status(500).json({ error: 'Failed to fetch current session' })
     }
 
@@ -176,8 +184,8 @@ router.get('/patrol/current', verifyAuth, async (req, res) => {
       }
     })
 
-  } catch (error) {
-    console.error('Error fetching current patrol:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching current patrol', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -187,7 +195,10 @@ router.patch('/patrol/:sessionId/status', verifyAuth, async (req, res) => {
   try {
     const { sessionId } = req.params
     const { status } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     if (!['active', 'paused'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status. Must be active or paused' })
@@ -202,7 +213,7 @@ router.patch('/patrol/:sessionId/status', verifyAuth, async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Error updating session status:', error)
+      logger.error('Error updating session status', { error })
       return res.status(500).json({ error: 'Failed to update session status' })
     }
 
@@ -212,8 +223,8 @@ router.patch('/patrol/:sessionId/status', verifyAuth, async (req, res) => {
 
     res.json({ success: true, session })
 
-  } catch (error) {
-    console.error('Error updating patrol status:', error)
+  } catch (error: unknown) {
+    logger.error('Error updating patrol status', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -223,7 +234,10 @@ router.post('/patrol/:sessionId/end', verifyAuth, async (req, res) => {
   try {
     const { sessionId } = req.params
     const { end_notes, current_latitude, current_longitude, device_battery_level } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     const { data: session, error } = await supabase
       .from('patrol_sessions')
@@ -241,7 +255,7 @@ router.post('/patrol/:sessionId/end', verifyAuth, async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Error ending session:', error)
+      logger.error('Error ending session', { error })
       return res.status(500).json({ error: 'Failed to end session' })
     }
 
@@ -266,8 +280,8 @@ router.post('/patrol/:sessionId/end', verifyAuth, async (req, res) => {
 
     res.json({ success: true, session })
 
-  } catch (error) {
-    console.error('Error ending patrol:', error)
+  } catch (error: unknown) {
+    logger.error('Error ending patrol', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -277,7 +291,10 @@ router.post('/patrol/:sessionId/panic', verifyAuth, async (req, res) => {
   try {
     const { sessionId } = req.params
     const { current_latitude, current_longitude } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Update session with panic flag
     const { data: session, error } = await supabase
@@ -298,7 +315,7 @@ router.post('/patrol/:sessionId/panic', verifyAuth, async (req, res) => {
       .single()
 
     if (error || !session) {
-      console.error('Error updating panic status:', error)
+      logger.error('Error updating panic status', { error })
       return res.status(500).json({ error: 'Failed to register panic alert' })
     }
 
@@ -324,8 +341,8 @@ router.post('/patrol/:sessionId/panic', verifyAuth, async (req, res) => {
       session 
     })
 
-  } catch (error) {
-    console.error('Error processing panic button:', error)
+  } catch (error: unknown) {
+    logger.error('Error processing panic button', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -346,7 +363,10 @@ router.post('/patrol/:sessionId/location', verifyAuth, async (req, res) => {
       is_checkpoint_scan = false,
       checkpoint_id 
     } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Verify session belongs to guard
     const { data: session } = await supabase
@@ -375,7 +395,7 @@ router.post('/patrol/:sessionId/location', verifyAuth, async (req, res) => {
       })
 
     if (error) {
-      console.error('Error logging location:', error)
+      logger.error('Error logging location', { error })
       return res.status(500).json({ error: 'Failed to log location' })
     }
 
@@ -392,8 +412,8 @@ router.post('/patrol/:sessionId/location', verifyAuth, async (req, res) => {
 
     res.json({ success: true })
 
-  } catch (error) {
-    console.error('Error updating location:', error)
+  } catch (error: unknown) {
+    logger.error('Error updating location', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -403,7 +423,10 @@ router.post('/patrol/:sessionId/locations/bulk', verifyAuth, async (req, res) =>
   try {
     const { sessionId } = req.params
     const { locations } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     if (!Array.isArray(locations) || locations.length === 0) {
       return res.status(400).json({ error: 'Locations array is required' })
@@ -439,7 +462,7 @@ router.post('/patrol/:sessionId/locations/bulk', verifyAuth, async (req, res) =>
       .insert(locationData)
 
     if (error) {
-      console.error('Error bulk inserting locations:', error)
+      logger.error('Error bulk inserting locations', { error })
       return res.status(500).json({ error: 'Failed to save locations' })
     }
 
@@ -463,8 +486,8 @@ router.post('/patrol/:sessionId/locations/bulk', verifyAuth, async (req, res) =>
       message: `${locations.length} locations saved successfully` 
     })
 
-  } catch (error) {
-    console.error('Error bulk updating locations:', error)
+  } catch (error: unknown) {
+    logger.error('Error bulk updating locations', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -476,7 +499,10 @@ router.post('/patrol/:sessionId/locations/bulk', verifyAuth, async (req, res) =>
 // Get available patrol routes for organization
 router.get('/routes', verifyAuth, async (req, res) => {
   try {
-    const user_id = req.user.id
+    const user_id = req.user?.id
+    if (!user_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Get user's organization
     const { data: profile } = await supabase
@@ -505,7 +531,7 @@ router.get('/routes', verifyAuth, async (req, res) => {
       .order('name')
 
     if (error) {
-      console.error('Error fetching routes:', error)
+      logger.error('Error fetching routes', { error })
       return res.status(500).json({ error: 'Failed to fetch patrol routes' })
     }
 
@@ -518,8 +544,8 @@ router.get('/routes', verifyAuth, async (req, res) => {
       boundary_coords: route.boundary_coords,
       color_code: route.color_code,
       checkpoints: (route.patrol_checkpoints || [])
-        .sort((a, b) => a.order_sequence - b.order_sequence)
-        .map(cp => ({
+        .sort((a: any, b: any) => a.order_sequence - b.order_sequence)
+        .map((cp: any) => ({
           id: cp.id,
           name: cp.name,
           latitude: cp.latitude,
@@ -535,8 +561,8 @@ router.get('/routes', verifyAuth, async (req, res) => {
 
     res.json({ success: true, routes: formattedRoutes })
 
-  } catch (error) {
-    console.error('Error fetching patrol routes:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching patrol routes', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -553,7 +579,10 @@ router.post('/checkpoints/:checkpointId/scan', verifyAuth, async (req, res) => {
       photo_url,
       notes 
     } = req.body
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Verify checkpoint exists and get details
     const { data: checkpoint, error: checkpointError } = await supabase
@@ -623,7 +652,7 @@ router.post('/checkpoints/:checkpointId/scan', verifyAuth, async (req, res) => {
       .single()
 
     if (scanError) {
-      console.error('Error recording checkpoint scan:', scanError)
+      logger.error('Error recording checkpoint scan', { error: scanError })
       return res.status(500).json({ error: 'Failed to record checkpoint scan' })
     }
 
@@ -651,8 +680,8 @@ router.post('/checkpoints/:checkpointId/scan', verifyAuth, async (req, res) => {
       }
     })
 
-  } catch (error) {
-    console.error('Error scanning checkpoint:', error)
+  } catch (error: unknown) {
+    logger.error('Error scanning checkpoint', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -661,7 +690,10 @@ router.post('/checkpoints/:checkpointId/scan', verifyAuth, async (req, res) => {
 router.get('/patrol/:sessionId/checkpoints', verifyAuth, async (req, res) => {
   try {
     const { sessionId } = req.params
-    const guard_id = req.user.id
+    const guard_id = req.user?.id
+    if (!guard_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Verify session belongs to guard
     const { data: session } = await supabase
@@ -686,7 +718,7 @@ router.get('/patrol/:sessionId/checkpoints', verifyAuth, async (req, res) => {
       .order('scan_time')
 
     if (error) {
-      console.error('Error fetching checkpoint scans:', error)
+      logger.error('Error fetching checkpoint scans', { error })
       return res.status(500).json({ error: 'Failed to fetch checkpoint scans' })
     }
 
@@ -698,7 +730,7 @@ router.get('/patrol/:sessionId/checkpoints', verifyAuth, async (req, res) => {
       .order('order_sequence')
 
     if (checkpointsError) {
-      console.error('Error fetching route checkpoints:', checkpointsError)
+      logger.error('Error fetching route checkpoints', { error: checkpointsError })
       return res.status(500).json({ error: 'Failed to fetch route checkpoints' })
     }
 
@@ -730,8 +762,8 @@ router.get('/patrol/:sessionId/checkpoints', verifyAuth, async (req, res) => {
       }
     })
 
-  } catch (error) {
-    console.error('Error fetching checkpoint progress:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching checkpoint progress', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -755,7 +787,10 @@ router.post('/incidents', verifyAuth, async (req, res) => {
       audio_url,
       video_url
     } = req.body
-    const reported_by = req.user.id
+    const reported_by = req.user?.id
+    if (!reported_by) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Get user's organization
     const { data: profile } = await supabase
@@ -793,7 +828,7 @@ router.post('/incidents', verifyAuth, async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Error creating incident:', error)
+      logger.error('Error creating incident', { error })
       return res.status(500).json({ error: 'Failed to create incident report' })
     }
 
@@ -802,7 +837,7 @@ router.post('/incidents', verifyAuth, async (req, res) => {
       const attachments = []
       
       // Photo attachments
-      photo_urls.forEach((url, index) => {
+      photo_urls.forEach((url: string, index: number) => {
         attachments.push({
           incident_id: incident.id,
           file_url: url,
@@ -869,8 +904,8 @@ router.post('/incidents', verifyAuth, async (req, res) => {
       }
     })
 
-  } catch (error) {
-    console.error('Error creating incident:', error)
+  } catch (error: unknown) {
+    logger.error('Error creating incident', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -879,7 +914,10 @@ router.post('/incidents', verifyAuth, async (req, res) => {
 router.get('/incidents', verifyAuth, async (req, res) => {
   try {
     const { status, severity, limit = 50, offset = 0 } = req.query
-    const user_id = req.user.id
+    const user_id = req.user?.id
+    if (!user_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Get user's organization
     const { data: profile } = await supabase
@@ -914,14 +952,14 @@ router.get('/incidents', verifyAuth, async (req, res) => {
     const { data: incidents, error } = await query
 
     if (error) {
-      console.error('Error fetching incidents:', error)
+      logger.error('Error fetching incidents', { error })
       return res.status(500).json({ error: 'Failed to fetch incidents' })
     }
 
     res.json({ success: true, incidents })
 
-  } catch (error) {
-    console.error('Error fetching incidents:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching incidents', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -931,7 +969,10 @@ router.patch('/incidents/:incidentId/status', verifyAuth, async (req, res) => {
   try {
     const { incidentId } = req.params
     const { status, resolution_notes } = req.body
-    const user_id = req.user.id
+    const user_id = req.user?.id
+    if (!user_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Get user's organization
     const { data: profile } = await supabase
@@ -960,7 +1001,7 @@ router.patch('/incidents/:incidentId/status', verifyAuth, async (req, res) => {
       .single()
 
     if (error) {
-      console.error('Error updating incident:', error)
+      logger.error('Error updating incident', { error })
       return res.status(500).json({ error: 'Failed to update incident' })
     }
 
@@ -970,8 +1011,8 @@ router.patch('/incidents/:incidentId/status', verifyAuth, async (req, res) => {
 
     res.json({ success: true, incident })
 
-  } catch (error) {
-    console.error('Error updating incident status:', error)
+  } catch (error: unknown) {
+    logger.error('Error updating incident status', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -983,7 +1024,10 @@ router.patch('/incidents/:incidentId/status', verifyAuth, async (req, res) => {
 // Get real-time dashboard data
 router.get('/dashboard/live', verifyAuth, async (req, res) => {
   try {
-    const user_id = req.user.id
+    const user_id = req.user?.id
+    if (!user_id) {
+      return res.status(401).json({ error: 'User authentication required' })
+    }
 
     // Get user's organization
     const { data: profile } = await supabase
@@ -1028,8 +1072,8 @@ router.get('/dashboard/live', verifyAuth, async (req, res) => {
       }
     })
 
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching dashboard data', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

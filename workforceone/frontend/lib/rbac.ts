@@ -1,5 +1,6 @@
 // Role-Based Access Control (RBAC) System for Web Portal
 import { createClient } from '@/lib/supabase/client';
+import { logger, devLog } from './utils/logger';
 
 const supabase = createClient();
 
@@ -185,7 +186,7 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      console.log('No authenticated user found');
+      devLog('No authenticated user found');
       return null;
     }
 
@@ -215,7 +216,7 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
     
     // Check if it's a legacy role that needs mapping
     if (!Object.values(UserRole).includes(userRole) && roleMappings[profile.role]) {
-      console.log(`Mapping legacy role "${profile.role}" to "${roleMappings[profile.role]}"`);
+      devLog(`Mapping legacy role "${profile.role}" to "${roleMappings[profile.role]}"`);
       userRole = roleMappings[profile.role];
     }
     
@@ -224,7 +225,7 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
       console.error('Invalid user role after mapping:', profile.role, '→', userRole);
       // Default to employee for unrecognized roles instead of failing
       userRole = UserRole.EMPLOYEE;
-      console.log('Defaulting to employee role for safety');
+      logger.warn('Unrecognized role, defaulting to employee for safety', { originalRole: profile.role }, 'RBAC');
     }
 
     const permissions = ROLE_PERMISSIONS[userRole];
@@ -440,7 +441,7 @@ export const logRoleBasedAccess = (
   granted: boolean,
   additionalContext?: any
 ) => {
-  console.log(`RBAC LOG: ${userProfile.email} (${userProfile.role}) ${granted ? 'GRANTED' : 'DENIED'} ${action} on ${resource}`, additionalContext);
+  logger.info(`${userProfile.email} (${userProfile.role}) ${granted ? 'GRANTED' : 'DENIED'} ${action} on ${resource}`, additionalContext, 'RBAC');
   
   // In production, this would be sent to a security monitoring system
   if (!granted) {

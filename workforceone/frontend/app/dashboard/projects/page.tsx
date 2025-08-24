@@ -278,9 +278,8 @@ export default function ProjectsPage() {
         .select('status, duration, project_id')
         .eq('project_id', projectId)
 
-      console.log(`Time entries for project ${projectId}:`, {
-        total: allEntries?.length || 0,
-        statuses: [...new Set(allEntries?.map(e => e.status) || [])],
+      devLog(`Time entries for project ${projectId}:`, { data: {
+        total: allEntries?.length || 0, statuses: [...new Set(allEntries?.map(e => e.status }); || [])],
         entries: allEntries?.map(e => ({ status: e.status, duration: e.duration }))
       })
 
@@ -305,12 +304,9 @@ export default function ProjectsPage() {
       const totalTimeMinutes = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
       const totalTimeCost = calculateProjectTimeCost(timeEntries, projectHourlyRate)
 
-      console.log(`Processed time data for project ${projectId}:`, {
-        timeEntriesCount: timeEntries.length,
-        totalTimeMinutes,
-        totalTimeCost,
-        sampleEntry: timeEntries[0]
-      })
+      devLog(`Processed time data for project ${projectId}:`, { data: {
+        timeEntriesCount: timeEntries.length, totalTimeMinutes, totalTimeCost, sampleEntry: timeEntries[0]
+      } });
 
       return {
         total_time_minutes: totalTimeMinutes,

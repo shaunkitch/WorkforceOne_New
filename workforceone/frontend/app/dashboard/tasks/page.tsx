@@ -189,11 +189,11 @@ export default function TasksPage() {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) {
-        console.log('No authenticated user found')
+        devLog('No authenticated user found');
         return
       }
 
-      console.log('Fetching user profile from database...')
+      devLog('Fetching user profile from database...');
       
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -207,7 +207,7 @@ export default function TasksPage() {
         return
       }
 
-      console.log('Successfully fetched user profile:', profile)
+      devLog('Successfully fetched user profile:', profile);
       setUserProfile(profile)
       
     } catch (error) {
@@ -299,11 +299,11 @@ export default function TasksPage() {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) {
-        console.log('No authenticated user found')
+        devLog('No authenticated user found');
         return
       }
 
-      console.log('Fetching users from database...')
+      devLog('Fetching users from database...');
       
       // Get current user's organization first
       const { data: currentProfile } = await supabase
@@ -332,8 +332,8 @@ export default function TasksPage() {
         return
       }
 
-      console.log('Successfully fetched users:', users?.length || 0, 'users')
-      console.log('Users:', users?.map(u => ({ id: u.id, name: u.full_name, email: u.email })))
+      devLog('Successfully fetched users:', users?.length || 0, 'users');
+      devLog('Users:', users?.map(u => ({ id: u.id, name: u.full_name, email: u.email });))
       setUsers(users || [])
 
     } catch (error) {
@@ -412,7 +412,7 @@ export default function TasksPage() {
         console.error('Error fetching tasks:', error)
         // If tasks table doesn't exist, just set empty array
         if (error.code === 'PGRST204' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-          console.log('Tasks table does not exist yet. Please run database migrations.')
+          devLog('Tasks table does not exist yet. Please run database migrations.');
           setTasks([])
           setLoading(false)
           return

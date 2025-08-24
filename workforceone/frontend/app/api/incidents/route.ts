@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/client';
+import { logger, apiLog } from '@/lib/utils/logger';
 
 // In-memory storage for demo incidents (simulating local storage from mobile)
 const demoIncidents = [
@@ -32,7 +33,7 @@ const demoIncidents = [
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🚨 Incidents API called');
+    apiLog('GET /api/incidents', 'Incidents API called');
     
     const incidents = [];
     
@@ -46,16 +47,16 @@ export async function GET(request: NextRequest) {
         .limit(50);
         
       if (!error && dbIncidents && dbIncidents.length > 0) {
-        console.log('✅ Found', dbIncidents.length, 'incidents from database');
+        apiLog('GET /api/incidents', `Found ${dbIncidents.length} incidents from database`);
         incidents.push(...dbIncidents.map(incident => ({
           ...incident,
           source: 'database'
         })));
       } else {
-        console.log('⚠️ Database incidents error or empty:', error?.message || 'No incidents');
+        logger.warn('Database incidents error or empty', { error: error?.message || 'No incidents' }, 'API');
       }
     } catch (dbError) {
-      console.log('⚠️ Database connection error:', dbError);
+      logger.error('Database connection error', dbError, 'API');
     }
     
     // Add demo incidents (simulating mobile app local storage)
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
     // Sort by created_at descending
     incidents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     
-    console.log('📊 Returning', incidents.length, 'total incidents');
+    apiLog('GET /api/incidents', `Returning ${incidents.length} total incidents`);
     
     return NextResponse.json({
       success: true,
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const incidentData = await request.json();
-    console.log('📝 Receiving incident via API:', incidentData.title);
+    apiLog('POST /api/incidents', `Receiving incident: ${incidentData.title}`);
     
     // Add to demo incidents (simulating storage)
     const newIncident = {
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
       demoIncidents.splice(50);
     }
     
-    console.log('✅ Incident stored via API');
+    apiLog('POST /api/incidents', 'Incident stored successfully');
     
     return NextResponse.json({
       success: true,

@@ -81,7 +81,7 @@ export default function GuardInvitationsPage() {
   const loadInvitations = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Loading invitations from database...')
+      devLog('🔄 Loading invitations from database...');
 
       // First try to get from security_guard_invitations table
       const { data: guardInvitations, error: guardError } = await supabase
@@ -147,12 +147,12 @@ export default function GuardInvitationsPage() {
         })
       }
 
-      console.log(`✅ Loaded ${transformedInvitations.length} invitations from database`)
+      devLog(`✅ Loaded ${transformedInvitations.length} invitations from database`);
       setInvitations(transformedInvitations)
 
       // If no invitations found, show some sample data
       if (transformedInvitations.length === 0) {
-        console.log('No invitations found, showing sample data for demo')
+        devLog('No invitations found, showing sample data for demo');
         setInvitations([{
           id: 'DEMO-001',
           guardName: 'Demo Guard',
@@ -220,7 +220,7 @@ export default function GuardInvitationsPage() {
         type: 'guard_invitation'
       })}`
 
-      console.log('🔄 Creating invitation in database...')
+      devLog('🔄 Creating invitation in database...');
       
       // Save to database - use security_guard_invitations table with correct schema
       const { data: dbInvitation, error: dbError } = await supabase
@@ -248,7 +248,7 @@ export default function GuardInvitationsPage() {
         throw new Error('Failed to create invitation in database')
       }
 
-      console.log('✅ Invitation created in database:', dbInvitation)
+      devLog('✅ Invitation created in database:', dbInvitation);
       
       // Create UI representation
       const newInvitation: GuardInvitation = {

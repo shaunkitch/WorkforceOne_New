@@ -245,7 +245,7 @@ export default function IntegrationsPage() {
     setSaving(true)
     try {
       // In a real implementation, this would save to the database
-      console.log('Saving configuration:', config)
+      devLog('Saving configuration:', config);
       await new Promise(resolve => setTimeout(resolve, 1500))
       alert('Integration settings saved successfully!')
     } catch (error) {

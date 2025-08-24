@@ -256,7 +256,7 @@ export default function ReportBuilderPage() {
     setSaving(true)
     try {
       // In a real implementation, this would save to the database
-      console.log('Saving report:', report)
+      devLog('Saving report:', report);
       alert('Report saved successfully!')
     } catch (error) {
       console.error('Error saving report:', error)

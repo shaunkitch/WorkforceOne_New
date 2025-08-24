@@ -1584,7 +1584,7 @@ function BrandingManagement({ organization, saving }: BrandingManagementProps) {
   useEffect(() => {
     if (currentBranding) {
       applyColorsToCSS(currentBranding)
-      console.log('Applied branding colors:', currentBranding)
+      devLog('Applied branding colors:', currentBranding);
     }
   }, [currentBranding])
 

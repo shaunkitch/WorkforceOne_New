@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { logger, devLog } from './utils/logger'
 
 export interface NotificationPayload {
   type: 'slack' | 'teams'
@@ -193,7 +194,7 @@ export class NotificationService {
       }
 
       // In a real implementation, this would make an HTTP POST to the webhook
-      console.log('Sending Slack notification:', slackMessage)
+      devLog('Sending Slack notification', slackMessage);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -300,7 +301,7 @@ export class NotificationService {
       }
 
       // In a real implementation, this would make an HTTP POST to the webhook
-      console.log('Sending Teams notification:', teamsMessage)
+      devLog('Sending Teams notification', teamsMessage);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 100))

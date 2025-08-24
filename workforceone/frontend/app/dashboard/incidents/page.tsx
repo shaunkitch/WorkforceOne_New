@@ -13,6 +13,7 @@ import {
 
 interface Incident {
   id: string;
+import { devLog } from '@/lib/utils/logger';
   title: string;
   description: string;
   status: string;
@@ -45,7 +46,7 @@ export default function IncidentsPage() {
 
   const loadIncidents = async () => {
     try {
-      console.log('🔄 Loading incidents from API...');
+      devLog('🔄 Loading incidents from API...');
       const response = await fetch('/api/incidents');
       
       if (!response.ok) {
@@ -70,7 +71,7 @@ export default function IncidentsPage() {
           total: incidentsData.length
         });
         
-        console.log('✅ Loaded', incidentsData.length, 'incidents');
+        devLog('✅ Loaded', incidentsData.length, 'incidents');
       } else {
         console.error('❌ API returned error:', result.error);
       }

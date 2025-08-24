@@ -130,7 +130,7 @@ export default function SubscriptionPage() {
       const locationInfo = await getUserLocationAndCurrency()
       setUserCurrency(locationInfo.currency)
     } catch (error) {
-      console.log('Using default USD currency')
+      devLog('Using default USD currency');
       setUserCurrency(CURRENCIES.USD)
     }
   }

@@ -123,7 +123,7 @@ export default function GuardOnboardingPage() {
 
   const handleSubmit = () => {
     // In real implementation, this would submit to API and trigger background processes
-    console.log('Submitting guard profile:', formData)
+    devLog('Submitting guard profile:', formData);
     alert('Guard profile created! Onboarding process initiated.')
   }
 

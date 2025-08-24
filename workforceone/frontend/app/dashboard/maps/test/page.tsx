@@ -16,7 +16,7 @@ export default function GoogleMapsTestPage() {
 
   const checkApiKey = () => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    console.log('Environment variable:', apiKey)
+    devLog('Environment variable:', apiKey);
     
     setApiKeyValue(apiKey || '')
     
@@ -44,13 +44,13 @@ export default function GoogleMapsTestPage() {
     }
 
     try {
-      console.log('Testing direct API call...')
+      devLog('Testing direct API call...');
       const testUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=New+York+City&key=${apiKey}`
       
       const response = await fetch(testUrl)
       const data = await response.json()
       
-      console.log('API Response:', data)
+      devLog('API Response:', data);
       
       if (data.status === 'OK') {
         setTestResult('✅ API key is working! Geocoding test successful.')
@@ -70,7 +70,7 @@ export default function GoogleMapsTestPage() {
 
   const testMapsJSAPI = async () => {
     try {
-      console.log('Testing Maps JavaScript API...')
+      devLog('Testing Maps JavaScript API...');
       
       // Try to load the Maps JavaScript API directly
       const script = document.createElement('script')
@@ -80,7 +80,7 @@ export default function GoogleMapsTestPage() {
       
       // Create a callback
       ;(window as any).initTestMap = () => {
-        console.log('Maps JavaScript API loaded successfully')
+        devLog('Maps JavaScript API loaded successfully');
         setTestResult('✅ Maps JavaScript API loaded successfully!')
         setApiKeyStatus('valid')
       }

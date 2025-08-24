@@ -16,7 +16,7 @@ export default function ContactUsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // Handle form submission here
-    console.log('Form submitted:', formData)
+    devLog('Form submitted:', formData);
     alert('Thank you for your message! We\'ll get back to you within 24 hours.')
     setFormData({
       name: '',

@@ -5,6 +5,7 @@ import morgan from 'morgan'
 import compression from 'compression'
 import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
+import { createLogger } from './utils/logger'
 
 // Import routes
 import invitationRoutes from './routes/simple-invitations'
@@ -17,6 +18,7 @@ dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5000
+const logger = createLogger('server')
 
 // Security middleware
 app.use(helmet())
@@ -70,24 +72,27 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Global error handler:', error)
+  logger.error('Global error handler', { 
+    error: error instanceof Error ? error.message : String(error),
+    stack: error.stack,
+    path: req.originalUrl,
+    method: req.method
+  })
   
   res.status(error.status || 500).json({
     error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
+    message: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : 'Something went wrong',
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
   })
 })
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`)
-  console.log(`📧 Email service initialized`)
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
-  
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`)
-  }
+  logger.info('Server started', { 
+    port: PORT, 
+    environment: process.env.NODE_ENV || 'development',
+    frontendUrl: process.env.NODE_ENV !== 'production' ? (process.env.FRONTEND_URL || 'http://localhost:3000') : undefined
+  })
 })
 
 export default app
