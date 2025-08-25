@@ -10,10 +10,10 @@ import {
   Clock, User, Camera, FileText, CheckCircle,
   AlertCircle, ExternalLink
 } from 'lucide-react'
+import { devLog } from '@/lib/utils/logger'
 
 interface Incident {
   id: string;
-import { devLog } from '@/lib/utils/logger';
   title: string;
   description: string;
   status: string;

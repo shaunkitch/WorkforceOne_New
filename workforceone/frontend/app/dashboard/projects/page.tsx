@@ -279,9 +279,9 @@ export default function ProjectsPage() {
         .eq('project_id', projectId)
 
       devLog(`Time entries for project ${projectId}:`, { data: {
-        total: allEntries?.length || 0, statuses: [...new Set(allEntries?.map(e => e.status }); || [])],
+        total: allEntries?.length || 0, statuses: [...new Set(allEntries?.map(e => e.status) || [])],
         entries: allEntries?.map(e => ({ status: e.status, duration: e.duration }))
-      })
+      }})
 
       const { data, error } = await supabase
         .from('time_entries')

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -23,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, getUser } from '../../lib/supabase';
 import syncManager from '../../lib/syncManager';
 import { getCurrentUserProfile, UserProfile, logRoleBasedAccess } from '../../lib/rbac';
+import { Ionicons } from '@expo/vector-icons';
 
 type IncidentReportRouteProp = RouteProp<GuardStackParamList, 'IncidentReport'>;
 type IncidentReportNavigationProp = StackNavigationProp<GuardStackParamList, 'IncidentReport'>;
@@ -30,7 +32,7 @@ type IncidentReportNavigationProp = StackNavigationProp<GuardStackParamList, 'In
 interface IncidentReport {
   id: string;
   type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: 'low' | 'medium' | 'high';
   title: string;
   description: string;
   location: {
@@ -46,33 +48,110 @@ interface IncidentReport {
   status: 'draft' | 'submitted' | 'resolved';
 }
 
+// Simplified to 4 most common incident types
 const INCIDENT_TYPES = [
-  { id: 'theft', label: 'Theft', icon: '🔓' },
-  { id: 'vandalism', label: 'Vandalism', icon: '🔨' },
-  { id: 'trespassing', label: 'Trespassing', icon: '🚫' },
-  { id: 'fire', label: 'Fire', icon: '🔥' },
-  { id: 'medical', label: 'Medical', icon: '🏥' },
-  { id: 'suspicious', label: 'Suspicious Activity', icon: '👁️' },
-  { id: 'accident', label: 'Accident', icon: '⚠️' },
-  { id: 'other', label: 'Other', icon: '📝' },
+  { 
+    id: 'safety', 
+    label: 'Safety Issue', 
+    icon: 'shield-outline',
+    description: 'Theft, suspicious activity, security concerns',
+    color: '#ef4444'
+  },
+  { 
+    id: 'property', 
+    label: 'Property Damage', 
+    icon: 'construct-outline',
+    description: 'Vandalism, broken equipment, damage',
+    color: '#f59e0b'
+  },
+  { 
+    id: 'emergency', 
+    label: 'Emergency', 
+    icon: 'medical-outline',
+    description: 'Medical, fire, urgent situations',
+    color: '#dc2626'
+  },
+  { 
+    id: 'other', 
+    label: 'Other', 
+    icon: 'document-text-outline',
+    description: 'Any other incident or concern',
+    color: '#6b7280'
+  },
 ];
+
+type StepType = 'type' | 'details' | 'photo' | 'review';
 
 export default function IncidentReportScreen() {
   const route = useRoute<IncidentReportRouteProp>();
   const navigation = useNavigation<IncidentReportNavigationProp>();
   const fromPatrol = route.params?.fromPatrol || false;
+  
+  // State management
+  const [currentStep, setCurrentStep] = useState<StepType>('type');
   const [incidentType, setIncidentType] = useState('');
-  const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
-  const [title, setTitle] = useState('');
+  const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [location, setLocation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  // Auto-get location on component mount
+  useEffect(() => {
+    getCurrentLocation();
+    
+    // Animate in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Save draft automatically when form data changes
+  useEffect(() => {
+    saveDraft();
+  }, [incidentType, severity, description, photos]);
+
+  // Auto-save draft function
+  const saveDraft = async () => {
+    if (!incidentType && !description && photos.length === 0) return;
+
+    try {
+      const draftData = {
+        incidentType,
+        severity,
+        description,
+        photos,
+        timestamp: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem('incidentDraft', JSON.stringify(draftData));
+    } catch (error) {
+      console.error('Failed to save draft:', error);
+    }
+  };
+
+  // Load draft on mount
+  const loadDraft = async () => {
+    try {
+      const draftData = await AsyncStorage.getItem('incidentDraft');
+      if (draftData) {
+        const draft = JSON.parse(draftData);
+        setIncidentType(draft.incidentType || '');
+        setSeverity(draft.severity || 'medium');
+        setDescription(draft.description || '');
+        setPhotos(draft.photos || []);
+      }
+    } catch (error) {
+      console.error('Failed to load draft:', error);
+    }
+  };
 
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Camera permission is required to take photos');
+      Alert.alert('Camera Permission', 'We need camera access to take photos for your report.');
       return;
     }
 
@@ -84,31 +163,17 @@ export default function IncidentReportScreen() {
 
     if (!result.canceled) {
       setPhotos([...photos, result.assets[0].uri]);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const newPhotos = result.assets.map(asset => asset.uri);
-      setPhotos([...photos, ...newPhotos]);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
   const getCurrentLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Location permission is required');
+      console.log('Location permission denied');
       return;
     }
 
-    setLoading(true);
     try {
       const loc = await Location.getCurrentPositionAsync({});
       const address = await Location.reverseGeocodeAsync({
@@ -123,12 +188,64 @@ export default function IncidentReportScreen() {
         },
         address: address[0] ? 
           `${address[0].street || ''} ${address[0].city || ''} ${address[0].region || ''}`.trim() :
-          'Unknown location',
+          'Current location',
       });
     } catch (error) {
-      Alert.alert('Error', 'Failed to get location');
-    } finally {
-      setLoading(false);
+      console.log('Failed to get location:', error);
+      setLocation({
+        coordinates: { latitude: 0, longitude: 0 },
+        address: 'Location unavailable'
+      });
+    }
+  };
+
+  // Navigation between steps
+  const nextStep = () => {
+    switch (currentStep) {
+      case 'type':
+        if (!incidentType) {
+          Alert.alert('Selection Required', 'Please select an incident type to continue.');
+          return;
+        }
+        setCurrentStep('details');
+        break;
+      case 'details':
+        if (!description.trim()) {
+          Alert.alert('Details Required', 'Please provide a description of what happened.');
+          return;
+        }
+        setCurrentStep('photo');
+        break;
+      case 'photo':
+        setCurrentStep('review');
+        break;
+    }
+    
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      fadeAnim.setValue(1);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const prevStep = () => {
+    switch (currentStep) {
+      case 'details':
+        setCurrentStep('type');
+        break;
+      case 'photo':
+        setCurrentStep('details');
+        break;
+      case 'review':
+        setCurrentStep('photo');
+        break;
     }
   };
 

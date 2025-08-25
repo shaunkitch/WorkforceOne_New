@@ -381,7 +381,7 @@ export default function SecurityDashboard() {
       const registrationLink = `${baseUrl}/signup?type=security&code=${code}&email=${encodeURIComponent(inviteEmail.trim())}`;
       setInviteLink(registrationLink);
       
-      devLog('🛡️ Guard invitation created successfully:', { id: invitation.id, code, email: inviteEmail.trim(); });
+      devLog('🛡️ Guard invitation created successfully:', { id: invitation.id, code, email: inviteEmail.trim() });
 
     } catch (error: any) {
       console.error('Error generating invitation:', error);

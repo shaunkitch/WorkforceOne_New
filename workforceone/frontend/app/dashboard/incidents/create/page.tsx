@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { devLog } from '@/lib/utils/logger'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -59,7 +60,7 @@ export default function CreateIncidentPage() {
 
   const handleSubmit = (isDraft: boolean = false) => {
     // In real app, this would submit to API
-    devLog('Submitting incident:', { ...formData, isDraft, timestamp: new Date(); })
+    devLog('Submitting incident:', { ...formData, isDraft, timestamp: new Date() })
     alert(isDraft ? 'Incident saved as draft!' : 'Incident reported successfully!')
   }
 

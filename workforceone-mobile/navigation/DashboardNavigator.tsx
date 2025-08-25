@@ -1,182 +1,147 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Text, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getAvailableProducts, getPrimaryProduct } from '../lib/products';
+import { Alert, View, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+// Screen imports
 import UnifiedDashboardScreen from '../screens/UnifiedDashboardScreen';
-import WorkforceDashboardScreen from '../screens/workforce/WorkforceDashboardScreen';
-import ProjectsScreen from '../screens/workforce/ProjectsScreen';
-import TimeDashboardScreen from '../screens/time/TimeDashboardScreen';
-import TimerScreen from '../screens/time/TimerScreen';
-import TimesheetScreen from '../screens/time/TimesheetScreen';
-import GuardDashboardScreen from '../screens/guard/GuardDashboardScreen';
-import SitesScreen from '../screens/guard/SitesScreen';
-import CheckInScreen from '../screens/guard/CheckInScreen';
-import GuardCheckInScreen from '../screens/guard/GuardCheckInScreen';
-import PatrolSessionScreen from '../screens/guard/PatrolSessionScreen';
-import IncidentReportScreen from '../screens/guard/IncidentReportScreen';
-import GuardKPIScreen from '../screens/guard/GuardKPIScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SyncDebugScreen from '../screens/SyncDebugScreen';
+import WorkforceDashboardScreen from '../screens/workforce/WorkforceDashboardScreen';
+import TimeDashboardScreen from '../screens/time/TimeDashboardScreen';
+import GuardNavigator from './GuardNavigator';
 
-export type DashboardTabParamList = {
-  Home: undefined;
-  Workforce: undefined;
-  TimeTracker: undefined;
-  Guard: undefined;
-  Profile: undefined;
-};
+// Utils
+import { supabase } from '../lib/supabase';
 
-export type WorkforceStackParamList = {
-  WorkforceDashboard: undefined;
-  Projects: undefined;
-  Employees: undefined;
-  Teams: undefined;
-  Analytics: undefined;
-};
+const Tab = createBottomTabNavigator();
 
-export type TimeStackParamList = {
-  TimeDashboard: undefined;
-  Timer: undefined;
-  Timesheet: undefined;
-  Reports: undefined;
-  Invoices: undefined;
-};
-
-export type GuardStackParamList = {
-  GuardDashboard: undefined;
-  Sites: undefined;
-  Guards: undefined;
-  CheckIn: undefined;
-  GuardCheckIn: undefined;
-  PatrolSession: undefined;
-  Incidents: undefined;
-  IncidentReport: { fromPatrol?: boolean };
-  GuardKPI: undefined;
-};
-
-const Tab = createBottomTabNavigator<DashboardTabParamList>();
-const WorkforceStack = createStackNavigator<WorkforceStackParamList>();
-const TimeStack = createStackNavigator<TimeStackParamList>();
-const GuardStack = createStackNavigator<GuardStackParamList>();
-
-interface Props {
-  userProducts: string[];
-  onSignOut: () => void;
+interface UserProduct {
+  id: string;
+  product_id: string;
+  is_active: boolean;
 }
 
-// Stack Navigators
-function WorkforceNavigator() {
-  return (
-    <WorkforceStack.Navigator
-      screenOptions={{
-        headerShown: false
-      }}
-    >
-      <WorkforceStack.Screen 
-        name="WorkforceDashboard" 
-        component={WorkforceDashboardScreen}
-      />
-      <WorkforceStack.Screen 
-        name="Projects" 
-        component={ProjectsScreen}
-      />
-    </WorkforceStack.Navigator>
-  );
+interface DashboardNavigatorProps {
+  userProducts?: UserProduct[];
 }
 
-function TimeNavigator() {
-  return (
-    <TimeStack.Navigator
-      screenOptions={{
-        headerShown: false
-      }}
-    >
-      <TimeStack.Screen 
-        name="TimeDashboard" 
-        component={TimeDashboardScreen}
-      />
-      <TimeStack.Screen 
-        name="Timer" 
-        component={TimerScreen}
-      />
-      <TimeStack.Screen 
-        name="Timesheet" 
-        component={TimesheetScreen}
-      />
-    </TimeStack.Navigator>
-  );
-}
-
-function GuardNavigator() {
-  return (
-    <GuardStack.Navigator
-      screenOptions={{
-        headerShown: false
-      }}
-    >
-      <GuardStack.Screen 
-        name="GuardDashboard" 
-        component={GuardDashboardScreen}
-      />
-      <GuardStack.Screen 
-        name="Sites" 
-        component={SitesScreen}
-      />
-      <GuardStack.Screen 
-        name="CheckIn" 
-        component={CheckInScreen}
-      />
-      <GuardStack.Screen 
-        name="GuardCheckIn" 
-        component={GuardCheckInScreen}
-      />
-      <GuardStack.Screen 
-        name="PatrolSession" 
-        component={PatrolSessionScreen}
-      />
-      <GuardStack.Screen 
-        name="IncidentReport" 
-        component={IncidentReportScreen}
-      />
-      <GuardStack.Screen 
-        name="GuardKPI" 
-        component={GuardKPIScreen}
-      />
-    </GuardStack.Navigator>
-  );
-}
-
-export default function DashboardNavigator({ userProducts, onSignOut }: Props) {
-  const availableProducts = getAvailableProducts(userProducts);
-  const primaryProduct = getPrimaryProduct(userProducts);
+const DashboardNavigator: React.FC<DashboardNavigatorProps> = ({ 
+  userProducts: propUserProducts = []
+}) => {
+  const [userProducts, setUserProducts] = useState<UserProduct[]>(propUserProducts);
+  const [loading, setLoading] = useState(!propUserProducts.length);
   const insets = useSafeAreaInsets();
-  
-  console.log('DashboardNavigator - userProducts:', userProducts);
-  console.log('DashboardNavigator - availableProducts:', availableProducts.map(p => p.id));
-  
-  const tabBarOptions = {
-    activeTintColor: primaryProduct?.color.primary || '#3b82f6',
+
+  useEffect(() => {
+    if (!propUserProducts.length) {
+      loadUserProducts();
+    }
+  }, [propUserProducts.length]);
+
+  const loadUserProducts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: products, error } = await supabase
+        .from('user_products')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error loading user products:', error);
+        return;
+      }
+
+      setUserProducts(products || []);
+    } catch (error) {
+      console.error('Error in loadUserProducts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Define available products with enhanced metadata
+  const availableProducts = [
+    {
+      id: 'workforce-management',
+      name: 'Workforce',
+      icon: 'people',
+      component: WorkforceDashboardScreen,
+      description: 'Team management'
+    },
+    {
+      id: 'time-tracker',
+      name: 'Time',
+      icon: 'time',
+      component: TimeDashboardScreen,
+      description: 'Time tracking'
+    },
+    {
+      id: 'guard-management',
+      name: 'Guard',
+      icon: 'shield-checkmark',
+      component: GuardNavigator,
+      description: 'Security guard tools'
+    }
+  ];
+
+  // Filter products based on user access
+  const accessibleProducts = availableProducts.filter(product =>
+    userProducts.some(up => up.product_id === product.id)
+  );
+
+  // Enhanced tab bar styling with better accessibility
+  const getTabBarOptions = () => ({
+    activeTintColor: '#2563eb',
     inactiveTintColor: '#6b7280',
     style: {
-      backgroundColor: '#fff',
+      backgroundColor: '#ffffff',
       borderTopColor: '#e5e7eb',
       borderTopWidth: 1,
-      paddingBottom: Math.max(insets.bottom, 5),
-      paddingTop: 8,
-      height: 60 + Math.max(insets.bottom, 5),
+      paddingBottom: Math.max(insets.bottom, 10),
+      paddingTop: 10,
+      height: 70 + Math.max(insets.bottom, 10),
       elevation: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
     },
     labelStyle: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '600' as const,
       marginBottom: 2,
+      marginTop: 4,
     },
-  };
+    tabStyle: {
+      paddingVertical: 4,
+    },
+  });
+
+  const tabBarOptions = getTabBarOptions();
+
+  // Custom tab bar icon renderer with better accessibility
+  const renderTabIcon = (iconName: string, color: string, focused: boolean) => (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons 
+        name={iconName as any} 
+        size={focused ? 26 : 24} 
+        color={color}
+      />
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <Tab.Navigator
@@ -187,12 +152,15 @@ export default function DashboardNavigator({ userProducts, onSignOut }: Props) {
         tabBarStyle: tabBarOptions.style,
         tabBarLabelStyle: tabBarOptions.labelStyle,
       }}
+      initialRouteName="Dashboard"
     >
+      {/* Main Dashboard - Always available */}
       <Tab.Screen
-        name="Home"
+        name="Dashboard"
         options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📊</Text>,
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, focused }) => renderTabIcon('home', color, focused),
+          tabBarAccessibilityLabel: 'Home Dashboard',
         }}
       >
         {(props) => (
@@ -200,50 +168,51 @@ export default function DashboardNavigator({ userProducts, onSignOut }: Props) {
         )}
       </Tab.Screen>
 
-      {availableProducts.some(p => p.id === 'workforce-management') && (
+      {/* Product-specific tabs - Only show if user has access */}
+      {accessibleProducts.map(product => (
         <Tab.Screen
-          name="Workforce"
-          component={WorkforceNavigator}
+          key={product.id}
+          name={product.name}
+          component={product.component}
           options={{
-            tabBarLabel: 'Workforce',
-            tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👥</Text>,
+            tabBarLabel: product.name,
+            tabBarIcon: ({ color, focused }) => renderTabIcon(product.icon, color, focused),
+            tabBarAccessibilityLabel: `${product.name} - ${product.description}`,
           }}
         />
-      )}
+      ))}
 
-      {availableProducts.some(p => p.id === 'time-tracker') && (
-        <Tab.Screen
-          name="TimeTracker"
-          component={TimeNavigator}
-          options={{
-            tabBarLabel: 'Time',
-            tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⏱️</Text>,
-          }}
-        />
-      )}
-
-      {availableProducts.some(p => p.id === 'guard-management') && (
-        <Tab.Screen
-          name="Guard"
-          component={GuardNavigator}
-          options={{
-            tabBarLabel: 'Security',
-            tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🛡️</Text>,
-          }}
-        />
-      )}
-
+      {/* Profile - Always available */}
       <Tab.Screen
         name="Profile"
+        component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👤</Text>,
+          tabBarIcon: ({ color, focused }) => renderTabIcon('person', color, focused),
+          tabBarAccessibilityLabel: 'User Profile and Settings',
         }}
-      >
-        {(props) => (
-          <ProfileScreen {...props} onSignOut={onSignOut} />
-        )}
-      </Tab.Screen>
+      />
+
+      {/* Debug Screen - Only in development */}
+      {__DEV__ && (
+        <Tab.Screen
+          name="Debug"
+          component={SyncDebugScreen}
+          options={{
+            tabBarLabel: 'Debug',
+            tabBarIcon: ({ color, focused }) => renderTabIcon('bug', color, focused),
+            tabBarAccessibilityLabel: 'Debug and Sync Information',
+            tabBarBadge: 'DEV',
+            tabBarBadgeStyle: {
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              fontSize: 8,
+            },
+          }}
+        />
+      )}
     </Tab.Navigator>
   );
-}
+};
+
+export default DashboardNavigator;

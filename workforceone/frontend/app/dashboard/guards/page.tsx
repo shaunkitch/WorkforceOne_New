@@ -16,6 +16,7 @@ import {
   Activity, Zap, Globe, Smartphone, QrCode, UserPlus,
   BarChart3, Target
 } from 'lucide-react'
+import { devLog } from '@/lib/utils/logger'
 
 interface Guard {
   id: string
@@ -105,7 +106,6 @@ export default function GuardsPage() {
       // Transform data to expected format
       const realGuards: Guard[] = allGuards.map((guardUser, index) => {
         const profile = Array.isArray(guardUser.profiles) ? guardUser.profiles[0] : guardUser.profiles;
-import { devLog } from '@/lib/utils/logger';
         return {
           id: guardUser.user_id,
           name: profile?.full_name || profile?.email || 'Unknown Guard',

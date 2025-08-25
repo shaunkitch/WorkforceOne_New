@@ -670,7 +670,7 @@ This will calculate the best order for visiting all outlets.`)
         setOptimizedRoutes(prev => new Map(prev.set(routeId, optimizedRoute)))
         
         const optimizedDate = new Date(routeData.optimization_timestamp)
-        devLog(`Loaded optimization from ${optimizedDate.toLocaleString();}`)
+        devLog(`Loaded optimization from ${optimizedDate.toLocaleString()}`)
         return true
       }
       
@@ -1462,7 +1462,7 @@ This will calculate the best order for visiting all outlets.`)
                           routeName: route.name,
                           currentlyShowing: showRouteOnMap, 
                           newSelection: newRouteId,
-                          hasOptimizedRoute: optimizedRoutes.has(route.id);,
+                          hasOptimizedRoute: optimizedRoutes.has(route.id),
                           optimizedRoute: optimizedRoutes.get(route.id)
                         })
                         
@@ -1625,7 +1625,7 @@ This will calculate the best order for visiting all outlets.`)
 
               <div>
                 <Label>Select Outlets for Route</Label>
-                {/* {devLog('Outlets in modal:', outlets.length, outlets.map(o => o.name);)} */}
+                {/* {devLog('Outlets in modal:', outlets.length, outlets.map(o => o.name))} */}
                 <div className="mt-2 space-y-2">
                   {/* Search box */}
                   <div className="relative">

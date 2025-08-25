@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Mail, Phone, MapPin, Clock, Send, MessageSquare, Users, Zap } from 'lucide-react'
+import { devLog } from '@/lib/utils/logger'
 
 export default function ContactUsPage() {
   const [formData, setFormData] = useState({

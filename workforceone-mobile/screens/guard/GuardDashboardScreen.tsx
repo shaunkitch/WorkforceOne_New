@@ -1,234 +1,506 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  Alert,
+  Dimensions,
+  StatusBar,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
-import type { GuardStackParamList } from '../../navigation/DashboardNavigator';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../lib/supabase';
 
-type NavigationProp = StackNavigationProp<GuardStackParamList, 'GuardDashboard'>;
+const { width } = Dimensions.get('window');
 
-export default function GuardDashboardScreen() {
-  const navigation = useNavigation<NavigationProp>();
-  const [refreshing, setRefreshing] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<string>('Off Duty');
-  
+interface GuardDashboardScreenProps {
+  navigation: any;
+}
+
+interface ShiftStatus {
+  isOnDuty: boolean;
+  shiftStart?: Date;
+  currentLocation?: string;
+  patrolsCompleted: number;
+  incidentsReported: number;
+}
+
+const GuardDashboardScreen: React.FC<GuardDashboardScreenProps> = ({ navigation }) => {
+  const [shiftStatus, setShiftStatus] = useState<ShiftStatus>({
+    isOnDuty: false,
+    patrolsCompleted: 0,
+    incidentsReported: 0
+  });
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [userName, setUserName] = useState('Guard');
+
   useEffect(() => {
-    loadDashboardData();
-    loadCurrentStatus();
+    loadUserData();
+    loadShiftStatus();
+    
+    // Update time every minute
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timeInterval);
   }, []);
 
-
-  const loadDashboardData = async () => {
+  const loadUserData = async () => {
     try {
-      console.log('🔄 Loading guard dashboard...');
-      // Dashboard data loading logic here if needed
-    } catch (error) {
-      console.error('❌ Failed to load dashboard:', error);
-    }
-  };
-
-  const loadCurrentStatus = async () => {
-    try {
-      const currentCheckIn = await AsyncStorage.getItem('currentCheckIn');
-      const activePatrol = await AsyncStorage.getItem('activePatrol');
-      
-      if (activePatrol) {
-        setCurrentStatus('On Patrol');
-      } else if (currentCheckIn) {
-        const checkIn = JSON.parse(currentCheckIn);
-        setCurrentStatus(`Checked in at ${checkIn.siteName}`);
-      } else {
-        setCurrentStatus('Off Duty');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.full_name) {
+          setUserName(profile.full_name.split(' ')[0]); // First name only
+        }
       }
     } catch (error) {
-      console.error('Failed to load status:', error);
+      console.error('Error loading user data:', error);
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadDashboardData();
-    await loadCurrentStatus();
-    setRefreshing(false);
+  const loadShiftStatus = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('shiftStatus');
+      if (stored) {
+        const status = JSON.parse(stored);
+        setShiftStatus({
+          ...status,
+          shiftStart: status.shiftStart ? new Date(status.shiftStart) : undefined
+        });
+      }
+    } catch (error) {
+      console.error('Error loading shift status:', error);
+    }
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.header}>
-          <Text style={styles.headerTitle}>Security Operations</Text>
-          <Text style={styles.headerSubtitle}>{currentStatus}</Text>
-        </LinearGradient>
+  const saveShiftStatus = async (status: ShiftStatus) => {
+    try {
+      await AsyncStorage.setItem('shiftStatus', JSON.stringify(status));
+      setShiftStatus(status);
+    } catch (error) {
+      console.error('Error saving shift status:', error);
+    }
+  };
 
-        <View style={styles.content}>
-          <View style={styles.actionsGrid}>
-            {/* Row 1 */}
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.checkInButton]}
-              onPress={() => navigation.navigate('GuardCheckIn')}
-            >
-              <View style={styles.buttonContent}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.actionIcon}>📱</Text>
-                </View>
-                <Text style={styles.actionText}>Check In</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.patrolButton]}
-              onPress={() => navigation.navigate('PatrolSession')}
-            >
-              <View style={styles.buttonContent}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.actionIcon}>🚶‍♂️</Text>
-                </View>
-                <Text style={styles.actionText}>Start Patrol</Text>
-              </View>
-            </TouchableOpacity>
-            
-            {/* Row 2 */}
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.incidentButton]}
-              onPress={() => navigation.navigate('IncidentReport', {})}
-            >
-              <View style={styles.buttonContent}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.actionIcon}>🚨</Text>
-                </View>
-                <Text style={styles.actionText}>Report Incident</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.backupButton]}
-              onPress={() => {/* TODO: Add backup request functionality */}}
-            >
-              <View style={styles.buttonContent}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.actionIcon}>🆘</Text>
-                </View>
-                <Text style={styles.actionText}>Request Backup</Text>
-              </View>
-            </TouchableOpacity>
-            
-            {/* Row 3 */}
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.reportButton]}
-              onPress={() => {/* TODO: Add daily report functionality */}}
-            >
-              <View style={styles.buttonContent}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.actionIcon}>📋</Text>
-                </View>
-                <Text style={styles.actionText}>Daily Report</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.kpiButton]}
-              onPress={() => navigation.navigate('GuardKPI')}
-            >
-              <View style={styles.buttonContent}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.actionIcon}>📊</Text>
-                </View>
-                <Text style={styles.actionText}>My KPIs</Text>
-              </View>
-            </TouchableOpacity>
+  const toggleShift = () => {
+    if (shiftStatus.isOnDuty) {
+      // End shift
+      Alert.alert(
+        "End Shift",
+        "Are you sure you want to end your shift?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "End Shift",
+            style: "destructive",
+            onPress: () => {
+              saveShiftStatus({
+                isOnDuty: false,
+                patrolsCompleted: 0,
+                incidentsReported: 0
+              });
+            }
+          }
+        ]
+      );
+    } else {
+      // Start shift
+      Alert.alert(
+        "Start Shift",
+        "Ready to start your shift?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Start Shift",
+            onPress: () => {
+              saveShiftStatus({
+                isOnDuty: true,
+                shiftStart: new Date(),
+                currentLocation: "Security Office",
+                patrolsCompleted: 0,
+                incidentsReported: 0
+              });
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const getShiftDuration = () => {
+    if (!shiftStatus.isOnDuty || !shiftStatus.shiftStart) return "Not on duty";
+    
+    const now = new Date();
+    const diffMs = now.getTime() - shiftStatus.shiftStart.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${hours}h ${minutes}m`;
+  };
+
+  const primaryActions = [
+    {
+      id: 'checkin',
+      title: 'Check In',
+      subtitle: 'Scan QR or manual entry',
+      icon: 'location',
+      color: '#2563eb',
+      onPress: () => navigation.navigate('GuardCheckIn')
+    },
+    {
+      id: 'patrol',
+      title: 'Start Patrol',
+      subtitle: 'Begin patrol session',
+      icon: 'walk',
+      color: '#059669',
+      onPress: () => navigation.navigate('PatrolSession'),
+      disabled: !shiftStatus.isOnDuty
+    },
+    {
+      id: 'incident',
+      title: 'Report Incident',
+      subtitle: 'Document security incident',
+      icon: 'alert-circle',
+      color: '#dc2626',
+      onPress: () => navigation.navigate('IncidentReport')
+    },
+    {
+      id: 'emergency',
+      title: 'EMERGENCY',
+      subtitle: 'Call for immediate help',
+      icon: 'warning',
+      color: '#dc2626',
+      isEmergency: true,
+      onPress: () => {
+        Alert.alert(
+          "EMERGENCY",
+          "This will immediately alert your supervisor and security team.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "SEND ALERT",
+              style: "destructive",
+              onPress: () => {
+                // TODO: Implement emergency alert
+                Alert.alert("Emergency Alert Sent", "Help is on the way!");
+              }
+            }
+          ]
+        );
+      }
+    }
+  ];
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1f2937" />
+      
+      {/* Header with shift status */}
+      <LinearGradient
+        colors={shiftStatus.isOnDuty ? ['#059669', '#047857'] : ['#1f2937', '#374151']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Hello, {userName}</Text>
+            <Text style={styles.timeText}>
+              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           </View>
+          
+          <TouchableOpacity
+            style={[
+              styles.shiftButton,
+              { backgroundColor: shiftStatus.isOnDuty ? '#dc2626' : '#059669' }
+            ]}
+            onPress={toggleShift}
+          >
+            <Text style={styles.shiftButtonText}>
+              {shiftStatus.isOnDuty ? 'End Shift' : 'Start Shift'}
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {shiftStatus.isOnDuty && (
+          <View style={styles.shiftInfo}>
+            <View style={styles.shiftDetail}>
+              <Text style={styles.shiftLabel}>On Duty</Text>
+              <Text style={styles.shiftValue}>{getShiftDuration()}</Text>
+            </View>
+            <View style={styles.shiftDetail}>
+              <Text style={styles.shiftLabel}>Location</Text>
+              <Text style={styles.shiftValue}>{shiftStatus.currentLocation || 'Unknown'}</Text>
+            </View>
+          </View>
+        )}
+      </LinearGradient>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        
+        {/* Today's Stats - Only show when on duty */}
+        {shiftStatus.isOnDuty && (
+          <View style={styles.statsContainer}>
+            <Text style={styles.sectionTitle}>Today's Activity</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{shiftStatus.patrolsCompleted}</Text>
+                <Text style={styles.statLabel}>Patrols</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{shiftStatus.incidentsReported}</Text>
+                <Text style={styles.statLabel}>Incidents</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Primary Actions */}
+        <View style={styles.actionsContainer}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          {primaryActions.map((action) => (
+            <TouchableOpacity
+              key={action.id}
+              style={[
+                styles.actionCard,
+                action.isEmergency && styles.emergencyCard,
+                action.disabled && styles.disabledCard
+              ]}
+              onPress={action.disabled ? undefined : action.onPress}
+              disabled={action.disabled}
+            >
+              <View style={styles.actionContent}>
+                <View style={[
+                  styles.actionIconContainer,
+                  { backgroundColor: action.color + '20' }
+                ]}>
+                  <Ionicons 
+                    name={action.icon as any} 
+                    size={28} 
+                    color={action.disabled ? '#9ca3af' : action.color} 
+                  />
+                </View>
+                <View style={styles.actionTextContainer}>
+                  <Text style={[
+                    styles.actionTitle,
+                    action.isEmergency && styles.emergencyTitle,
+                    action.disabled && styles.disabledText
+                  ]}>
+                    {action.title}
+                  </Text>
+                  <Text style={[
+                    styles.actionSubtitle,
+                    action.disabled && styles.disabledText
+                  ]}>
+                    {action.disabled ? 'Start shift first' : action.subtitle}
+                  </Text>
+                </View>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={20} 
+                  color={action.disabled ? '#9ca3af' : '#6b7280'} 
+                />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Quick Stats Access */}
+        <TouchableOpacity
+          style={styles.statsAccessCard}
+          onPress={() => navigation.navigate('GuardKPI')}
+        >
+          <View style={styles.actionContent}>
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="bar-chart" size={28} color="#7c3aed" />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>My Performance</Text>
+              <Text style={styles.actionSubtitle}>View your daily targets and stats</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { padding: 32, alignItems: 'center' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
-  headerSubtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
-  content: { 
-    padding: 24, 
-    flex: 1, 
-    justifyContent: 'center'
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
   },
-  actionsGrid: { 
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  headerContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  actionButton: { 
-    width: '47%',
-    aspectRatio: 1.1,
+  greeting: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  timeText: {
+    fontSize: 16,
+    color: '#d1d5db',
+  },
+  shiftButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  shiftButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  shiftInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+  },
+  shiftDetail: {
+    alignItems: 'center',
+  },
+  shiftLabel: {
+    fontSize: 12,
+    color: '#d1d5db',
+    marginBottom: 4,
+  },
+  shiftValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  statsContainer: {
+    marginBottom: 32,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statCard: {
+    flex: 1,
     backgroundColor: '#ffffff',
+    padding: 20,
     borderRadius: 16,
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    padding: 16
+    elevation: 4,
   },
-  buttonContent: {
-    flex: 1,
+  statNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  actionsContainer: {
+    marginBottom: 32,
+  },
+  actionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  emergencyCard: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 2,
+    borderColor: '#fecaca',
+  },
+  disabledCard: {
+    backgroundColor: '#f3f4f6',
+    opacity: 0.6,
+  },
+  actionContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8
   },
-  iconContainer: {
+  actionIconContainer: {
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
-    backgroundColor: 'rgba(0,0,0,0.02)'
+    marginRight: 16,
   },
-  actionIcon: { 
-    fontSize: 28,
-    textAlign: 'center'
+  actionTextContainer: {
+    flex: 1,
   },
-  actionText: { 
-    fontSize: 14, 
-    fontWeight: '600', 
-    textAlign: 'center',
-    color: '#374151',
-    lineHeight: 18,
-    marginTop: 4
+  actionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
   },
-  checkInButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#7c3aed'
+  emergencyTitle: {
+    color: '#dc2626',
   },
-  patrolButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981'
+  actionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
   },
-  incidentButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#ef4444'
+  disabledText: {
+    color: '#9ca3af',
   },
-  backupButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b'
+  statsAccessCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  reportButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6'
-  },
-  kpiButton: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#8b5cf6'
+  bottomSpacer: {
+    height: 100,
   },
 });
+
+export default GuardDashboardScreen;

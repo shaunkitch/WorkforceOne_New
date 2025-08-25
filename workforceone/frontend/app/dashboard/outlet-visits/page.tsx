@@ -242,7 +242,7 @@ export default function OutletVisitsPage() {
 
         devLog('Date filter applied:', {
           range: filters.date_range,
-          startDate: startDate.toISOString();,
+          startDate: startDate.toISOString(),
           now: now.toISOString()
         })
         query = query.gte('check_in_time', startDate.toISOString())
@@ -297,7 +297,7 @@ export default function OutletVisitsPage() {
             })
           } else {
             devLog('Fetched outlets:', outletData);
-            devLog('Outlet mapping:', outletData?.map(o => ({ id: o.id, name: o.name });))
+            devLog('Outlet mapping:', outletData?.map(o => ({ id: o.id, name: o.name })))
           }
 
           // Fetch users
@@ -393,7 +393,7 @@ export default function OutletVisitsPage() {
       todayVisits,
       weekVisits,
       monthVisits,
-      today: today.toISOString();,
+      today: today.toISOString(),
       visitsWithDates: visitsData.map(v => v.check_in_time)
     })
 

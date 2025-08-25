@@ -12,9 +12,7 @@ const nextConfig: NextConfig = {
   },
   // Optimize production builds
   reactStrictMode: true,
-  swcMinify: true,
   poweredByHeader: false,
-  compress: true,
   // Image optimization
   images: {
     domains: ['images.unsplash.com', 'localhost'],

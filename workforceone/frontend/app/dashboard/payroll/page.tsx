@@ -213,7 +213,7 @@ export default function PayrollPage() {
           email: emp.email,
           role: emp.role,
           is_active: emp.is_active
-        });)
+        }))
       })
 
       if (!employees) return
@@ -238,7 +238,7 @@ export default function PayrollPage() {
 
       devLog('Attendance data query:', {
         dateRange,
-        employeeIds: employees.map(emp => emp.id);,
+        employeeIds: employees.map(emp => emp.id),
         employeeNames: employees.map(emp => ({ id: emp.id, name: emp.full_name })),
         attendanceCount: attendanceData?.length || 0,
         attendanceError,
@@ -327,7 +327,7 @@ export default function PayrollPage() {
       // Add debug logging for final employee hours data
       devLog('Final employee hours data:', {
         totalEmployees: employeeHours.size,
-        employeesWithHours: Array.from(employeeHours.values();).filter(emp => emp.total_hours > 0).length,
+        employeesWithHours: Array.from(employeeHours.values()).filter(emp => emp.total_hours > 0).length,
         sampleEmployeeData: Array.from(employeeHours.values())[0]
       })
 

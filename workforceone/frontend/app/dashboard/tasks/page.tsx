@@ -333,7 +333,7 @@ export default function TasksPage() {
       }
 
       devLog('Successfully fetched users:', users?.length || 0, 'users');
-      devLog('Users:', users?.map(u => ({ id: u.id, name: u.full_name, email: u.email });))
+      devLog('Users:', users?.map(u => ({ id: u.id, name: u.full_name, email: u.email })))
       setUsers(users || [])
 
     } catch (error) {
