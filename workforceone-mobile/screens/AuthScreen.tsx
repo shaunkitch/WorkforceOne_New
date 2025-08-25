@@ -12,349 +12,208 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signInWithEmail, signUpWithEmail } from '../lib/supabase';
-
-declare global {
-  var qrScanCallback: ((data: string) => void) | undefined;
-  var pendingInvitationCode: string | undefined;
-  var pendingInvitationType: 'guard' | 'product' | undefined;
-}
+import { signInWithEmail } from '../lib/supabase';
 
 interface Props {
   onAuthSuccess: () => void;
   navigation?: any;
 }
 
+type AuthMode = 'qr' | 'email';
+
 export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
+  const [authMode, setAuthMode] = useState<AuthMode>('qr');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleEmailAuth = async () => {
+  const handleEmailSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Missing Information', 'Please enter both email and password');
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = isSignUp 
-        ? await signUpWithEmail(email, password)
-        : await signInWithEmail(email, password);
-
+      const { error } = await signInWithEmail(email, password);
+      
       if (error) {
-        Alert.alert('Authentication Error', error.message);
+        Alert.alert('Sign In Failed', 'Please check your email and password');
       } else {
-        // Check if there's a pending invitation to process
-        if (global.pendingInvitationCode) {
-          try {
-            // Process the pending invitation using the complete function
-            const { completeInvitationAfterAuth } = await import('../lib/supabase');
-            const { data: result, error: inviteError } = await completeInvitationAfterAuth(global.pendingInvitationCode);
-            
-            if (!inviteError && result?.success) {
-              const inviteType = global.pendingInvitationType === 'guard' ? 'Guard Management' : 'WorkforceOne';
-              Alert.alert(
-                '✅ Welcome!', 
-                `Successfully joined ${inviteType}! Access granted to: ${result.products.join(', ')}`, 
-                [{ text: 'Continue', onPress: onAuthSuccess }],
-                { cancelable: false }
-              );
-            } else {
-              // Even if invitation processing failed, continue to dashboard
-              console.error('Pending invitation processing failed:', inviteError);
-              onAuthSuccess();
-            }
-          } catch (error) {
-            console.error('Error processing pending invitation:', error);
-            // Continue to dashboard even if invitation processing fails
-            onAuthSuccess();
-          }
-          
-          // Clear the pending invitation
-          global.pendingInvitationCode = undefined;
-          global.pendingInvitationType = undefined;
-          return;
-        }
         onAuthSuccess();
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
-      console.error('Auth error:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQRScanner = () => {
+  const handleQRScan = () => {
     if (navigation) {
-      // Store the callback in state to avoid navigation warning
-      const scanCallback = async (data: string) => {
+      // Set up QR scan callback
+      global.qrScanCallback = async (qrData: string) => {
         try {
-          console.log('QR Data Scanned:', data);
+          console.log('QR Code scanned:', qrData);
           
-          let qrData;
-          
-          // Handle different QR code formats
-          if (data.startsWith('GUARD_INVITE:')) {
-            // Guard invitation format: "GUARD_INVITE:{...json...}"
-            const jsonPart = data.substring('GUARD_INVITE:'.length);
-            const guardData = JSON.parse(jsonPart);
-            
-            // Convert guard invitation to product invitation format
-            qrData = {
-              type: 'product_invitation',
-              invitationCode: guardData.code,
-              products: ['guard-management'],
-              organizationName: 'Security Guard System',
-              guardInvite: true,
-              originalData: guardData
-            };
-          } else if (data.startsWith('{')) {
-            // Pure JSON format
-            qrData = JSON.parse(data);
-          } else {
-            // Other formats (URLs, plain text, etc.)
-            throw new Error('Unsupported QR code format');
-          }
-          
-          console.log('Parsed QR Data:', qrData);
-          
-          if (qrData.type === 'product_invitation') {
-            console.log('Processing product invitation:', qrData.invitationCode);
-            
-            let result, error;
-            
-            // Extract user info from QR data for auto sign-up
-            const userEmail = qrData.originalData?.email || 
-                             qrData.originalData?.contact?.email || 
-                             null;
-            const userName = qrData.originalData?.name || 
-                            qrData.originalData?.contact?.name || 
-                            'New User';
-            
-            if (qrData.guardInvite) {
-              // Handle guard invitation with auto sign-up
-              // Try auto sign-up even without email by generating one from invitation code
-              const autoEmail = userEmail || `${qrData.invitationCode.toLowerCase()}@auto-invite.temp`;
-              console.log('Auto sign-up attempt with email:', autoEmail);
+          // Parse QR code data
+          if (qrData.startsWith('GUARD_INVITE:')) {
+            const jsonPart = qrData.replace('GUARD_INVITE:', '');
+            try {
+              const inviteData = JSON.parse(jsonPart);
+              const invitationCode = inviteData.code;
               
-              try {
-                // Attempt QR invitation processing with Supabase Auth
-                console.log('Processing QR invitation for guard (handles both signup and login)...');
-                const { processQRInvitation } = await import('../lib/supabase');
-                const authResponse = await processQRInvitation(qrData.invitationCode, autoEmail, userName);
-                
-                if (!authResponse.error && (authResponse.data?.auto_signed_in || authResponse.data?.existing_user_signin || authResponse.data?.already_signed_in)) {
-                  // User was signed in (new account or existing account)
-                  console.log('QR invitation processed successfully, navigating to dashboard...');
-                  // Navigate directly to Dashboard without any popup
-                  onAuthSuccess();
-                  return;
-                } else if (authResponse.data?.needs_confirmation) {
-                  // Account created but needs email confirmation
-                  console.log('Account created but needs email confirmation');
-                  Alert.alert(
-                    '📧 Check Your Email', 
-                    `Account created for ${autoEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
-                    [{ text: 'OK' }]
-                  );
-                  return;
-                } else {
-                  console.log('Auto sign-up failed, will try validation only:', authResponse.error);
-                }
-              } catch (autoError) {
-                console.log('Auto sign-up exception, will try validation only:', autoError);
-              }
+              console.log('Processing guard invitation:', invitationCode);
               
-              // Fallback: Just validate invitation and show manual signup
-              const { acceptGuardInvitation } = await import('../lib/supabase');
-              const response = await acceptGuardInvitation(qrData.invitationCode, userEmail, userName);
-              result = response.data;
-              error = response.error;
-            } else {
-              // Handle regular product invitation with auto sign-up
-              // Try auto sign-up even without email by generating one from invitation code
-              const autoEmail = userEmail || `${qrData.invitationCode.toLowerCase()}@auto-invite.temp`;
-              console.log('Auto sign-up attempt with email:', autoEmail);
+              // Process the QR invitation with auto sign-up
+              const { processQRInvitation } = await import('../lib/supabase');
+              const email = `guard-${invitationCode.toLowerCase()}@auto-invite.temp`;
+              const name = 'Security Guard';
               
-              try {
-                // Attempt QR invitation processing with Supabase Auth
-                console.log('Processing QR invitation for product (handles both signup and login)...');
-                const { processQRInvitation } = await import('../lib/supabase');
-                const authResponse = await processQRInvitation(qrData.invitationCode, autoEmail, userName);
-                
-                if (!authResponse.error && (authResponse.data?.auto_signed_in || authResponse.data?.existing_user_signin || authResponse.data?.already_signed_in)) {
-                  // User was signed in (new account or existing account)
-                  console.log('QR invitation processed successfully, navigating to dashboard...');
-                  // Navigate directly to Dashboard without any popup
-                  onAuthSuccess();
-                  return;
-                } else if (authResponse.data?.needs_confirmation) {
-                  // Account created but needs email confirmation
-                  console.log('Account created but needs email confirmation');
-                  Alert.alert(
-                    '📧 Check Your Email', 
-                    `Account created for ${autoEmail}! Please check your email and confirm your account, then try scanning the QR code again.`,
-                    [{ text: 'OK' }]
-                  );
-                  return;
-                } else {
-                  console.log('Auto sign-up failed, will try validation only:', authResponse.error);
-                }
-              } catch (autoError) {
-                console.log('Auto sign-up exception, will try validation only:', autoError);
-              }
+              const result = await processQRInvitation(invitationCode, email, name);
               
-              // Fallback: Just validate invitation and show manual signup
-              const { acceptProductInvitation } = await import('../lib/supabase');
-              const response = await acceptProductInvitation(qrData.invitationCode, userEmail, userName);
-              result = response.data;
-              error = response.error;
-            }
-            
-            console.log('Invitation processing result:', { result, error });
-            
-            if (error) {
-              console.error('Invitation error:', error);
-              Alert.alert('Invitation Error', error);
-            } else if (result?.success) {
-              if (result.requires_signup || result.auto_signup) {
-                const inviteType = qrData.guardInvite ? 'Guard Management' : 'WorkforceOne';
-                Alert.alert(
-                  `🎉 ${inviteType} Invitation!`, 
-                  `You're invited to join ${qrData.organizationName || 'organization'}.\n\nAccess: ${qrData.products.join(', ')}\n\nPlease sign up or log in to complete the process.`,
-                  [{ text: 'OK' }]
-                );
-                // Store invitation data for later use after authentication
-                global.pendingInvitationCode = qrData.invitationCode;
-                global.pendingInvitationType = qrData.guardInvite ? 'guard' : 'product';
+              if (result.error) {
+                console.error('QR invitation processing failed:', result.error);
+                Alert.alert('QR Processing Failed', result.error);
               } else {
-                // User is already authenticated and invitation processed successfully
-                console.log('Invitation processed successfully, navigating to dashboard...');
-                // Navigate directly to Dashboard without any popup
+                console.log('QR invitation processed successfully:', result.data);
                 onAuthSuccess();
               }
-            } else {
-              console.error('Invitation failed:', result);
-              Alert.alert('Error', result?.error || 'Failed to process invitation');
+            } catch (parseError) {
+              console.error('Failed to parse QR invite data:', parseError);
+              Alert.alert('Invalid QR Code', 'Unable to parse invitation data');
             }
           } else {
-            console.log('Invalid QR type:', qrData.type);
-            Alert.alert('Invalid QR Code', 'This is not a valid WorkforceOne invitation code');
+            // Handle other QR code formats or fall back to simple success
+            console.log('Non-invitation QR code, proceeding with simple auth');
+            onAuthSuccess();
           }
         } catch (error) {
-          console.error('QR Parse Error:', error);
-          console.log('Raw QR Data:', data);
-          Alert.alert(
-            'QR Code Debug Info', 
-            `Raw data: ${data.substring(0, 100)}...\n\nError: ${error.message}\n\nThis should be JSON starting with {"type":"product_invitation"...}`
-          );
+          console.error('QR processing error:', error);
+          Alert.alert('Invalid QR Code', 'Please scan a valid WorkforceOne QR code');
         }
       };
       
-      // Store callback in a global variable to pass to QRScanner
-      global.qrScanCallback = scanCallback;
       navigation.navigate('QRScanner');
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={['#1e40af', '#3b82f6', '#6366f1']}
+        colors={['#1e3a8a', '#3b82f6', '#1e40af']}
         style={styles.gradient}
       >
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+          style={styles.content}
         >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Text style={styles.logo}>⚡</Text>
-            <Text style={styles.title}>WorkforceOne</Text>
-            <Text style={styles.subtitle}>
-              {isSignUp ? 'Create your account' : 'Welcome back'}
-            </Text>
-          </View>
-
-          <View style={styles.formContainer}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                placeholderTextColor="#9ca3af"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <Text style={styles.logo}>🛡️</Text>
+              </View>
+              <Text style={styles.title}>Sign In to WorkforceOne</Text>
+              <Text style={styles.subtitle}>Security Management System</Text>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                placeholderTextColor="#9ca3af"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete="password"
-              />
+            {/* Auth Mode Selection */}
+            <View style={styles.authContainer}>
+              {authMode === 'qr' ? (
+                // QR Code Mode (Primary)
+                <View style={styles.qrSection}>
+                  <View style={styles.instructionCard}>
+                    <Text style={styles.instructionTitle}>Scan Your Badge</Text>
+                    <Text style={styles.instructionText}>
+                      Point your camera at the QR code on your employee badge or invitation
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.scanButton}
+                    onPress={handleQRScan}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.scanIcon}>
+                      <Text style={styles.scanIconText}>📱</Text>
+                    </View>
+                    <Text style={styles.scanButtonText}>Scan QR Code</Text>
+                    <Text style={styles.scanButtonSubtext}>Quick & Easy</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.switchModeButton}
+                    onPress={() => setAuthMode('email')}
+                  >
+                    <Text style={styles.switchModeText}>Use Email Instead</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                // Email Mode (Fallback)
+                <View style={styles.emailSection}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => setAuthMode('qr')}
+                  >
+                    <Text style={styles.backButtonText}>← Back to QR Scan</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.emailForm}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Email Address</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="your.email@company.com"
+                        placeholderTextColor="#94a3b8"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        autoCorrect={false}
+                      />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Password</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter your password"
+                        placeholderTextColor="#94a3b8"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                        autoComplete="password"
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.signInButton, loading && styles.buttonDisabled]}
+                      onPress={handleEmailSignIn}
+                      disabled={loading}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.signInButtonText}>
+                        {loading ? 'Signing In...' : 'Sign In'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
 
-            <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
-              onPress={handleEmailAuth}
-              disabled={loading}
-            >
-              <Text style={styles.primaryButtonText}>
-                {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>
+                Secure • Professional • Trusted
               </Text>
-            </TouchableOpacity>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
             </View>
-
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleQRScanner}
-            >
-              <Text style={styles.qrIcon}>📱</Text>
-              <Text style={styles.secondaryButtonText}>
-                Scan QR Code to Join
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.switchButton}
-              onPress={() => setIsSignUp(!isSignUp)}
-            >
-              <Text style={styles.switchButtonText}>
-                {isSignUp 
-                  ? 'Already have an account? Sign In' 
-                  : "Don't have an account? Sign Up"
-                }
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Secure • Unified • Mobile-First
-            </Text>
-          </View>
-        </ScrollView>
+          </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
@@ -364,129 +223,209 @@ export default function AuthScreen({ onAuthSuccess, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1e40af',
   },
   gradient: {
     flex: 1,
   },
-  keyboardView: {
+  content: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 40,
+    minHeight: '100%',
   },
+  
+  // Header Styles
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 48,
+  },
+  logoContainer: {
+    marginBottom: 16,
   },
   logo: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 72,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 8,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#e0e7ff',
+    fontSize: 18,
+    color: '#e2e8f0',
     textAlign: 'center',
-  },
-  formContainer: {
-    width: '100%',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 8,
-  },
-  primaryButton: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e40af',
-  },
-  secondaryButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  qrIcon: {
-    fontSize: 20,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: '#e0e7ff',
     fontWeight: '500',
   },
-  switchButton: {
-    marginTop: 16,
+
+  // Auth Container
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+
+  // QR Section Styles
+  qrSection: {
     alignItems: 'center',
   },
-  switchButtonText: {
-    fontSize: 14,
-    color: '#e0e7ff',
-    textDecorationLine: 'underline',
+  instructionCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
+  instructionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  instructionText: {
+    fontSize: 18,
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 26,
+  },
+  scanButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    marginBottom: 24,
+    minHeight: 120,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 3,
+    borderColor: '#3b82f6',
+  },
+  scanIcon: {
+    marginBottom: 8,
+  },
+  scanIconText: {
+    fontSize: 48,
+  },
+  scanButtonText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: 4,
+  },
+  scanButtonSubtext: {
+    fontSize: 16,
+    color: '#3b82f6',
+    fontWeight: '500',
+  },
+  switchModeButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  switchModeText: {
+    fontSize: 18,
+    color: '#e2e8f0',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+  },
+
+  // Email Section Styles
+  emailSection: {
+    width: '100%',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  backButtonText: {
+    fontSize: 18,
+    color: '#e2e8f0',
+    fontWeight: '500',
+  },
+  emailForm: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  inputGroup: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  input: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 18,
+    color: '#1e293b',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    minHeight: 64,
+  },
+  signInButton: {
+    backgroundColor: '#1e40af',
+    borderRadius: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+    marginTop: 8,
+    minHeight: 64,
+    justifyContent: 'center',
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  signInButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+
+  // Footer Styles
   footer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 32,
   },
   footerText: {
-    fontSize: 12,
-    color: '#c7d2fe',
+    fontSize: 14,
+    color: '#cbd5e1',
     textAlign: 'center',
+    fontWeight: '500',
   },
 });

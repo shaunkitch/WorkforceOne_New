@@ -8,6 +8,7 @@ export enum UserRole {
   MANAGER = 'manager',
   SUPERVISOR = 'supervisor',
   GUARD = 'guard',
+  REP = 'rep',
   EMPLOYEE = 'employee'
 }
 
@@ -66,6 +67,15 @@ const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAllData: false,
     canManageUsers: false,
     canViewReports: false,
+    canManageOrganization: false,
+    dataScope: 'self'
+  },
+  [UserRole.REP]: {
+    role: UserRole.REP,
+    products: ['workforce-management', 'time-tracker'],
+    canViewAllData: false,
+    canManageUsers: false,
+    canViewReports: true,
     canManageOrganization: false,
     dataScope: 'self'
   },
@@ -190,6 +200,124 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
 // Check if user has access to specific product
 export const hasProductAccess = (userProfile: UserProfile, productId: string): boolean => {
   return userProfile.permissions.products.includes(productId);
+};
+
+// Feature access interface
+export interface FeatureAccess {
+  [key: string]: boolean;
+}
+
+// Check if organization has specific feature enabled
+export const hasFeatureAccess = async (featureKey: string): Promise<boolean> => {
+  try {
+    const userProfile = await getCurrentUserProfile();
+    
+    if (!userProfile || !userProfile.organization_id) {
+      return false;
+    }
+
+    // Try to check using the new RBAC feature system
+    const { data: orgFeatures, error: featureError } = await supabase
+      .from('organization_features')
+      .select(`
+        is_enabled,
+        features!inner (
+          key
+        )
+      `)
+      .eq('organization_id', userProfile.organization_id)
+      .eq('features.key', featureKey)
+      .maybeSingle();
+
+    if (!featureError && orgFeatures) {
+      return orgFeatures.is_enabled;
+    }
+
+    // Fallback to legacy feature_flags in organizations table
+    const { data: organization, error: orgError } = await supabase
+      .from('organizations')
+      .select('feature_flags')
+      .eq('id', userProfile.organization_id)
+      .maybeSingle();
+
+    if (orgError || !organization?.feature_flags) {
+      // Default to enabled for essential features if no data found
+      const defaultFeatures = [
+        'mobile_guard_product', 'mobile_workforce_product', 'mobile_time_product',
+        'guard_management', 'mobile_security', 'workforce_management', 
+        'time_tracking', 'dashboard', 'attendance'
+      ];
+      return defaultFeatures.includes(featureKey);
+    }
+
+    return organization.feature_flags[featureKey] === true;
+  } catch (error) {
+    console.error('Error checking feature access:', error);
+    return false;
+  }
+};
+
+// Get all enabled features for user's organization
+export const getEnabledFeatures = async (): Promise<FeatureAccess> => {
+  try {
+    const userProfile = await getCurrentUserProfile();
+    
+    if (!userProfile || !userProfile.organization_id) {
+      return {};
+    }
+
+    // Try RBAC system first
+    const { data: orgFeatures, error: featureError } = await supabase
+      .from('organization_features')
+      .select(`
+        is_enabled,
+        features!inner (
+          key
+        )
+      `)
+      .eq('organization_id', userProfile.organization_id)
+      .eq('is_enabled', true);
+
+    if (!featureError && orgFeatures && orgFeatures.length > 0) {
+      const features: FeatureAccess = {};
+      orgFeatures.forEach(feature => {
+        if (feature.features) {
+          features[feature.features.key] = true;
+        }
+      });
+      return features;
+    }
+
+    // Fallback to legacy system
+    const { data: organization, error: orgError } = await supabase
+      .from('organizations')
+      .select('feature_flags')
+      .eq('id', userProfile.organization_id)
+      .maybeSingle();
+
+    if (orgError || !organization?.feature_flags) {
+      // Return default enabled features (including master toggles)
+      return {
+        // Master mobile product toggles
+        mobile_guard_product: true,
+        mobile_workforce_product: true,
+        mobile_time_product: true,
+        
+        // Individual features
+        guard_management: true,
+        mobile_security: true,
+        workforce_management: true,
+        time_tracking: true,
+        dashboard: true,
+        attendance: true
+      };
+    }
+
+    return organization.feature_flags || {};
+  } catch (error) {
+    console.error('Error getting enabled features:', error);
+    return {};
+  }
 };
 
 // Check if user can view all organization data

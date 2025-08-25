@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import QRCode from 'qrcode'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUserProfile, hasWebPortalAccess } from '@/lib/rbac'
+import { devLog } from '@/lib/utils/logger'
 import { 
   UserPlus, QrCode, Mail, Copy, RefreshCw, Eye, EyeOff,
   CheckCircle, AlertTriangle, Timer, MapPin, Shield,

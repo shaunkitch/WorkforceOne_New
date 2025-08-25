@@ -14,6 +14,7 @@ import GuardNavigator from './GuardNavigator';
 
 // Utils
 import { supabase } from '../lib/supabase';
+import { getCurrentUserProfile, hasProductAccess, hasFeatureAccess, getEnabledFeatures, FeatureAccess } from '../lib/rbac';
 
 const Tab = createBottomTabNavigator();
 
@@ -31,68 +32,93 @@ const DashboardNavigator: React.FC<DashboardNavigatorProps> = ({
   userProducts: propUserProducts = []
 }) => {
   const [userProducts, setUserProducts] = useState<UserProduct[]>(propUserProducts);
+  const [enabledFeatures, setEnabledFeatures] = useState<FeatureAccess>({});
   const [loading, setLoading] = useState(!propUserProducts.length);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!propUserProducts.length) {
-      loadUserProducts();
+      loadUserProductsAndFeatures();
     }
   }, [propUserProducts.length]);
 
-  const loadUserProducts = async () => {
+  const loadUserProductsAndFeatures = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: products, error } = await supabase
-        .from('user_products')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (error) {
-        console.error('Error loading user products:', error);
+      // Use RBAC system to get user profile and products
+      const userProfile = await getCurrentUserProfile();
+      if (!userProfile) {
+        setLoading(false);
         return;
       }
 
-      setUserProducts(products || []);
+      // Convert role-based products to UserProduct format for compatibility
+      const roleBasedProducts: UserProduct[] = userProfile.permissions.products.map(productId => ({
+        id: `rbac-${productId}`,
+        product_id: productId,
+        is_active: true
+      }));
+
+      // Get organization's enabled features
+      const features = await getEnabledFeatures();
+
+      setUserProducts(roleBasedProducts);
+      setEnabledFeatures(features);
+
+      console.log('User products from RBAC:', roleBasedProducts);
+      console.log('Enabled features:', features);
     } catch (error) {
-      console.error('Error in loadUserProducts:', error);
+      console.error('Error loading user products and features:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Define available products with enhanced metadata
+  // Define available products with enhanced metadata and feature checking
   const availableProducts = [
     {
       id: 'workforce-management',
       name: 'Workforce',
       icon: 'people',
       component: WorkforceDashboardScreen,
-      description: 'Team management'
+      description: 'Team management',
+      requiredFeatures: ['mobile_workforce_product', 'workforce_management'] // Check main product toggle first
     },
     {
       id: 'time-tracker',
       name: 'Time',
       icon: 'time',
       component: TimeDashboardScreen,
-      description: 'Time tracking'
+      description: 'Time tracking',
+      requiredFeatures: ['mobile_time_product', 'time_tracking'] // Check main product toggle first
     },
     {
       id: 'guard-management',
       name: 'Guard',
       icon: 'shield-checkmark',
       component: GuardNavigator,
-      description: 'Security guard tools'
+      description: 'Security guard tools',
+      requiredFeatures: ['mobile_guard_product', 'guard_management'] // Check main product toggle first
     }
   ];
 
-  // Filter products based on user access
-  const accessibleProducts = availableProducts.filter(product =>
-    userProducts.some(up => up.product_id === product.id)
-  );
+  // Filter products based on user access AND feature availability
+  const accessibleProducts = availableProducts.filter(product => {
+    // Check if user has product access via RBAC
+    const hasProductAccess = userProducts.some(up => up.product_id === product.id);
+    
+    // Check if organization has required features enabled
+    // ALL required features must be enabled (includes main product toggle + specific features)
+    const hasRequiredFeatures = product.requiredFeatures.every(feature => 
+      enabledFeatures[feature] === true
+    );
+    
+    console.log(`Product ${product.name}: RBAC=${hasProductAccess}, Features=${hasRequiredFeatures}`, {
+      requiredFeatures: product.requiredFeatures,
+      enabledFeatures: enabledFeatures
+    });
+    
+    return hasProductAccess && hasRequiredFeatures;
+  });
 
   // Enhanced tab bar styling with better accessibility
   const getTabBarOptions = () => ({
@@ -152,11 +178,11 @@ const DashboardNavigator: React.FC<DashboardNavigatorProps> = ({
         tabBarStyle: tabBarOptions.style,
         tabBarLabelStyle: tabBarOptions.labelStyle,
       }}
-      initialRouteName="Dashboard"
+      initialRouteName="Home"
     >
       {/* Main Dashboard - Always available */}
       <Tab.Screen
-        name="Dashboard"
+        name="Home"
         options={{
           tabBarLabel: 'Home',
           tabBarIcon: ({ color, focused }) => renderTabIcon('home', color, focused),

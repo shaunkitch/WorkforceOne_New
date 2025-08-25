@@ -267,77 +267,60 @@ export default function IncidentReportScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!incidentType || !title || !description) {
-      Alert.alert('Incomplete Report', 'Please fill in all required fields');
-      return;
-    }
-
     setLoading(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
       // Convert photos to base64 for web compatibility
       const convertedPhotos = await Promise.all(
-        photos.map(async (photo) => {
-          console.log('📸 Converting photo to base64:', photo);
-          const base64Photo = await convertImageToBase64(photo);
-          console.log('✅ Photo converted, size:', base64Photo.length, 'chars');
-          return base64Photo;
-        })
+        photos.map(async (photo) => await convertImageToBase64(photo))
       );
       
       // Get current user
       const { user } = await getUser();
       const guardId = user?.id || 'anonymous';
-      const guardName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Unknown Guard';
+      const guardName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Security Guard';
 
       const reportId = `INC-${Date.now()}`;
+      
+      // Create auto-generated title based on incident type
+      const selectedType = INCIDENT_TYPES.find(type => type.id === incidentType);
+      const autoTitle = `${selectedType?.label || 'Incident'} - ${new Date().toLocaleDateString()}`;
       
       // Prepare incident data for database
       const incidentData = {
         id: reportId,
-        title,
+        title: autoTitle,
         description,
         category: incidentType,
         severity,
         latitude: location?.coordinates?.latitude || 0,
         longitude: location?.coordinates?.longitude || 0,
-        address: location?.address || 'Unknown location',
+        address: location?.address || 'Location unavailable',
         guard_id: guardId,
         guard_name: guardName,
         status: 'submitted',
         metadata: {
           photos: photos.length,
-          photo_urls: convertedPhotos, // Use base64 converted photos
+          photo_urls: convertedPhotos,
           timestamp: new Date().toISOString(),
           device_info: Platform.OS
         }
       };
 
-      // Use sync manager for reliable incident submission
-      await syncManager.log('INCIDENT_SUBMIT', 'info', 'Starting incident submission', { 
-        title: incidentData.title, 
-        severity: incidentData.severity 
-      });
-
       try {
         // Add incident to outbox - this will automatically try to sync
         const outboxId = await syncManager.addToOutbox('incident', incidentData);
-        
-        await syncManager.log('INCIDENT_SUBMIT', 'success', 'Incident added to sync queue', { 
-          outboxId,
-          reportId 
-        });
 
         // Also save to local storage for immediate access
         const report: IncidentReport = {
           id: reportId,
           type: incidentType,
           severity,
-          title,
+          title: autoTitle,
           description,
           location: location || {
-            address: 'Unknown',
+            address: 'Location unavailable',
             coordinates: { latitude: 0, longitude: 0 },
           },
           photos: convertedPhotos,
@@ -350,6 +333,9 @@ export default function IncidentReportScreen() {
         const reports = existingReports ? JSON.parse(existingReports) : [];
         reports.unshift(report);
         await AsyncStorage.setItem('incidentReports', JSON.stringify(reports));
+
+        // Clear draft
+        await AsyncStorage.removeItem('incidentDraft');
 
         // If this incident was reported during patrol, update patrol stats
         if (fromPatrol) {
@@ -366,53 +352,38 @@ export default function IncidentReportScreen() {
         }
 
         Alert.alert(
-          'Incident Reported',
-          `Incident "${title}" has been queued for submission. Check the sync status in the debug screen to monitor progress.`,
+          'Report Submitted',
+          'Your incident report has been saved and will be sent when you have internet connection.',
           [
             { 
-              text: 'OK', 
+              text: 'Done', 
               onPress: () => {
                 resetForm();
-                if (fromPatrol) {
-                  navigation.goBack(); // Return to patrol screen
-                }
-              }
-            },
-            { 
-              text: 'View Sync Status', 
-              onPress: () => {
-                resetForm();
-                if (fromPatrol) {
-                  navigation.goBack(); // Return to patrol screen
-                } else {
-                  // Navigation to sync debug screen would go here
-                }
+                navigation.goBack();
               }
             }
           ]
         );
 
       } catch (error) {
-        await syncManager.log('INCIDENT_SUBMIT', 'error', 'Failed to queue incident', error);
-        
         Alert.alert(
-          'Submission Error',
-          'Failed to queue incident for submission. Please try again.',
-          [{ text: 'OK' }]
+          'Report Saved',
+          'Your report has been saved locally and will be sent when connection is available.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       }
     } catch (error) {
       console.error('Submit error:', error);
-      Alert.alert('Error', 'Failed to submit report');
+      Alert.alert('Error', 'Failed to save report. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const resetForm = () => {
+    setCurrentStep('type');
     setIncidentType('');
     setSeverity('medium');
-    setTitle('');
     setDescription('');
     setPhotos([]);
     setLocation(null);
@@ -422,191 +393,317 @@ export default function IncidentReportScreen() {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
-  return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#dc2626', '#ef4444']}
-          style={styles.header}
-        >
-          <Text style={styles.headerTitle}>Incident Report</Text>
-          <Text style={styles.headerSubtitle}>Report security incidents immediately</Text>
-        </LinearGradient>
+  // Step progress indicator
+  const getStepNumber = (step: StepType): number => {
+    const steps: StepType[] = ['type', 'details', 'photo', 'review'];
+    return steps.indexOf(step) + 1;
+  };
 
-        <View style={styles.content}>
-          {/* Incident Type Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Incident Type *</Text>
-            <View style={styles.typeGrid}>
-              {INCIDENT_TYPES.map((type) => (
-                <TouchableOpacity
-                  key={type.id}
-                  style={[
-                    styles.typeCard,
-                    incidentType === type.id && styles.typeCardSelected,
-                  ]}
-                  onPress={() => setIncidentType(type.id)}
-                >
-                  <Text style={styles.typeIcon}>{type.icon}</Text>
-                  <Text style={[
-                    styles.typeLabel,
-                    incidentType === type.id && styles.typeLabelSelected,
-                  ]}>
-                    {type.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+  // Render step-specific content
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 'type':
+        return renderTypeSelection();
+      case 'details':
+        return renderDetailsForm();
+      case 'photo':
+        return renderPhotoCapture();
+      case 'review':
+        return renderReviewStep();
+      default:
+        return null;
+    }
+  };
 
-          {/* Severity Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Severity Level *</Text>
-            <View style={styles.severityContainer}>
-              {(['low', 'medium', 'high', 'critical'] as const).map((level) => (
-                <TouchableOpacity
-                  key={level}
-                  style={[
-                    styles.severityButton,
-                    severity === level && styles.severityButtonSelected,
-                    severity === level && {
-                      backgroundColor:
-                        level === 'low' ? '#10b981' :
-                        level === 'medium' ? '#f59e0b' :
-                        level === 'high' ? '#ef4444' :
-                        '#7c3aed',
-                    },
-                  ]}
-                  onPress={() => setSeverity(level)}
-                >
-                  <Text style={[
-                    styles.severityText,
-                    severity === level && styles.severityTextSelected,
-                  ]}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Title Input */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Title *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Brief description of the incident"
-              placeholderTextColor="#9ca3af"
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-
-          {/* Description Input */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Detailed Description *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Provide detailed information about the incident..."
-              placeholderTextColor="#9ca3af"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Location */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Location</Text>
-            {location ? (
-              <View style={styles.locationCard}>
-                <Text style={styles.locationIcon}>📍</Text>
-                <View style={styles.locationContent}>
-                  <Text style={styles.locationAddress}>{location.address}</Text>
-                  <Text style={styles.locationCoords}>
-                    {location.coordinates.latitude.toFixed(6)}, {location.coordinates.longitude.toFixed(6)}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.locationButton}
-                onPress={getCurrentLocation}
-                disabled={loading}
-              >
-                <Text style={styles.locationButtonIcon}>📍</Text>
-                <Text style={styles.locationButtonText}>Get Current Location</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Photos */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Evidence Photos</Text>
-            <View style={styles.photoContainer}>
-              {photos.map((photo, index) => (
-                <View key={index} style={styles.photoWrapper}>
-                  <Image source={{ uri: photo }} style={styles.photo} />
-                  <TouchableOpacity
-                    style={styles.photoRemove}
-                    onPress={() => removePhoto(index)}
-                  >
-                    <Text style={styles.photoRemoveText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              
-              {photos.length < 4 && (
-                <View style={styles.photoActions}>
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={handleTakePhoto}
-                  >
-                    <Text style={styles.photoButtonIcon}>📷</Text>
-                    <Text style={styles.photoButtonText}>Take Photo</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={handlePickImage}
-                  >
-                    <Text style={styles.photoButtonIcon}>🖼️</Text>
-                    <Text style={styles.photoButtonText}>Choose Photo</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Submit Button */}
+  const renderTypeSelection = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>What happened?</Text>
+      <Text style={styles.stepSubtitle}>Choose the type of issue you want to report</Text>
+      
+      <View style={styles.typeGrid}>
+        {INCIDENT_TYPES.map((type) => (
           <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
+            key={type.id}
+            style={[
+              styles.typeCard,
+              incidentType === type.id && [styles.typeCardSelected, { borderColor: type.color }],
+            ]}
+            onPress={() => {
+              setIncidentType(type.id);
+              Haptics.selectionAsync();
+            }}
+          >
+            <View style={[styles.typeIconContainer, { backgroundColor: incidentType === type.id ? type.color : '#f1f5f9' }]}>
+              <Ionicons 
+                name={type.icon as any} 
+                size={32} 
+                color={incidentType === type.id ? '#ffffff' : type.color} 
+              />
+            </View>
+            <Text style={[styles.typeLabel, incidentType === type.id && { color: type.color, fontWeight: '700' }]}>
+              {type.label}
+            </Text>
+            <Text style={styles.typeDescription}>
+              {type.description}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderDetailsForm = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Tell us what happened</Text>
+      <Text style={styles.stepSubtitle}>Provide details about the situation</Text>
+      
+      <View style={styles.detailsCard}>
+        <Text style={styles.inputLabel}>How serious is this?</Text>
+        <View style={styles.severityContainer}>
+          {(['low', 'medium', 'high'] as const).map((level) => {
+            const colors = {
+              low: '#10b981',
+              medium: '#f59e0b',
+              high: '#ef4444'
+            };
+            return (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.severityButton,
+                  severity === level && [styles.severityButtonSelected, { backgroundColor: colors[level] }],
+                ]}
+                onPress={() => {
+                  setSeverity(level);
+                  Haptics.selectionAsync();
+                }}
+              >
+                <Text style={[
+                  styles.severityText,
+                  severity === level && styles.severityTextSelected,
+                ]}>
+                  {level === 'low' ? 'Low' : level === 'medium' ? 'Medium' : 'High'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.inputLabel, { marginTop: 24 }]}>What happened?</Text>
+        <TextInput
+          style={styles.textArea}
+          placeholder="Describe what you saw or what happened..."
+          placeholderTextColor="#94a3b8"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          textAlignVertical="top"
+          returnKeyType="done"
+          blurOnSubmit
+        />
+
+        {location && (
+          <View style={styles.locationInfo}>
+            <Ionicons name="location-outline" size={20} color="#64748b" />
+            <Text style={styles.locationText}>{location.address}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderPhotoCapture = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Add photos (optional)</Text>
+      <Text style={styles.stepSubtitle}>Take pictures to help explain what happened</Text>
+      
+      <View style={styles.photoSection}>
+        {photos.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll}>
+            {photos.map((photo, index) => (
+              <View key={index} style={styles.photoWrapper}>
+                <Image source={{ uri: photo }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.photoRemove}
+                  onPress={() => {
+                    removePhoto(index);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  }}
+                >
+                  <Ionicons name="close" size={16} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+        
+        {photos.length < 3 && (
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={handleTakePhoto}
           >
             <LinearGradient
-              colors={['#dc2626', '#ef4444']}
-              style={styles.submitGradient}
+              colors={['#3b82f6', '#1d4ed8']}
+              style={styles.cameraGradient}
             >
-              <Text style={styles.submitIcon}>🚨</Text>
-              <Text style={styles.submitText}>
-                {loading ? 'Submitting...' : 'Submit Incident Report'}
-              </Text>
+              <Ionicons name="camera" size={32} color="#ffffff" />
+              <Text style={styles.cameraButtonText}>Take Photo</Text>
             </LinearGradient>
           </TouchableOpacity>
+        )}
 
-          {/* Save as Draft */}
-          <TouchableOpacity style={styles.draftButton}>
-            <Text style={styles.draftButtonText}>Save as Draft</Text>
-          </TouchableOpacity>
+        {photos.length === 0 && (
+          <Text style={styles.photoHint}>Photos help us understand what happened better</Text>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderReviewStep = () => {
+    const selectedType = INCIDENT_TYPES.find(type => type.id === incidentType);
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Review your report</Text>
+        <Text style={styles.stepSubtitle}>Make sure everything looks correct</Text>
+        
+        <View style={styles.reviewCard}>
+          <View style={styles.reviewRow}>
+            <Ionicons name={selectedType?.icon as any} size={24} color={selectedType?.color} />
+            <View style={styles.reviewContent}>
+              <Text style={styles.reviewLabel}>Issue Type</Text>
+              <Text style={styles.reviewValue}>{selectedType?.label}</Text>
+            </View>
+          </View>
+
+          <View style={styles.reviewRow}>
+            <Ionicons name="alert-circle-outline" size={24} color="#f59e0b" />
+            <View style={styles.reviewContent}>
+              <Text style={styles.reviewLabel}>Priority Level</Text>
+              <Text style={[styles.reviewValue, { 
+                color: severity === 'low' ? '#10b981' : severity === 'medium' ? '#f59e0b' : '#ef4444' 
+              }]}>
+                {severity.charAt(0).toUpperCase() + severity.slice(1)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.reviewRow}>
+            <Ionicons name="document-text-outline" size={24} color="#64748b" />
+            <View style={styles.reviewContent}>
+              <Text style={styles.reviewLabel}>Description</Text>
+              <Text style={styles.reviewValue} numberOfLines={3}>{description}</Text>
+            </View>
+          </View>
+
+          {photos.length > 0 && (
+            <View style={styles.reviewRow}>
+              <Ionicons name="image-outline" size={24} color="#64748b" />
+              <View style={styles.reviewContent}>
+                <Text style={styles.reviewLabel}>Photos</Text>
+                <Text style={styles.reviewValue}>{photos.length} photo{photos.length > 1 ? 's' : ''} attached</Text>
+              </View>
+            </View>
+          )}
+
+          {location && (
+            <View style={styles.reviewRow}>
+              <Ionicons name="location-outline" size={24} color="#64748b" />
+              <View style={styles.reviewContent}>
+                <Text style={styles.reviewLabel}>Location</Text>
+                <Text style={styles.reviewValue} numberOfLines={2}>{location.address}</Text>
+              </View>
+            </View>
+          )}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <LinearGradient
+        colors={['#1e40af', '#3b82f6']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          {currentStep !== 'type' && (
+            <TouchableOpacity style={styles.backButton} onPress={prevStep}>
+              <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Report an Issue</Text>
+            <Text style={styles.headerSubtitle}>Step {getStepNumber(currentStep)} of 4</Text>
+          </View>
+        </View>
+        
+        {/* Progress Bar */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${(getStepNumber(currentStep) / 4) * 100}%` }]} />
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Content */}
+      <KeyboardAvoidingView 
+        style={styles.contentContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <Animated.View style={[{ opacity: fadeAnim }]}>
+            {renderStepContent()}
+          </Animated.View>
+        </ScrollView>
+
+        {/* Bottom Action Buttons */}
+        <View style={styles.bottomActions}>
+          {currentStep === 'review' ? (
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={['#dc2626', '#ef4444']}
+                style={styles.submitGradient}
+              >
+                <Ionicons name="checkmark-circle" size={24} color="#ffffff" />
+                <Text style={styles.submitText}>
+                  {loading ? 'Submitting...' : 'Submit Report'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={nextStep}
+            >
+              <LinearGradient
+                colors={['#3b82f6', '#1d4ed8']}
+                style={styles.nextGradient}
+              >
+                <Text style={styles.nextText}>
+                  {currentStep === 'photo' ? 'Continue' : 'Next'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {currentStep === 'photo' && (
+            <TouchableOpacity style={styles.skipButton} onPress={nextStep}>
+              <Text style={styles.skipButtonText}>Skip Photos</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -615,227 +712,346 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  
+  // Header Styles
   header: {
-    padding: 32,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 16,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  headerText: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  content: {
-    padding: 20,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 12,
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  typeCard: {
-    flex: 1,
-    minWidth: '30%',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-  },
-  typeCardSelected: {
-    borderColor: '#dc2626',
-    backgroundColor: '#fef2f2',
-  },
-  typeIcon: {
-    fontSize: 24,
     marginBottom: 4,
   },
-  typeLabel: {
-    fontSize: 12,
-    color: '#6b7280',
+  headerSubtitle: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  progressContainer: {
+    marginTop: 8,
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 3,
+  },
+
+  // Content Styles
+  contentContainer: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  stepContainer: {
+    padding: 24,
+  },
+  stepTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 8,
     textAlign: 'center',
   },
-  typeLabelSelected: {
-    color: '#dc2626',
+  stepSubtitle: {
+    fontSize: 18,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+
+  // Type Selection Styles
+  typeGrid: {
+    gap: 16,
+  },
+  typeCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    minHeight: 160,
+  },
+  typeCardSelected: {
+    borderWidth: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  typeIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  typeLabel: {
+    fontSize: 20,
     fontWeight: '600',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  typeDescription: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  // Details Form Styles
+  detailsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inputLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 12,
   },
   severityContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
+    marginBottom: 8,
   },
   severityButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
     alignItems: 'center',
+    minHeight: 56,
   },
   severityButtonSelected: {
     borderWidth: 0,
   },
   severityText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '600',
   },
   severityTextSelected: {
     color: '#ffffff',
-    fontWeight: '600',
-  },
-  input: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1f2937',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    fontWeight: 'bold',
   },
   textArea: {
-    minHeight: 100,
-    paddingTop: 14,
-  },
-  locationCard: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  locationIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  locationContent: {
-    flex: 1,
-  },
-  locationAddress: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  locationCoords: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  locationButton: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    fontSize: 18,
+    color: '#1e293b',
     borderWidth: 2,
-    borderColor: '#3b82f6',
+    borderColor: '#e2e8f0',
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
     gap: 8,
   },
-  locationButtonIcon: {
-    fontSize: 20,
-  },
-  locationButtonText: {
+  locationText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#3b82f6',
+    color: '#64748b',
+    flex: 1,
   },
-  photoContainer: {
-    gap: 12,
+
+  // Photo Section Styles
+  photoSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  photoScroll: {
+    marginBottom: 20,
   },
   photoWrapper: {
+    marginRight: 16,
     position: 'relative',
   },
-  photo: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+  photoPreview: {
+    width: 150,
+    height: 150,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
   },
   photoRemove: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     borderRadius: 16,
     width: 32,
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoRemoveText: {
-    color: '#ffffff',
+  cameraButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  cameraGradient: {
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 80,
+  },
+  cameraButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#ffffff',
   },
-  photoActions: {
-    flexDirection: 'row',
-    gap: 12,
+  photoHint: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
-  photoButton: {
-    flex: 1,
+
+  // Review Step Styles
+  reviewCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderStyle: 'dashed',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    gap: 20,
   },
-  photoButtonIcon: {
-    fontSize: 24,
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  reviewContent: {
+    flex: 1,
+  },
+  reviewLabel: {
+    fontSize: 16,
+    color: '#64748b',
     marginBottom: 4,
   },
-  photoButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
+  reviewValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+
+  // Bottom Actions
+  bottomActions: {
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    gap: 12,
+  },
+  nextButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  nextGradient: {
+    flexDirection: 'row',
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 56,
+  },
+  nextText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   submitButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 12,
   },
   submitButtonDisabled: {
     opacity: 0.5,
   },
   submitGradient: {
     flexDirection: 'row',
-    padding: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-  },
-  submitIcon: {
-    fontSize: 24,
+    gap: 8,
+    minHeight: 56,
   },
   submitText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  draftButton: {
-    padding: 16,
+  skipButton: {
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  draftButtonText: {
+  skipButtonText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#64748b',
     textDecorationLine: 'underline',
   },
 });

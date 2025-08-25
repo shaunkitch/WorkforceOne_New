@@ -7,47 +7,88 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Shield, Info } from 'lucide-react'
+import { Shield, Info, Users, Clock, Settings, Smartphone, Zap } from 'lucide-react'
 import { toast } from 'sonner'
+import { devLog } from '@/lib/utils/logger'
 
 interface FeatureFlags {
-  dashboard: boolean
-  time_tracking: boolean
-  attendance: boolean
-  maps: boolean
+  // === MOBILE APP PRODUCT TOGGLES (Main Controls) ===
+  mobile_guard_product: boolean          // Enable entire Guard Management mobile experience
+  mobile_workforce_product: boolean      // Enable entire Workforce Management mobile experience  
+  mobile_time_product: boolean          // Enable entire Time Tracking mobile experience
+  
+  // === GUARD MANAGEMENT FEATURES ===
+  guard_management: boolean
+  mobile_security: boolean
+  security_dashboard: boolean
+  incident_reporting: boolean
+  patrol_management: boolean
+  qr_checkpoints: boolean
+  guard_performance: boolean
+  
+  // === WORKFORCE MANAGEMENT FEATURES ===
+  workforce_management: boolean
   teams: boolean
   projects: boolean
   tasks: boolean
-  forms: boolean
+  attendance: boolean
   leave: boolean
+  
+  // === TIME TRACKING FEATURES ===
+  time_tracking: boolean
+  timesheets: boolean
+  time_reports: boolean
+  
+  // === CORE PLATFORM FEATURES ===
+  dashboard: boolean
+  maps: boolean
+  forms: boolean
   outlets: boolean
-  security: boolean
   settings: boolean
   analytics: boolean
   reports: boolean
   automation: boolean
   integrations: boolean
-  mobile_security: boolean
 }
 
 const featureDescriptions = {
-  dashboard: 'Main dashboard access',
-  time_tracking: 'Time tracking and timesheets',
-  attendance: 'Clock in/out and attendance tracking',
-  maps: 'Daily visits and location-based features',
-  teams: 'Team management and organization',
-  projects: 'Project management tools',
-  tasks: 'Task assignment and tracking',
-  forms: 'Custom forms and data collection',
-  leave: 'Leave requests and management',
-  outlets: 'Outlet/location management',
-  security: 'Security guard patrol system with QR checkpoints',
-  settings: 'Settings and configuration access',
-  analytics: 'Analytics and insights',
-  reports: 'Reporting tools',
-  automation: 'Automated workflows',
-  integrations: 'Third-party integrations',
-  mobile_security: 'Enable security features in mobile app for security guards'
+  // === MOBILE APP PRODUCT TOGGLES ===
+  mobile_guard_product: 'Enable the complete Guard Management mobile application experience for security guards',
+  mobile_workforce_product: 'Enable the complete Workforce Management mobile application experience for employees',
+  mobile_time_product: 'Enable the complete Time Tracking mobile application experience for time logging',
+  
+  // === GUARD MANAGEMENT FEATURES ===
+  guard_management: 'Complete security guard management system',
+  mobile_security: 'Mobile security guard patrol features and QR scanning',
+  security_dashboard: 'Web dashboard for security management and monitoring',
+  incident_reporting: 'Security incident reporting and management',
+  patrol_management: 'Guard patrol route planning and management',
+  qr_checkpoints: 'QR code checkpoint system for patrols',
+  guard_performance: 'Guard KPI tracking and performance analytics',
+  
+  // === WORKFORCE MANAGEMENT FEATURES ===
+  workforce_management: 'Complete workforce management system',
+  teams: 'Team management and organization structure',
+  projects: 'Project management tools and assignment',
+  tasks: 'Task assignment and progress tracking',
+  attendance: 'Employee attendance and clock in/out tracking',
+  leave: 'Leave requests and approval management',
+  
+  // === TIME TRACKING FEATURES ===
+  time_tracking: 'Employee time tracking and logging',
+  timesheets: 'Digital timesheets and time entry management',
+  time_reports: 'Time tracking reports and analytics',
+  
+  // === CORE PLATFORM FEATURES ===
+  dashboard: 'Main unified dashboard access',
+  maps: 'Location-based features and daily visits tracking',
+  forms: 'Custom forms and data collection tools',
+  outlets: 'Outlet/location management for field operations',
+  settings: 'System settings and configuration access',
+  analytics: 'Advanced analytics and business insights',
+  reports: 'Comprehensive reporting across all systems',
+  automation: 'Automated workflows and business processes',
+  integrations: 'Third-party system integrations and APIs'
 }
 
 export default function FeaturesPage() {
@@ -89,23 +130,43 @@ export default function FeaturesPage() {
 
       setOrganization(org)
       setFeatureFlags(org.feature_flags || {
-        dashboard: true,
-        time_tracking: true,
-        attendance: true,
-        maps: true,
+        // === MOBILE APP PRODUCT TOGGLES (Master Controls) ===
+        mobile_guard_product: true,       // Controls entire Guard mobile experience
+        mobile_workforce_product: true,   // Controls entire Workforce mobile experience
+        mobile_time_product: true,        // Controls entire Time mobile experience
+        
+        // === GUARD MANAGEMENT FEATURES ===
+        guard_management: true,
+        mobile_security: true,
+        security_dashboard: true,
+        incident_reporting: true,
+        patrol_management: true,
+        qr_checkpoints: true,
+        guard_performance: true,
+        
+        // === WORKFORCE MANAGEMENT FEATURES ===
+        workforce_management: true,
         teams: true,
         projects: true,
         tasks: true,
-        forms: true,
+        attendance: true,
         leave: true,
+        
+        // === TIME TRACKING FEATURES ===
+        time_tracking: true,
+        timesheets: true,
+        time_reports: true,
+        
+        // === CORE PLATFORM FEATURES ===
+        dashboard: true,
+        maps: true,
+        forms: true,
         outlets: true,
-        security: true,
         settings: true,
         analytics: true,
         reports: true,
         automation: true,
-        integrations: true,
-        mobile_security: true
+        integrations: true
       })
     } catch (error) {
       console.error('Error fetching organization features:', error)
@@ -225,127 +286,321 @@ export default function FeaturesPage() {
         </p>
       </div>
 
-      {/* Security Management Section */}
-      <Card className="border-amber-200 bg-amber-50/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-amber-600" />
-            Security Management
-          </CardTitle>
-          <CardDescription>
-            Control access to security guard patrol features including QR code scanning, route management, and real-time tracking.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-4 px-4 bg-white rounded-lg border border-amber-200">
-              <div className="flex-1">
-                <Label htmlFor="security" className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-amber-600" />
-                  Security Guard Patrols (Web)
-                </Label>
-                <p className="text-sm text-gray-600 mt-1">
-                  Enable security guard patrol system management in the web dashboard
+      <div className="space-y-6">
+        {/* Mobile App Master Controls */}
+        <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Smartphone className="h-6 w-6 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Mobile App Control Center</h3>
+                <p className="text-sm text-indigo-700 font-medium">Master toggles for entire mobile application sections</p>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              Control access to complete mobile application experiences. These are the main switches that enable or disable entire product sections in the mobile app for your remote workforce.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              {/* Guard Product Toggle */}
+              <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Shield className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">Guard Management</h4>
+                      <p className="text-xs text-amber-700">Security Guards & Patrols</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={featureFlags?.mobile_guard_product || false}
+                    onCheckedChange={(checked) => updateFeatureFlag('mobile_guard_product', checked)}
+                    className="ml-2"
+                  />
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {featureDescriptions.mobile_guard_product}
                 </p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                  <span>• Route Planning & Management</span>
-                  <span>• QR Code Generation</span>
-                  <span>• Guard Assignment</span>
+                <div className="mt-3 text-xs text-amber-700">
+                  <strong>Includes:</strong> QR Scanning, Patrols, Incident Reporting, Check-ins
                 </div>
               </div>
-              <Switch
-                id="security"
-                checked={featureFlags?.security || false}
-                onCheckedChange={(checked) => updateFeatureFlag('security', checked)}
-                className="ml-4"
-              />
-            </div>
 
-            <div className="flex items-center justify-between py-4 px-4 bg-white rounded-lg border border-amber-200">
-              <div className="flex-1">
-                <Label htmlFor="mobile_security" className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-amber-600" />
-                  Mobile Security Features
-                </Label>
-                <p className="text-sm text-gray-600 mt-1">
-                  Enable security patrol features in the mobile app for guards
+              {/* Workforce Product Toggle */}
+              <div className="p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">Workforce Management</h4>
+                      <p className="text-xs text-blue-700">Teams & Remote Work</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={featureFlags?.mobile_workforce_product || false}
+                    onCheckedChange={(checked) => updateFeatureFlag('mobile_workforce_product', checked)}
+                    className="ml-2"
+                  />
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {featureDescriptions.mobile_workforce_product}
                 </p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                  <span>• QR Code Checkpoint Scanning</span>
-                  <span>• Real-time Location Tracking</span>
-                  <span>• Incident Reporting</span>
-                  <span>• Patrol Dashboard</span>
+                <div className="mt-3 text-xs text-blue-700">
+                  <strong>Includes:</strong> Teams, Projects, Tasks, Attendance, Leave Management
                 </div>
               </div>
-              <Switch
-                id="mobile_security"
-                checked={featureFlags?.mobile_security || false}
-                onCheckedChange={(checked) => updateFeatureFlag('mobile_security', checked)}
-                className="ml-4"
-              />
-            </div>
-          </div>
-          
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-start gap-2">
-              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-blue-900">Security Feature Requirements</p>
-                <ul className="text-blue-700 mt-1 space-y-1">
-                  <li>• Requires Admin or Manager role to configure</li>
-                  <li>• Set user work type to "Security Guard" for mobile access</li>
-                  <li>• Enable location permissions on mobile devices</li>
-                  <li>• Print and deploy QR codes at patrol checkpoints</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Core App Features Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Core App Features</CardTitle>
-          <CardDescription>
-            Essential features that control the main functionality of your workforce management system.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {featureFlags && Object.entries(featureFlags)
-              .filter(([feature]) => !['security', 'mobile_security'].includes(feature))
-              .map(([feature, enabled]) => (
-              <div key={feature} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <Label htmlFor={feature} className="text-sm font-medium text-gray-900 capitalize">
-                    {feature.replace(/_/g, ' ')}
-                  </Label>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {featureDescriptions[feature as keyof typeof featureDescriptions]}
-                  </p>
+              {/* Time Product Toggle */}
+              <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Clock className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">Time Tracking</h4>
+                      <p className="text-xs text-green-700">Time & Productivity</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={featureFlags?.mobile_time_product || false}
+                    onCheckedChange={(checked) => updateFeatureFlag('mobile_time_product', checked)}
+                    className="ml-2"
+                  />
                 </div>
-                <Switch
-                  id={feature}
-                  checked={enabled}
-                  onCheckedChange={(checked) => updateFeatureFlag(feature as keyof FeatureFlags, checked)}
-                  className="ml-4"
-                />
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {featureDescriptions.mobile_time_product}
+                </p>
+                <div className="mt-3 text-xs text-green-700">
+                  <strong>Includes:</strong> Time Logging, Timesheets, Time Reports, Productivity
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div className="flex justify-end mt-6 pt-6 border-t border-gray-200">
-            <Button 
-              onClick={saveFeatureFlags}
-              disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+              <div className="flex items-start gap-3">
+                <Zap className="h-5 w-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-indigo-900 mb-2">Mobile App Master Controls</p>
+                  <ul className="text-indigo-800 space-y-1">
+                    <li>• <strong>Guard Management:</strong> Complete security guard mobile experience with QR scanning and patrols</li>
+                    <li>• <strong>Workforce Management:</strong> Full employee mobile experience for remote and hybrid workers</li>
+                    <li>• <strong>Time Tracking:</strong> Complete time management mobile experience for productivity tracking</li>
+                    <li>• Disabling a product removes the entire tab from the mobile app navigation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Guard Management Product */}
+        <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Shield className="h-6 w-6 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Guard Management</h3>
+                <p className="text-sm text-amber-700 font-medium">Security Guard Operations & Patrol System</p>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              Comprehensive security guard management including mobile patrols, QR checkpoints, incident reporting, and performance tracking.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {featureFlags && ['guard_management', 'mobile_security', 'security_dashboard', 'incident_reporting', 'patrol_management', 'qr_checkpoints', 'guard_performance'].map((feature) => (
+                <div key={feature} className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-amber-100 shadow-sm">
+                  <div className="flex-1">
+                    <Label htmlFor={feature} className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-amber-600" />
+                      {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                      {featureDescriptions[feature as keyof typeof featureDescriptions]}
+                    </p>
+                  </div>
+                  <Switch
+                    id={feature}
+                    checked={featureFlags[feature as keyof FeatureFlags] || false}
+                    onCheckedChange={(checked) => updateFeatureFlag(feature as keyof FeatureFlags, checked)}
+                    className="ml-4"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-900 mb-2">Guard Management Requirements</p>
+                  <ul className="text-amber-800 space-y-1">
+                    <li>• Set user work type to "Security Guard" for mobile app access</li>
+                    <li>• Deploy QR codes at patrol checkpoints for scanning</li>
+                    <li>• Enable location permissions on mobile devices</li>
+                    <li>• Configure patrol routes and guard assignments</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Workforce Management Product */}
+        <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Workforce Management</h3>
+                <p className="text-sm text-blue-700 font-medium">Employee Management & Team Operations</p>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              Complete workforce management system including team organization, project management, task assignment, and attendance tracking.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {featureFlags && ['workforce_management', 'teams', 'projects', 'tasks', 'attendance', 'leave'].map((feature) => (
+                <div key={feature} className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-blue-100 shadow-sm">
+                  <div className="flex-1">
+                    <Label htmlFor={feature} className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                      {featureDescriptions[feature as keyof typeof featureDescriptions]}
+                    </p>
+                  </div>
+                  <Switch
+                    id={feature}
+                    checked={featureFlags[feature as keyof FeatureFlags] || false}
+                    onCheckedChange={(checked) => updateFeatureFlag(feature as keyof FeatureFlags, checked)}
+                    className="ml-4"
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Time Tracking Product */}
+        <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Clock className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Time Tracking</h3>
+                <p className="text-sm text-green-700 font-medium">Employee Time Management & Reporting</p>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              Advanced time tracking system with digital timesheets, detailed reporting, and comprehensive time analytics.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {featureFlags && ['time_tracking', 'timesheets', 'time_reports'].map((feature) => (
+                <div key={feature} className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-green-100 shadow-sm">
+                  <div className="flex-1">
+                    <Label htmlFor={feature} className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-green-600" />
+                      {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                      {featureDescriptions[feature as keyof typeof featureDescriptions]}
+                    </p>
+                  </div>
+                  <Switch
+                    id={feature}
+                    checked={featureFlags[feature as keyof FeatureFlags] || false}
+                    onCheckedChange={(checked) => updateFeatureFlag(feature as keyof FeatureFlags, checked)}
+                    className="ml-4"
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Core Platform Features */}
+        <Card className="border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <Settings className="h-6 w-6 text-gray-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Core Platform Features</h3>
+                <p className="text-sm text-gray-700 font-medium">Essential System Components & Tools</p>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              Core platform functionality including dashboard, analytics, reporting, forms, maps, and system integrations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {featureFlags && ['dashboard', 'maps', 'forms', 'outlets', 'settings', 'analytics', 'reports', 'automation', 'integrations'].map((feature) => (
+                <div key={feature} className="flex items-center justify-between py-3 px-4 bg-white rounded-lg border border-gray-100 shadow-sm">
+                  <div className="flex-1">
+                    <Label htmlFor={feature} className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-gray-600" />
+                      {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                      {featureDescriptions[feature as keyof typeof featureDescriptions]}
+                    </p>
+                  </div>
+                  <Switch
+                    id={feature}
+                    checked={featureFlags[feature as keyof FeatureFlags] || false}
+                    onCheckedChange={(checked) => updateFeatureFlag(feature as keyof FeatureFlags, checked)}
+                    className="ml-4"
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Save Changes Button */}
+        <div className="flex justify-end pt-6">
+          <Button 
+            onClick={saveFeatureFlags}
+            disabled={saving}
+            size="lg"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            {saving ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                Saving Changes...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Save Feature Settings
+              </div>
+            )}
+          </Button>
+        </div>
+      </div>
 
       <Card className="mt-6">
         <CardHeader>

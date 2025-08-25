@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useFeatureFlags } from '@/components/feature-flags-provider'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { devLog } from '@/lib/utils/logger'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -1164,12 +1166,37 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          {activeTab === 'features' && organization && (
-            <FeatureManagement 
-              organization={organization} 
-              onUpdateFlags={updateFeatureFlags} 
-              saving={saving} 
-            />
+          {activeTab === 'features' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Smartphone className="h-5 w-5 mr-2" />
+                  Enhanced Feature Management
+                </CardTitle>
+                <CardDescription>
+                  Access the new enhanced feature management system with master mobile product toggles.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <div className="mb-4">
+                    <Smartphone className="h-16 w-16 text-blue-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Enhanced Feature Management Available
+                    </h3>
+                    <p className="text-gray-600 max-w-md mx-auto">
+                      The new feature management system includes master mobile app product toggles 
+                      for Guard Management, Workforce Management, and Time Tracking.
+                    </p>
+                  </div>
+                  <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700">
+                    <Link href="/dashboard/settings/features">
+                      Open Enhanced Feature Management
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
