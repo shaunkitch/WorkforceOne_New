@@ -89,19 +89,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform sites data to QR codes format
-    const qrCodes = (sites || []).flatMap(site => 
-      (site.qr_codes || []).map((qr: any) => ({
-        id: qr.id,
-        location_name: site.name,
-        description: site.address,
-        shift_type: 'both', // Default since schema doesn't have this field
-        qr_code_data: qr.code,
-        qr_code_image: `data:image/png;base64,${await generateQRCodeImage(qr.code)}`,
-        expires_at: qr.valid_until,
-        is_active: qr.is_active,
-        created_at: qr.created_at,
-        site: site
-      }))
+    const qrCodes = await Promise.all(
+      (sites || []).flatMap(site => 
+        (site.qr_codes || []).map(async (qr: any) => ({
+          id: qr.id,
+          location_name: site.name,
+          description: site.address,
+          shift_type: 'both', // Default since schema doesn't have this field
+          qr_code_data: qr.code,
+          qr_code_image: `data:image/png;base64,${await generateQRCodeImage(qr.code)}`,
+          expires_at: qr.valid_until,
+          is_active: qr.is_active,
+          created_at: qr.created_at,
+          site: site
+        }))
+      )
     )
 
 
