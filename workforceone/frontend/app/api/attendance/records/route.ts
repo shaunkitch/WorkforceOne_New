@@ -89,7 +89,32 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to match expected format
-    const transformedRecords = (records || []).reduce((acc: any[], record: any) => {
+    const transformedRecords = (records || []).reduce((acc: Array<{
+      id: string;
+      user_id: string;
+      date: string;
+      check_in_time?: string | null;
+      check_out_time?: string | null;
+      work_hours?: number | null;
+      status: string;
+      latitude?: number;
+      longitude?: number;
+      location_accuracy?: number;
+      qr_code_id?: string;
+      created_at: string;
+      users: {id: string, first_name: string, last_name: string, organization_id: string};
+    }>, record: {
+      id: string;
+      user_id: string;
+      timestamp: string;
+      shift_type: string;
+      latitude?: number;
+      longitude?: number;
+      accuracy?: number;
+      qr_code_id?: string;
+      created_at: string;
+      users: {id: string, first_name: string, last_name: string, organization_id: string};
+    }) => {
       const date = record.timestamp.split('T')[0]
       const existingRecord = acc.find(r => r.user_id === record.user_id && r.date === date)
       
@@ -189,10 +214,8 @@ export async function POST(request: NextRequest) {
       user_id, 
       date, 
       check_in_time, 
-      check_out_time, 
-      status, 
-      notes,
-      location 
+      check_out_time
+      // status, notes not used in current implementation
     } = body
 
     // Validate required fields
@@ -209,15 +232,6 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Insufficient permissions' },
         { status: 403 }
       )
-    }
-
-    // Calculate work hours if both check-in and check-out times are provided
-    let workHours = null
-    if (check_in_time && check_out_time) {
-      const checkIn = new Date(check_in_time)
-      const checkOut = new Date(check_out_time)
-      const diffMs = checkOut.getTime() - checkIn.getTime()
-      workHours = diffMs / (1000 * 60 * 60) // Convert to hours
     }
 
     // For shift_attendance table, we need to handle check_in and check_out separately

@@ -25,7 +25,7 @@ async function generateQRCodeImage(code: string): Promise<string> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = await cookies()
     const supabase = createServerClient(
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     // Transform sites data to QR codes format
     const qrCodes = await Promise.all(
       (sites || []).flatMap(site => 
-        (site.qr_codes || []).map(async (qr: any) => ({
+        (site.qr_codes || []).map(async (qr: {id: string, code: string, valid_until?: string, is_active: boolean, created_at: string}) => ({
           id: qr.id,
           location_name: site.name,
           description: site.address,
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }
     
-    const qrCodeString = JSON.stringify(qrData)
+    // const qrCodeString = JSON.stringify(qrData) // Not used currently
     const uniqueCode = `${site.id}_${Date.now()}`
     
     // Create QR code record
